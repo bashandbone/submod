@@ -1,0 +1,15 @@
+[defaults]
+ignore = "dirty"
+
+
+[vendor-utils]
+folder = "vendor/utils"
+url = "https://github.com/example/utils.git"
+sparse_paths = ["src/", "include/", "*.md"]
+ignore = "all" # override default ignore setting
+
+[my-submodule]
+folder = "my-submodule"
+url = "https://github.com/example/my-submodule.git"
+sparse_paths = ["src/", "include/"]
+ignore = "all" 

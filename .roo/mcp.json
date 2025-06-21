@@ -1,0 +1,41 @@
+{
+  "mcpServers": {
+    "context7": {
+      "alwaysAllow": [
+        "resolve-library-id",
+        "get-library-docs"
+      ],
+      "args": [
+        "--bun",
+        "@upstash/context7-mcp@latest"
+      ],
+      "command": "bunx",
+      "type": "stdio"
+    },
+    "fetch": {
+      "args": [
+        "mcp-server-fetch"
+      ],
+      "command": "uvx"
+    },
+    "sequential-thinking": {
+      "alwaysAllow": [
+        "sequentialthinking"
+      ],
+      "args": [
+        "--bun",
+        "@modelcontextprotocol/server-sequential-thinking"
+      ],
+      "command": "bunx",
+      "type": "stdio"
+    },
+    "filesystem": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-filesystem",
+        "~/submod"
+      ]
+    }
+  }
+}
