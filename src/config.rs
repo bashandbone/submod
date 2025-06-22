@@ -1,3 +1,25 @@
+#![doc = r#"
+Configuration types and utilities for submod.
+
+Defines serializable wrappers for git submodule options, project-level defaults, and submodule
+configuration management. Supports loading and saving configuration in TOML format.
+
+Main Types:
+- SerializableIgnore, SerializableFetchRecurse, SerializableBranch, SerializableUpdate: Wrappers for git submodule config enums, supporting (de)serialization.
+- SubmoduleGitOptions: Git-specific options for a submodule.
+- SubmoduleDefaults: Project-level default submodule options.
+- SubmoduleConfig: Configuration for a single submodule.
+- Config: Main configuration structure, containing defaults and all submodules.
+
+Features:
+- Load and save configuration from/to TOML files.
+- Serialize/deserialize submodule options for config files.
+- Manage submodule entries and defaults programmatically.
+
+TODO:
+- Add validation for config values when loading from file.
+"#]
+
 use anyhow::{Context, Result};
 use bstr::BStr;
 use gix_submodule::config::{Branch, FetchRecurse, Ignore, Update};
@@ -6,9 +28,7 @@ use std::fs;
 use std::{collections::HashMap, path::Path};
 use toml_edit::{Array, DocumentMut, Item, Table, value};
 
-/**========================================================================
- **                  Wrappers for Gix Submodule Config
- *========================================================================**/
+
 /// Serializable wrapper for [`Ignore`] config
 #[derive(Debug, Default, Clone, Copy, Ord, PartialOrd, Eq, PartialEq, Hash)]
 pub struct SerializableIgnore(pub Ignore);
@@ -221,7 +241,6 @@ impl From<SerializableUpdate> for Update {
 }
 
 /// Git options for a submodule
-/// Git-specific options for submodule configuration
 #[derive(Debug, Default, Clone, Ord, PartialOrd, Eq, PartialEq, Hash, Serialize, Deserialize)]
 pub struct SubmoduleGitOptions {
     /// How to handle dirty files when updating submodules

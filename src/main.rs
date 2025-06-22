@@ -1,7 +1,21 @@
-//! Submod - Git submodule manager with sparse checkout support
-//!
-//! A CLI tool for managing Git submodules with advanced features like sparse checkout
-//! support using the gitoxide library for high performance operations.
+#![doc = r#"
+Main entry point for the submod CLI tool.
+
+Parses command-line arguments and dispatches submodule management commands using the
+[`GitoxideSubmoduleManager`]. Supports adding, checking, initializing, updating, resetting,
+and syncing submodules with advanced features like sparse checkout.
+
+# Commands
+
+- `add`: Add a new submodule with optional sparse paths.
+- `check`: Check the status of all configured submodules.
+- `init`: Initialize all submodules from config.
+- `update`: Update all submodules.
+- `reset`: Reset specified or all submodules.
+- `sync`: Run check, init, and update in sequence.
+
+Exits with an error if any operation fails.
+"#]
 
 mod commands;
 mod config;
@@ -11,8 +25,6 @@ use crate::commands::{Cli, Commands};
 use crate::gitoxide_manager::GitoxideSubmoduleManager;
 use anyhow::Result;
 use clap::Parser;
-
-// Old SubmoduleManager removed - now using GitoxideSubmoduleManager
 
 fn main() -> Result<()> {
     let cli = Cli::parse();

@@ -1,7 +1,48 @@
-//! Gitoxide-maximized submodule manager
-//!
-//! This module implements the submodule manager with maximum use of gitoxide/gix APIs
-//! and strategic fallbacks only where necessary.
+#![doc = r#"
+# Gitoxide-Based Submodule Manager
+
+Provides core logic for managing git submodules using the [`gitoxide`](https://github.com/Byron/gitoxide) library, with fallbacks to `git2` and the Git CLI when needed. Supports advanced features like sparse checkout and TOML-based configuration.
+
+## Overview
+
+- Loads submodule configuration from a TOML file.
+- Adds, initializes, updates, resets, and checks submodules.
+- Uses `gitoxide` APIs where possible for performance and reliability.
+- Falls back to `git2` (if enabled) or the Git CLI for unsupported operations.
+- Supports sparse checkout configuration per submodule.
+
+## Key Types
+
+- [`SubmoduleError`](src/gitoxide_manager.rs:14): Error type for submodule operations.
+- [`SubmoduleStatus`](src/gitoxide_manager.rs:55): Reports the status of a submodule, including cleanliness, commit, remotes, and sparse checkout state.
+- [`SparseStatus`](src/gitoxide_manager.rs:77): Describes the sparse checkout configuration state.
+- [`GitoxideSubmoduleManager`](src/gitoxide_manager.rs:94): Main struct for submodule management.
+
+## Main Operations
+
+- [`GitoxideSubmoduleManager::add_submodule()`](src/gitoxide_manager.rs:207): Adds a new submodule, configuring sparse checkout if specified.
+- [`GitoxideSubmoduleManager::init_submodule()`](src/gitoxide_manager.rs:643): Initializes a submodule, adding it if missing.
+- [`GitoxideSubmoduleManager::update_submodule()`](src/gitoxide_manager.rs:544): Updates a submodule using the Git CLI.
+- [`GitoxideSubmoduleManager::reset_submodule()`](src/gitoxide_manager.rs:574): Resets a submodule (stash, hard reset, clean).
+- [`GitoxideSubmoduleManager::check_all_submodules()`](src/gitoxide_manager.rs:732): Checks the status of all configured submodules.
+
+## Sparse Checkout Support
+
+- Checks and configures sparse checkout for each submodule based on the TOML config.
+- Writes sparse-checkout patterns and applies them using the Git CLI.
+
+## Error Handling
+
+All operations return [`SubmoduleError`](src/gitoxide_manager.rs:14) for consistent error reporting.
+
+## TODOs
+
+- TODO: Implement submodule addition using gitoxide APIs when available ([`add_submodule_with_gix`](src/gitoxide_manager.rs:278)).
+
+## Usage
+
+Use this module as the backend for CLI commands to manage submodules in a repository. See the project [README](README.md) for usage examples and configuration details.
+"#]
 
 use crate::config::{Config, SubmoduleConfig, SubmoduleGitOptions};
 use gix::Repository;
@@ -38,11 +79,11 @@ pub enum SubmoduleError {
 
     /// Submodule not found in repository
     #[error("Submodule {name} not found")]
-    SubmoduleNotFound { name: String },
+    SubmoduleNotFound {
+        /// Name of the missing submodule.
+        name: String,
+    },
 
-    /// Sparse checkout configuration error
-    #[error("Invalid sparse checkout configuration: {reason}")]
-    SparseCheckoutError { reason: String },
 
     /// Repository access or validation error
     #[error("Repository not found or invalid")]
@@ -101,6 +142,16 @@ pub struct GitoxideSubmoduleManager {
 }
 
 impl GitoxideSubmoduleManager {
+    /// Creates a new `GitoxideSubmoduleManager` by loading configuration from the given path.
+    ///
+    /// # Arguments
+    ///
+    /// * `config_path` - Path to the TOML configuration file.
+    ///
+    /// # Errors
+    ///
+    /// Returns `SubmoduleError::RepositoryError` if the repository cannot be discovered,
+    /// or `SubmoduleError::ConfigError` if the configuration fails to load.
     pub fn new(config_path: PathBuf) -> Result<Self, SubmoduleError> {
         // Use gix::discover for repository detection
         let repo = gix::discover(".").map_err(|_| SubmoduleError::RepositoryError)?;

@@ -1,7 +1,19 @@
-//! Submod - Git submodule manager with sparse checkout support using gitoxide
+//! Library entry point for submod, a Git submodule manager with sparse checkout support.
 //!
-//! This library exists only for testing purposes. We're a CLI tool, not a library.
-//! You're welcome to use it as a library, but we don't guarantee any API stability.
+//! This crate is primarily intended for CLI use. The library API is not stable and may change.
+//!
+//! # Modules
+//! - [`config`]: Submodule configuration management.
+//! - [`gitoxide_manager`]: Implementation of submodule operations using gitoxide.
+//!
+//! # Exports
+//! - Common types and managers for use in tests or advanced integrations.
+//!
+//! # Version
+//! - Exposes the current crate version as [`VERSION`].
+//!
+//! # Note
+//! The API is not guaranteed to be stable. Use at your own risk.
 
 /// Configuration management for submodules
 pub mod config;
