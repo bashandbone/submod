@@ -17,17 +17,22 @@ mod tests {
         let harness = TestHarness::new().expect("Failed to create test harness");
         harness.init_git_repo().expect("Failed to init git repo");
 
-        let remote_repo = harness.create_complex_remote("sparse_basic").expect("Failed to create remote");
+        let remote_repo = harness
+            .create_complex_remote("sparse_basic")
+            .expect("Failed to create remote");
         let remote_url = format!("file://{}", remote_repo.display());
 
         // Add submodule with basic sparse paths
-        harness.run_submod_success(&[
-            "add",
-            "sparse-basic",
-            "lib/sparse-basic",
-            &remote_url,
-            "--sparse-paths", "src,docs",
-        ]).expect("Failed to add submodule");
+        harness
+            .run_submod_success(&[
+                "add",
+                "sparse-basic",
+                "lib/sparse-basic",
+                &remote_url,
+                "--sparse-paths",
+                "src,docs",
+            ])
+            .expect("Failed to add submodule");
 
         // Verify sparse-checkout file exists and has correct content
         let sparse_file = harness.get_sparse_checkout_file_path("lib/sparse-basic");
@@ -60,17 +65,22 @@ mod tests {
         let harness = TestHarness::new().expect("Failed to create test harness");
         harness.init_git_repo().expect("Failed to init git repo");
 
-        let remote_repo = harness.create_complex_remote("sparse_patterns").expect("Failed to create remote");
+        let remote_repo = harness
+            .create_complex_remote("sparse_patterns")
+            .expect("Failed to create remote");
         let remote_url = format!("file://{}", remote_repo.display());
 
         // Add submodule with pattern-based sparse paths
-        harness.run_submod_success(&[
-            "add",
-            "sparse-patterns",
-            "lib/sparse-patterns",
-            &remote_url,
-            "--sparse-paths", "src/,*.md,Cargo.toml",
-        ]).expect("Failed to add submodule");
+        harness
+            .run_submod_success(&[
+                "add",
+                "sparse-patterns",
+                "lib/sparse-patterns",
+                &remote_url,
+                "--sparse-paths",
+                "src/,*.md,Cargo.toml",
+            ])
+            .expect("Failed to add submodule");
 
         let sparse_file = harness.get_sparse_checkout_file_path("lib/sparse-patterns");
         let sparse_content = fs::read_to_string(&sparse_file).expect("Failed to read sparse file");
@@ -90,24 +100,31 @@ mod tests {
         let harness = TestHarness::new().expect("Failed to create test harness");
         harness.init_git_repo().expect("Failed to init git repo");
 
-        let remote_repo = harness.create_complex_remote("sparse_mismatch").expect("Failed to create remote");
+        let remote_repo = harness
+            .create_complex_remote("sparse_mismatch")
+            .expect("Failed to create remote");
         let remote_url = format!("file://{}", remote_repo.display());
 
         // Add submodule with specific sparse paths
-        harness.run_submod_success(&[
-            "add",
-            "sparse-mismatch",
-            "lib/sparse-mismatch",
-            &remote_url,
-            "--sparse-paths", "src,docs",
-        ]).expect("Failed to add submodule");
+        harness
+            .run_submod_success(&[
+                "add",
+                "sparse-mismatch",
+                "lib/sparse-mismatch",
+                &remote_url,
+                "--sparse-paths",
+                "src,docs",
+            ])
+            .expect("Failed to add submodule");
 
         // Manually modify sparse-checkout file to create mismatch
         let sparse_file = harness.get_sparse_checkout_file_path("lib/sparse-mismatch");
         fs::write(&sparse_file, "tests\nexamples\n").expect("Failed to modify sparse file");
 
         // Run check command to detect mismatch
-        let stdout = harness.run_submod_success(&["check"]).expect("Failed to run check");
+        let stdout = harness
+            .run_submod_success(&["check"])
+            .expect("Failed to run check");
 
         assert!(stdout.contains("Sparse checkout mismatch"));
         assert!(stdout.contains("Expected:"));
@@ -119,28 +136,28 @@ mod tests {
         let harness = TestHarness::new().expect("Failed to create test harness");
         harness.init_git_repo().expect("Failed to init git repo");
 
-        let remote_repo = harness.create_complex_remote("sparse_disabled").expect("Failed to create remote");
+        let remote_repo = harness
+            .create_complex_remote("sparse_disabled")
+            .expect("Failed to create remote");
         let remote_url = format!("file://{}", remote_repo.display());
 
         // Add submodule normally first
-        harness.run_submod_success(&[
-            "add",
-            "sparse-disabled",
-            "lib/sparse-disabled",
-            &remote_url,
-        ]).expect("Failed to add submodule");
+        harness
+            .run_submod_success(&["add", "sparse-disabled", "lib/sparse-disabled", &remote_url])
+            .expect("Failed to add submodule");
 
         // Update config to include sparse paths
         let config_content = format!(
             r#"[sparse-disabled]
 path = "lib/sparse-disabled"
-url = "{}"
+url = "{remote_url}"
 active = true
 sparse_paths = ["src", "docs"]
-"#,
-            remote_url
+"#
         );
-        harness.create_config(&config_content).expect("Failed to create config");
+        harness
+            .create_config(&config_content)
+            .expect("Failed to create config");
 
         // Remove sparse-checkout file to simulate it not being configured
         let sparse_file = harness.get_sparse_checkout_file_path("lib/sparse-disabled");
@@ -149,7 +166,9 @@ sparse_paths = ["src", "docs"]
         }
 
         // Run check to detect missing sparse configuration
-        let stdout = harness.run_submod_success(&["check"]).expect("Failed to run check");
+        let stdout = harness
+            .run_submod_success(&["check"])
+            .expect("Failed to run check");
         assert!(stdout.contains("Sparse checkout not configured"));
     }
 
@@ -158,17 +177,22 @@ sparse_paths = ["src", "docs"]
         let harness = TestHarness::new().expect("Failed to create test harness");
         harness.init_git_repo().expect("Failed to init git repo");
 
-        let remote_repo = harness.create_complex_remote("sparse_complex").expect("Failed to create remote");
+        let remote_repo = harness
+            .create_complex_remote("sparse_complex")
+            .expect("Failed to create remote");
         let remote_url = format!("file://{}", remote_repo.display());
 
         // Test complex patterns including negation
-        harness.run_submod_success(&[
-            "add",
-            "sparse-complex",
-            "lib/sparse-complex",
-            &remote_url,
-            "--sparse-paths", "src/,docs/,*.md,!tests/,!examples/",
-        ]).expect("Failed to add submodule");
+        harness
+            .run_submod_success(&[
+                "add",
+                "sparse-complex",
+                "lib/sparse-complex",
+                &remote_url,
+                "--sparse-paths",
+                "src/,docs/,*.md,!tests/,!examples/",
+            ])
+            .expect("Failed to add submodule");
 
         let sparse_file = harness.get_sparse_checkout_file_path("lib/sparse-complex");
         let sparse_content = fs::read_to_string(&sparse_file).expect("Failed to read sparse file");
@@ -185,23 +209,28 @@ sparse_paths = ["src", "docs"]
         let harness = TestHarness::new().expect("Failed to create test harness");
         harness.init_git_repo().expect("Failed to init git repo");
 
-        let remote_repo = harness.create_complex_remote("sparse_init").expect("Failed to create remote");
+        let remote_repo = harness
+            .create_complex_remote("sparse_init")
+            .expect("Failed to create remote");
         let remote_url = format!("file://{}", remote_repo.display());
 
         // Create config with sparse paths but don't initialize yet
         let config_content = format!(
             r#"[sparse-init]
 path = "lib/sparse-init"
-url = "{}"
+url = "{remote_url}"
 active = true
 sparse_paths = ["src", "docs", "*.md"]
-"#,
-            remote_url
+"#
         );
-        harness.create_config(&config_content).expect("Failed to create config");
+        harness
+            .create_config(&config_content)
+            .expect("Failed to create config");
 
         // Run init command
-        harness.run_submod_success(&["init"]).expect("Failed to run init");
+        harness
+            .run_submod_success(&["init"])
+            .expect("Failed to run init");
 
         // Verify sparse checkout was configured during init
         let sparse_file = harness.get_sparse_checkout_file_path("lib/sparse-init");
@@ -223,28 +252,32 @@ sparse_paths = ["src", "docs", "*.md"]
         let harness = TestHarness::new().expect("Failed to create test harness");
         harness.init_git_repo().expect("Failed to init git repo");
 
-        let remote_repo = harness.create_complex_remote("sparse_status").expect("Failed to create remote");
+        let remote_repo = harness
+            .create_complex_remote("sparse_status")
+            .expect("Failed to create remote");
         let remote_url = format!("file://{}", remote_repo.display());
 
         // Add submodule without sparse checkout
-        harness.run_submod_success(&[
-            "add",
-            "no-sparse",
-            "lib/no-sparse",
-            &remote_url,
-        ]).expect("Failed to add submodule");
+        harness
+            .run_submod_success(&["add", "no-sparse", "lib/no-sparse", &remote_url])
+            .expect("Failed to add submodule");
 
         // Add submodule with sparse checkout
-        harness.run_submod_success(&[
-            "add",
-            "with-sparse",
-            "lib/with-sparse",
-            &remote_url,
-            "--sparse-paths", "src,docs",
-        ]).expect("Failed to add submodule");
+        harness
+            .run_submod_success(&[
+                "add",
+                "with-sparse",
+                "lib/with-sparse",
+                &remote_url,
+                "--sparse-paths",
+                "src,docs",
+            ])
+            .expect("Failed to add submodule");
 
         // Run check to see status reporting
-        let stdout = harness.run_submod_success(&["check"]).expect("Failed to run check");
+        let stdout = harness
+            .run_submod_success(&["check"])
+            .expect("Failed to run check");
 
         // Should show different status for each submodule
         assert!(stdout.contains("no-sparse"));
@@ -257,7 +290,9 @@ sparse_paths = ["src", "docs", "*.md"]
         let harness = TestHarness::new().expect("Failed to create test harness");
         harness.init_git_repo().expect("Failed to init git repo");
 
-        let remote_repo = harness.create_test_remote("sparse_empty").expect("Failed to create remote");
+        let remote_repo = harness
+            .create_test_remote("sparse_empty")
+            .expect("Failed to create remote");
         let remote_url = format!("file://{}", remote_repo.display());
 
         // Try to add with empty sparse paths - should handle gracefully
@@ -266,21 +301,22 @@ sparse_paths = ["src", "docs", "*.md"]
             "sparse-empty",
             "lib/sparse-empty",
             &remote_url,
-            "--sparse-paths", "",
+            "--sparse-paths",
+            "",
         ]);
 
         // Should either succeed without sparse checkout or provide clear error
-        match output {
-            Ok(process_output) => {
-                if process_output.status.success() {
-                    // If successful, sparse checkout should not be enabled
-                    let sparse_file = harness.get_sparse_checkout_file_path("lib/sparse-empty");
-                    assert!(!sparse_file.exists() || fs::read_to_string(&sparse_file).unwrap().trim().is_empty());
-                }
+        if let Ok(process_output) = output {
+            if process_output.status.success() {
+                // If successful, sparse checkout should not be enabled
+                let sparse_file = harness.get_sparse_checkout_file_path("lib/sparse-empty");
+                assert!(
+                    !sparse_file.exists()
+                        || fs::read_to_string(&sparse_file).unwrap().trim().is_empty()
+                );
             }
-            Err(_) => {
-                // If it fails, that's also acceptable for empty patterns
-            }
+        } else {
+            // If it fails, that's also acceptable for empty patterns
         }
     }
 
@@ -289,23 +325,28 @@ sparse_paths = ["src", "docs", "*.md"]
         let harness = TestHarness::new().expect("Failed to create test harness");
         harness.init_git_repo().expect("Failed to init git repo");
 
-        let remote_repo = harness.create_complex_remote("sparse_sync").expect("Failed to create remote");
+        let remote_repo = harness
+            .create_complex_remote("sparse_sync")
+            .expect("Failed to create remote");
         let remote_url = format!("file://{}", remote_repo.display());
 
         // Create config with sparse paths
         let config_content = format!(
             r#"[sparse-sync]
 path = "lib/sparse-sync"
-url = "{}"
+url = "{remote_url}"
 active = true
 sparse_paths = ["src", "docs", "README.md"]
-"#,
-            remote_url
+"#
         );
-        harness.create_config(&config_content).expect("Failed to create config");
+        harness
+            .create_config(&config_content)
+            .expect("Failed to create config");
 
         // Run sync command
-        harness.run_submod_success(&["sync"]).expect("Failed to run sync");
+        harness
+            .run_submod_success(&["sync"])
+            .expect("Failed to run sync");
 
         // Verify sparse checkout was configured during sync
         let sparse_file = harness.get_sparse_checkout_file_path("lib/sparse-sync");

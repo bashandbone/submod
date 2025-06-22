@@ -18,7 +18,9 @@ mod tests {
         harness.init_git_repo().expect("Failed to init git repo");
 
         // Run check command without config file
-        let output = harness.run_submod(&["check"]).expect("Failed to run submod");
+        let output = harness
+            .run_submod(&["check"])
+            .expect("Failed to run submod");
 
         // Should succeed but show no submodules
         assert!(output.status.success());
@@ -30,9 +32,13 @@ mod tests {
     fn test_check_command_with_empty_config() {
         let harness = TestHarness::new().expect("Failed to create test harness");
         harness.init_git_repo().expect("Failed to init git repo");
-        harness.create_config("# Empty config\n").expect("Failed to create config");
+        harness
+            .create_config("# Empty config\n")
+            .expect("Failed to create config");
 
-        let output = harness.run_submod(&["check"]).expect("Failed to run submod");
+        let output = harness
+            .run_submod(&["check"])
+            .expect("Failed to run submod");
 
         assert!(output.status.success());
         let stdout = String::from_utf8_lossy(&output.stdout);
@@ -44,16 +50,15 @@ mod tests {
         let harness = TestHarness::new().expect("Failed to create test harness");
         harness.init_git_repo().expect("Failed to init git repo");
 
-        let remote_repo = harness.create_test_remote("test_lib").expect("Failed to create remote");
+        let remote_repo = harness
+            .create_test_remote("test_lib")
+            .expect("Failed to create remote");
         let remote_url = format!("file://{}", remote_repo.display());
 
         // Add a submodule
-        let stdout = harness.run_submod_success(&[
-            "add",
-            "test-lib",
-            "lib/test",
-            &remote_url,
-        ]).expect("Failed to add submodule");
+        let stdout = harness
+            .run_submod_success(&["add", "test-lib", "lib/test", &remote_url])
+            .expect("Failed to add submodule");
 
         assert!(stdout.contains("Added submodule"));
 
@@ -61,7 +66,7 @@ mod tests {
         let config = harness.read_config().expect("Failed to read config");
         assert!(config.contains("[test-lib]"));
         assert!(config.contains("path = \"lib/test\""));
-        assert!(config.contains(&format!("url = \"{}\"", remote_url)));
+        assert!(config.contains(&format!("url = \"{remote_url}\"")));
         assert!(config.contains("active = true"));
 
         // Verify directory structure was created
@@ -74,17 +79,22 @@ mod tests {
         let harness = TestHarness::new().expect("Failed to create test harness");
         harness.init_git_repo().expect("Failed to init git repo");
 
-        let remote_repo = harness.create_test_remote("sparse_lib").expect("Failed to create remote");
+        let remote_repo = harness
+            .create_test_remote("sparse_lib")
+            .expect("Failed to create remote");
         let remote_url = format!("file://{}", remote_repo.display());
 
         // Add submodule with sparse paths
-        let stdout = harness.run_submod_success(&[
-            "add",
-            "sparse-lib",
-            "lib/sparse",
-            &remote_url,
-            "--sparse-paths", "src,docs",
-        ]).expect("Failed to add submodule");
+        let stdout = harness
+            .run_submod_success(&[
+                "add",
+                "sparse-lib",
+                "lib/sparse",
+                &remote_url,
+                "--sparse-paths",
+                "src,docs",
+            ])
+            .expect("Failed to add submodule");
 
         assert!(stdout.contains("Added submodule"));
         assert!(stdout.contains("Configured sparse checkout"));
@@ -107,23 +117,28 @@ mod tests {
         let harness = TestHarness::new().expect("Failed to create test harness");
         harness.init_git_repo().expect("Failed to init git repo");
 
-        let remote_repo = harness.create_test_remote("init_lib").expect("Failed to create remote");
+        let remote_repo = harness
+            .create_test_remote("init_lib")
+            .expect("Failed to create remote");
         let remote_url = format!("file://{}", remote_repo.display());
 
         // Create config manually
         let config_content = format!(
             r#"[init-lib]
 path = "lib/init"
-url = "{}"
+url = "{remote_url}"
 active = true
 sparse_paths = ["src"]
-"#,
-            remote_url
+"#
         );
-        harness.create_config(&config_content).expect("Failed to create config");
+        harness
+            .create_config(&config_content)
+            .expect("Failed to create config");
 
         // Run init command
-        let stdout = harness.run_submod_success(&["init"]).expect("Failed to run init");
+        let stdout = harness
+            .run_submod_success(&["init"])
+            .expect("Failed to run init");
 
         assert!(stdout.contains("Initializing init-lib"));
         assert!(stdout.contains("initialized"));
@@ -142,19 +157,20 @@ sparse_paths = ["src"]
         let harness = TestHarness::new().expect("Failed to create test harness");
         harness.init_git_repo().expect("Failed to init git repo");
 
-        let remote_repo = harness.create_test_remote("update_lib").expect("Failed to create remote");
+        let remote_repo = harness
+            .create_test_remote("update_lib")
+            .expect("Failed to create remote");
         let remote_url = format!("file://{}", remote_repo.display());
 
         // Add and initialize submodule first
-        harness.run_submod_success(&[
-            "add",
-            "update-lib",
-            "lib/update",
-            &remote_url,
-        ]).expect("Failed to add submodule");
+        harness
+            .run_submod_success(&["add", "update-lib", "lib/update", &remote_url])
+            .expect("Failed to add submodule");
 
         // Run update command
-        let stdout = harness.run_submod_success(&["update"]).expect("Failed to run update");
+        let stdout = harness
+            .run_submod_success(&["update"])
+            .expect("Failed to run update");
 
         assert!(stdout.contains("Updated") || stdout.contains("Already up to date"));
     }
@@ -164,28 +180,27 @@ sparse_paths = ["src"]
         let harness = TestHarness::new().expect("Failed to create test harness");
         harness.init_git_repo().expect("Failed to init git repo");
 
-        let remote_repo = harness.create_test_remote("reset_lib").expect("Failed to create remote");
+        let remote_repo = harness
+            .create_test_remote("reset_lib")
+            .expect("Failed to create remote");
         let remote_url = format!("file://{}", remote_repo.display());
 
         // Add and initialize submodule
-        harness.run_submod_success(&[
-            "add",
-            "reset-lib",
-            "lib/reset",
-            &remote_url,
-        ]).expect("Failed to add submodule");
+        harness
+            .run_submod_success(&["add", "reset-lib", "lib/reset", &remote_url])
+            .expect("Failed to add submodule");
 
         // Make some changes in the submodule
         fs::write(
             harness.work_dir.join("lib/reset/test_file.txt"),
-            "This is a test change"
-        ).expect("Failed to create test file");
+            "This is a test change",
+        )
+        .expect("Failed to create test file");
 
         // Run reset command
-        let stdout = harness.run_submod_success(&[
-            "reset",
-            "reset-lib"
-        ]).expect("Failed to run reset");
+        let stdout = harness
+            .run_submod_success(&["reset", "reset-lib"])
+            .expect("Failed to run reset");
 
         assert!(stdout.contains("Hard resetting"));
         assert!(stdout.contains("reset complete"));
@@ -199,28 +214,34 @@ sparse_paths = ["src"]
         let harness = TestHarness::new().expect("Failed to create test harness");
         harness.init_git_repo().expect("Failed to init git repo");
 
-        let remote_repo1 = harness.create_test_remote("reset_lib1").expect("Failed to create remote");
-        let remote_repo2 = harness.create_test_remote("reset_lib2").expect("Failed to create remote");
+        let remote_repo1 = harness
+            .create_test_remote("reset_lib1")
+            .expect("Failed to create remote");
+        let remote_repo2 = harness
+            .create_test_remote("reset_lib2")
+            .expect("Failed to create remote");
         let remote_url1 = format!("file://{}", remote_repo1.display());
         let remote_url2 = format!("file://{}", remote_repo2.display());
 
         // Add two submodules
-        harness.run_submod_success(&[
-            "add", "reset-lib1", "lib/reset1", &remote_url1,
-        ]).expect("Failed to add submodule 1");
+        harness
+            .run_submod_success(&["add", "reset-lib1", "lib/reset1", &remote_url1])
+            .expect("Failed to add submodule 1");
 
-        harness.run_submod_success(&[
-            "add", "reset-lib2", "lib/reset2", &remote_url2,
-        ]).expect("Failed to add submodule 2");
+        harness
+            .run_submod_success(&["add", "reset-lib2", "lib/reset2", &remote_url2])
+            .expect("Failed to add submodule 2");
 
         // Make changes in both submodules
-        fs::write(harness.work_dir.join("lib/reset1/test1.txt"), "change1").expect("Failed to create test file");
-        fs::write(harness.work_dir.join("lib/reset2/test2.txt"), "change2").expect("Failed to create test file");
+        fs::write(harness.work_dir.join("lib/reset1/test1.txt"), "change1")
+            .expect("Failed to create test file");
+        fs::write(harness.work_dir.join("lib/reset2/test2.txt"), "change2")
+            .expect("Failed to create test file");
 
         // Run reset all command
-        let stdout = harness.run_submod_success(&[
-            "reset", "--all"
-        ]).expect("Failed to run reset all");
+        let stdout = harness
+            .run_submod_success(&["reset", "--all"])
+            .expect("Failed to run reset all");
 
         assert!(stdout.contains("Hard resetting"));
 
@@ -234,22 +255,27 @@ sparse_paths = ["src"]
         let harness = TestHarness::new().expect("Failed to create test harness");
         harness.init_git_repo().expect("Failed to init git repo");
 
-        let remote_repo = harness.create_test_remote("sync_lib").expect("Failed to create remote");
+        let remote_repo = harness
+            .create_test_remote("sync_lib")
+            .expect("Failed to create remote");
         let remote_url = format!("file://{}", remote_repo.display());
 
         // Create config manually without initializing
         let config_content = format!(
             r#"[sync-lib]
 path = "lib/sync"
-url = "{}"
+url = "{remote_url}"
 active = true
-"#,
-            remote_url
+"#
         );
-        harness.create_config(&config_content).expect("Failed to create config");
+        harness
+            .create_config(&config_content)
+            .expect("Failed to create config");
 
         // Run sync command (should check, init, and update)
-        let stdout = harness.run_submod_success(&["sync"]).expect("Failed to run sync");
+        let stdout = harness
+            .run_submod_success(&["sync"])
+            .expect("Failed to run sync");
 
         assert!(stdout.contains("Running full sync"));
         assert!(stdout.contains("Checking submodule configurations"));
@@ -266,7 +292,9 @@ active = true
         let harness = TestHarness::new().expect("Failed to create test harness");
         harness.init_git_repo().expect("Failed to init git repo");
 
-        let remote_repo = harness.create_test_remote("defaults_lib").expect("Failed to create remote");
+        let remote_repo = harness
+            .create_test_remote("defaults_lib")
+            .expect("Failed to create remote");
         let remote_url = format!("file://{}", remote_repo.display());
 
         // Create config with defaults
@@ -276,15 +304,18 @@ ignore = "dirty"
 
 [defaults-lib]
 path = "lib/defaults"
-url = "{}"
+url = "{remote_url}"
 active = true
-"#,
-            remote_url
+"#
         );
-        harness.create_config(&config_content).expect("Failed to create config");
+        harness
+            .create_config(&config_content)
+            .expect("Failed to create config");
 
         // Run check to see if defaults are applied
-        let stdout = harness.run_submod_success(&["check"]).expect("Failed to run check");
+        let stdout = harness
+            .run_submod_success(&["check"])
+            .expect("Failed to run check");
 
         assert!(stdout.contains("Checking submodule configurations"));
         // The output should show effective settings including defaults
@@ -296,14 +327,16 @@ active = true
         harness.init_git_repo().expect("Failed to init git repo");
 
         let custom_config = harness.work_dir.join("custom.toml");
-        fs::write(&custom_config, "[test-sub]\npath = \"test\"\nurl = \"https://example.com/test.git\"\nactive = true\n")
-            .expect("Failed to create custom config");
+        fs::write(
+            &custom_config,
+            "[test-sub]\npath = \"test\"\nurl = \"https://example.com/test.git\"\nactive = true\n",
+        )
+        .expect("Failed to create custom config");
 
         // Run with custom config file
-        let stdout = harness.run_submod_success(&[
-            "--config", "custom.toml",
-            "check"
-        ]).expect("Failed to run with custom config");
+        let stdout = harness
+            .run_submod_success(&["--config", "custom.toml", "check"])
+            .expect("Failed to run with custom config");
 
         assert!(stdout.contains("Checking submodule configurations"));
     }
@@ -314,11 +347,15 @@ active = true
         // Don't initialize git repo
 
         // Should fail when not in a git repository
-        let output = harness.run_submod(&["check"]).expect("Failed to run submod");
+        let output = harness
+            .run_submod(&["check"])
+            .expect("Failed to run submod");
         assert!(!output.status.success());
 
         let stderr = String::from_utf8_lossy(&output.stderr);
-        assert!(stderr.contains("Failed to create manager") || stderr.contains("Repository not found"));
+        assert!(
+            stderr.contains("Failed to create manager") || stderr.contains("Repository not found")
+        );
     }
 
     #[test]
@@ -327,12 +364,9 @@ active = true
         harness.init_git_repo().expect("Failed to init git repo");
 
         // Try to add submodule with invalid URL
-        let output = harness.run_submod(&[
-            "add",
-            "invalid-lib",
-            "lib/invalid",
-            "not-a-valid-url",
-        ]).expect("Failed to run submod");
+        let output = harness
+            .run_submod(&["add", "invalid-lib", "lib/invalid", "not-a-valid-url"])
+            .expect("Failed to run submod");
 
         assert!(!output.status.success());
         let stderr = String::from_utf8_lossy(&output.stderr);
@@ -344,24 +378,31 @@ active = true
         let harness = TestHarness::new().expect("Failed to create test harness");
         harness.init_git_repo().expect("Failed to init git repo");
 
-        let remote_repo = harness.create_test_remote("mismatch_lib").expect("Failed to create remote");
+        let remote_repo = harness
+            .create_test_remote("mismatch_lib")
+            .expect("Failed to create remote");
         let remote_url = format!("file://{}", remote_repo.display());
 
         // Add submodule with specific sparse paths
-        harness.run_submod_success(&[
-            "add",
-            "mismatch-lib",
-            "lib/mismatch",
-            &remote_url,
-            "--sparse-paths", "src,docs",
-        ]).expect("Failed to add submodule");
+        harness
+            .run_submod_success(&[
+                "add",
+                "mismatch-lib",
+                "lib/mismatch",
+                &remote_url,
+                "--sparse-paths",
+                "src,docs",
+            ])
+            .expect("Failed to add submodule");
 
         // Manually modify sparse-checkout file to create mismatch
         let sparse_file = harness.get_sparse_checkout_file_path("lib/mismatch");
         fs::write(&sparse_file, "include\nLICENSE\n").expect("Failed to modify sparse file");
 
         // Run check command
-        let stdout = harness.run_submod_success(&["check"]).expect("Failed to run check");
+        let stdout = harness
+            .run_submod_success(&["check"])
+            .expect("Failed to run check");
 
         assert!(stdout.contains("Sparse checkout mismatch"));
     }

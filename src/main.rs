@@ -3,14 +3,14 @@
 //! A CLI tool for managing Git submodules with advanced features like sparse checkout
 //! support using the gitoxide library for high performance operations.
 
-mod config;
 mod commands;
+mod config;
 mod gitoxide_manager;
 
-use anyhow::Result;
-use clap::Parser;
 use crate::commands::{Cli, Commands};
 use crate::gitoxide_manager::GitoxideSubmoduleManager;
+use anyhow::Result;
+use clap::Parser;
 
 // Old SubmoduleManager removed - now using GitoxideSubmoduleManager
 
@@ -18,19 +18,28 @@ fn main() -> Result<()> {
     let cli = Cli::parse();
 
     match cli.command {
-        Commands::Add { name, path, url, sparse_paths, settings: _ } => {
+        Commands::Add {
+            name,
+            path,
+            url,
+            sparse_paths,
+            settings: _,
+        } => {
             let mut manager = GitoxideSubmoduleManager::new(cli.config)
                 .map_err(|e| anyhow::anyhow!("Failed to create manager: {}", e))?;
 
             let sparse_paths_vec = sparse_paths.map(|paths| {
-                paths.split(',')
+                paths
+                    .split(',')
                     .map(|s| s.trim().to_string())
                     .filter(|s| !s.is_empty())
                     .collect::<Vec<String>>()
                     .into_iter()
                     .map(|s| {
                         if s.contains('\0') {
-                            return Err(anyhow::anyhow!("Invalid sparse path pattern: contains null byte"));
+                            return Err(anyhow::anyhow!(
+                                "Invalid sparse path pattern: contains null byte"
+                            ));
                         }
                         Ok(s)
                     })
@@ -45,13 +54,15 @@ fn main() -> Result<()> {
                 None => None,
             };
 
-            manager.add_submodule(name, path, url, sparse_paths_vec)
+            manager
+                .add_submodule(name, path, url, sparse_paths_vec)
                 .map_err(|e| anyhow::anyhow!("Failed to add submodule: {}", e))?;
         }
         Commands::Check => {
             let manager = GitoxideSubmoduleManager::new(cli.config)
                 .map_err(|e| anyhow::anyhow!("Failed to create manager: {}", e))?;
-            manager.check_all_submodules()
+            manager
+                .check_all_submodules()
                 .map_err(|e| anyhow::anyhow!("Failed to check submodules: {}", e))?;
         }
         Commands::Init => {
@@ -60,7 +71,8 @@ fn main() -> Result<()> {
 
             // Initialize all submodules from config
             for (name, _) in manager.config().get_submodules() {
-                manager.init_submodule(name)
+                manager
+                    .init_submodule(name)
                     .map_err(|e| anyhow::anyhow!("Failed to init submodule {}: {}", name, e))?;
             }
         }
@@ -74,10 +86,14 @@ fn main() -> Result<()> {
                 println!("No submodules configured");
             } else {
                 for (name, _) in submodules {
-                    manager.update_submodule(name)
-                        .map_err(|e| anyhow::anyhow!("Failed to update submodule {}: {}", name, e))?;
+                    manager.update_submodule(name).map_err(|e| {
+                        anyhow::anyhow!("Failed to update submodule {}: {}", name, e)
+                    })?;
                 }
-                println!("Updated {} submodule(s)", manager.config().get_submodules().count());
+                println!(
+                    "Updated {} submodule(s)",
+                    manager.config().get_submodules().count()
+                );
             }
         }
         Commands::Reset { all, names } => {
@@ -85,17 +101,24 @@ fn main() -> Result<()> {
                 .map_err(|e| anyhow::anyhow!("Failed to create manager: {}", e))?;
 
             let submodules_to_reset: Vec<String> = if all {
-                manager.config().get_submodules().map(|(name, _)| name.clone()).collect()
+                manager
+                    .config()
+                    .get_submodules()
+                    .map(|(name, _)| name.clone())
+                    .collect()
             } else {
                 names
             };
 
             if submodules_to_reset.is_empty() {
-                return Err(anyhow::anyhow!("No submodules specified for reset. Use --all to reset all submodules or specify submodule names."));
+                return Err(anyhow::anyhow!(
+                    "No submodules specified for reset. Use --all to reset all submodules or specify submodule names."
+                ));
             }
 
             for name in submodules_to_reset {
-                manager.reset_submodule(&name)
+                manager
+                    .reset_submodule(&name)
                     .map_err(|e| anyhow::anyhow!("Failed to reset submodule {}: {}", name, e))?;
             }
         }
@@ -106,16 +129,19 @@ fn main() -> Result<()> {
             // Run check, init, and update in sequence
             println!("🔄 Running full sync: check, init, update");
 
-            manager.check_all_submodules()
+            manager
+                .check_all_submodules()
                 .map_err(|e| anyhow::anyhow!("Failed to check submodules: {}", e))?;
 
             for (name, _) in manager.config().get_submodules() {
-                manager.init_submodule(name)
+                manager
+                    .init_submodule(name)
                     .map_err(|e| anyhow::anyhow!("Failed to init submodule {}: {}", name, e))?;
             }
 
             for (name, _) in manager.config().get_submodules() {
-                manager.update_submodule(name)
+                manager
+                    .update_submodule(name)
                     .map_err(|e| anyhow::anyhow!("Failed to update submodule {}: {}", name, e))?;
             }
 

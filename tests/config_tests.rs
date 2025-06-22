@@ -40,10 +40,14 @@ sparse_paths = ["src/", "docs/"]
 "#;
 
         // Create config and verify it can be parsed
-        harness.create_config(original_config).expect("Failed to create config");
+        harness
+            .create_config(original_config)
+            .expect("Failed to create config");
 
         // Run a command that loads and potentially saves the config
-        let stdout = harness.run_submod_success(&["check"]).expect("Failed to run check");
+        let stdout = harness
+            .run_submod_success(&["check"])
+            .expect("Failed to run check");
         assert!(stdout.contains("Checking submodule configurations"));
 
         // Verify config content is preserved
@@ -78,10 +82,14 @@ url = "https://github.com/example/inherits.git"
 active = true
 "#;
 
-        harness.create_config(config_with_defaults).expect("Failed to create config");
+        harness
+            .create_config(config_with_defaults)
+            .expect("Failed to create config");
 
         // Run check to see effective settings
-        let stdout = harness.run_submod_success(&["check"]).expect("Failed to run check");
+        let stdout = harness
+            .run_submod_success(&["check"])
+            .expect("Failed to run check");
 
         assert!(stdout.contains("Checking submodule configurations"));
         // Check should show that one submodule overrides defaults while another inherits them
@@ -98,10 +106,14 @@ path = "broken
 url = "https://github.com/example/test.git"
 "#;
 
-        harness.create_config(invalid_toml).expect("Failed to create invalid config");
+        harness
+            .create_config(invalid_toml)
+            .expect("Failed to create invalid config");
 
         // Should fail gracefully with a meaningful error
-        let output = harness.run_submod(&["check"]).expect("Failed to run submod");
+        let output = harness
+            .run_submod(&["check"])
+            .expect("Failed to run submod");
         assert!(!output.status.success());
 
         let stderr = String::from_utf8_lossy(&output.stderr);
@@ -130,9 +142,13 @@ branch = "develop"
 fetchRecurse = "always"
 "#;
 
-        harness.create_config(comprehensive_config).expect("Failed to create config");
+        harness
+            .create_config(comprehensive_config)
+            .expect("Failed to create config");
 
-        let stdout = harness.run_submod_success(&["check"]).expect("Failed to run check");
+        let stdout = harness
+            .run_submod_success(&["check"])
+            .expect("Failed to run check");
         assert!(stdout.contains("Checking submodule configurations"));
 
         // Verify config was parsed correctly
@@ -149,7 +165,9 @@ fetchRecurse = "always"
         let harness = TestHarness::new().expect("Failed to create test harness");
         harness.init_git_repo().expect("Failed to init git repo");
 
-        let remote_repo = harness.create_test_remote("config_test").expect("Failed to create remote");
+        let remote_repo = harness
+            .create_test_remote("config_test")
+            .expect("Failed to create remote");
         let remote_url = format!("file://{}", remote_repo.display());
 
         // Start with existing config
@@ -162,19 +180,26 @@ url = "https://github.com/example/existing.git"
 active = true
 "#;
 
-        harness.create_config(initial_config).expect("Failed to create initial config");
+        harness
+            .create_config(initial_config)
+            .expect("Failed to create initial config");
 
         // Add a new submodule
-        harness.run_submod_success(&[
-            "add",
-            "new-submodule",
-            "lib/new",
-            &remote_url,
-            "--sparse-paths", "src,docs",
-        ]).expect("Failed to add submodule");
+        harness
+            .run_submod_success(&[
+                "add",
+                "new-submodule",
+                "lib/new",
+                &remote_url,
+                "--sparse-paths",
+                "src,docs",
+            ])
+            .expect("Failed to add submodule");
 
         // Verify config was updated properly
-        let updated_config = harness.read_config().expect("Failed to read updated config");
+        let updated_config = harness
+            .read_config()
+            .expect("Failed to read updated config");
 
         // Should preserve existing content
         assert!(updated_config.contains("[defaults]"));
@@ -184,7 +209,7 @@ active = true
         // Should add new submodule
         assert!(updated_config.contains("[new-submodule]"));
         assert!(updated_config.contains("path = \"lib/new\""));
-        assert!(updated_config.contains(&format!("url = \"{}\"", remote_url)));
+        assert!(updated_config.contains(&format!("url = \"{remote_url}\"")));
         assert!(updated_config.contains("active = true"));
         assert!(updated_config.contains("sparse_paths = [\"src\", \"docs\"]"));
     }
@@ -202,9 +227,13 @@ url = "https://github.com/example/test.git"
 active = true
 "#;
 
-        harness.create_config(config_with_empty_defaults).expect("Failed to create config");
+        harness
+            .create_config(config_with_empty_defaults)
+            .expect("Failed to create config");
 
-        let stdout = harness.run_submod_success(&["check"]).expect("Failed to run check");
+        let stdout = harness
+            .run_submod_success(&["check"])
+            .expect("Failed to run check");
         assert!(stdout.contains("Checking submodule configurations"));
     }
 
@@ -244,9 +273,13 @@ url = "https://github.com/example/dev-tools.git"
 active = false  # Not active by default
 "#;
 
-        harness.create_config(formatted_config).expect("Failed to create config");
+        harness
+            .create_config(formatted_config)
+            .expect("Failed to create config");
 
-        let stdout = harness.run_submod_success(&["check"]).expect("Failed to run check");
+        let stdout = harness
+            .run_submod_success(&["check"])
+            .expect("Failed to run check");
         assert!(stdout.contains("Checking submodule configurations"));
 
         // Verify comments and formatting are preserved
@@ -261,15 +294,19 @@ active = false  # Not active by default
         harness.init_git_repo().expect("Failed to init git repo");
 
         // Config with missing required fields
-        let incomplete_config = r#"[incomplete-submodule]
+        let incomplete_config = r"[incomplete-submodule]
 # Missing path and url
 active = true
-"#;
+";
 
-        harness.create_config(incomplete_config).expect("Failed to create config");
+        harness
+            .create_config(incomplete_config)
+            .expect("Failed to create config");
 
         // Should handle missing fields gracefully
-        let stdout = harness.run_submod_success(&["check"]).expect("Failed to run check");
+        let stdout = harness
+            .run_submod_success(&["check"])
+            .expect("Failed to run check");
         assert!(stdout.contains("Checking submodule configurations"));
         // The check should report issues with incomplete configuration
     }
@@ -286,9 +323,13 @@ active = true
 sparse_paths = ["src/**", "docs/*", "*.{md,txt,rst}"]
 "#;
 
-        harness.create_config(special_config).expect("Failed to create config");
+        harness
+            .create_config(special_config)
+            .expect("Failed to create config");
 
-        let stdout = harness.run_submod_success(&["check"]).expect("Failed to run check");
+        let stdout = harness
+            .run_submod_success(&["check"])
+            .expect("Failed to run check");
         assert!(stdout.contains("Checking submodule configurations"));
     }
 }

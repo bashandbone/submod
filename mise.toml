@@ -5,6 +5,7 @@ cargo-binstall = "latest"  # For installing binaries from crates.io
 "cargo:cargo-deny" = "latest"
 "cargo:cargo-nextest" = "latest"
 "cargo:cargo-watch" = "latest"
+hk = "latest"
 rust = "1.87"   # The minimum Rust version we support; mise just makes sure it's there.
 uv = "latest"   # Another runner for MCP servers.
 

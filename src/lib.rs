@@ -8,8 +8,10 @@ pub mod config;
 /// Gitoxide-based submodule management implementation
 pub mod gitoxide_manager;
 
-pub use config::{Config, SubmoduleConfig, SubmoduleGitOptions, SubmoduleDefaults};
-pub use gitoxide_manager::{GitoxideSubmoduleManager, SubmoduleError, SubmoduleStatus, SparseStatus};
+pub use config::{Config, SubmoduleConfig, SubmoduleDefaults, SubmoduleGitOptions};
+pub use gitoxide_manager::{
+    GitoxideSubmoduleManager, SparseStatus, SubmoduleError, SubmoduleStatus,
+};
 
 /// Version information
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
