@@ -62,38 +62,126 @@ cd submod
 git remote add upstream https://github.com/originaluser/submod.git
 ```
 
-### 2. Install Dependencies
+### 2. Install Mise and Dependencies
 
 ```bash
-# Using Mise (recommended for consistent environment)
+# Install mise (if you haven't already)
+curl https://mise.run | sh
+
+# Install all development tools and dependencies
 mise install
 
-# Or install Rust manually
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+# This automatically installs:
+# - Rust 1.87+
+# - hk (git hooks)
+# - cargo tools (nextest, audit, deny, watch)
+# - prettier, typos, and other linters
 ```
 
 ### 3. Verify Setup
 
 ```bash
 # Build the project
-cargo build
+mise run build
 
 # Run tests to ensure everything works
-cargo test
+mise run test
 
-# Run the comprehensive test suite
-./scripts/run-tests.sh
+# Run the full CI suite
+mise run ci
+
+# Verify git hooks are installed
+hk --version
 ```
 
-### 4. Install Development Tools
+### 4. Development Workflow
+
+With mise and hk installed, you have access to streamlined development commands:
 
 ```bash
-# Install useful development tools
+# Development tasks
+mise run build         # Build the project
+mise run test          # Run tests
+mise run lint          # Run clippy
+mise run ci            # Full CI pipeline
+
+# Git hooks (run automatically on commit)
+hk pre-commit          # Run pre-commit checks manually
+hk fix                 # Auto-fix issues where possible
+hk check               # Run all linters
+```
+
+### 5. Manual Setup (Alternative)
+
+If you prefer not to use mise:
+
+```bash
+# Install Rust manually
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+
+# Install development tools manually
 cargo install cargo-watch      # Watch for changes
 cargo install cargo-audit      # Security auditing
 cargo install cargo-deny       # Dependency checking
 cargo install cargo-nextest    # Better test runner
+
+# Build and test
+cargo build
+cargo test
+./scripts/run-tests.sh
 ```
+
+## 🔧 Development Tools Overview
+
+This project uses modern development tools to streamline the contribution process:
+
+### Mise - Task Runner & Tool Manager
+
+[Mise](https://mise.jdx.dev/) manages our development environment and provides consistent task execution:
+
+```bash
+# Available tasks
+mise run build         # Build the project (alias: mise run b)
+mise run test          # Run the test suite
+mise run lint          # Run clippy linting
+mise run ci            # Full CI pipeline (build + lint + test)
+mise run clean         # Clean build artifacts
+mise run release       # Cut a new release (maintainers only)
+```
+
+### hk - Git Hooks Manager
+
+[hk](https://github.com/jdx/hk) provides automated git hooks for code quality:
+
+```bash
+# Hook commands
+hk pre-commit          # Run pre-commit checks
+hk pre-push            # Run pre-push checks  
+hk check               # Run all linters
+hk fix                 # Auto-fix issues where possible
+hk test                # Run tests only
+hk ci                  # Run CI checks
+```
+
+### Automated Quality Checks
+
+The pre-commit hooks automatically run these tools on every commit:
+
+- **cargo fmt** - Formats Rust code
+- **cargo clippy** - Lints Rust code for common issues
+- **cargo test** - Runs the test suite (with nextest for parallel execution)
+- **typos** - Checks for spelling errors in code and documentation
+- **prettier** - Formats TOML, YAML, and other configuration files
+- **cargo deny** - Audits dependencies for security vulnerabilities and license compliance
+- **pkl** - Validates pkl configuration files
+
+### Tool Integration
+
+Both tools work together seamlessly:
+- **mise** handles tool installation and version management
+- **hk** uses the tools installed by mise for git hooks
+- Both can run the same underlying commands (e.g., `mise run test` and `hk test`)
+- CI uses the same tools for consistency between local and remote environments
 
 ## 🔄 Making Changes
 
@@ -168,17 +256,22 @@ My philosophy on testing is to "test what matters." Tests focus on integration a
 ### Running All Tests
 
 ```bash
-# Quick test run
-cargo test
+# Using mise (recommended)
+mise run test           # Quick test run
+mise run ci             # Full CI suite (build + lint + test)
 
-# Comprehensive test suite with reporting
-./scripts/run-tests.sh --verbose
+# Using hk
+hk test                 # Run tests only
+hk ci                   # Run CI checks
+hk check                # Run all linters and checks
 
-# Include performance tests
-./scripts/run-tests.sh --performance
+# Using cargo directly
+cargo test              # Quick test run
 
-# Filter specific tests
-./scripts/run-tests.sh --filter sparse_checkout
+# Using the test script
+./scripts/run-tests.sh --verbose     # Comprehensive test suite with reporting
+./scripts/run-tests.sh --performance # Include performance tests
+./scripts/run-tests.sh --filter sparse_checkout  # Filter specific tests
 ```
 
 ### Writing Tests
@@ -235,12 +328,18 @@ fn test_submod_init_command() {
 Before submitting your PR, ensure:
 
 - [ ] **Code compiles** without warnings
-- [ ] **All tests pass** (`./scripts/run-tests.sh`)
-- [ ] **Code is formatted** (`cargo fmt`)
-- [ ] **Lints pass** (`cargo clippy`)
+- [ ] **All tests pass** (`mise run ci` or `hk ci`)
+- [ ] **Pre-commit hooks pass** (automatically run on commit, or manually with `hk pre-commit`)
 - [ ] **Documentation is updated** if needed
 - [ ] **CHANGELOG is updated** for user-facing changes
 - [ ] **Commit messages follow conventions**
+
+**Note**: If you're using the recommended mise/hk setup, many checks are automated:
+- **Code formatting** (`cargo fmt`) - Auto-fixed by pre-commit hooks
+- **Linting** (`cargo clippy`) - Checked by pre-commit hooks  
+- **Spell checking** (`typos`) - Checked and auto-fixed by pre-commit hooks
+- **TOML/YAML formatting** (`prettier`) - Auto-fixed by pre-commit hooks
+- **Security auditing** (`cargo deny`) - Checked by pre-commit hooks
 
 ### 2. Submitting the PR
 
