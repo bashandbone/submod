@@ -12,95 +12,79 @@ use crate::config::{Config, SubmoduleConfig, SubmoduleGitOptions};
 /// Custom error types for submodule operations
 #[derive(Debug, thiserror::Error)]
 pub enum SubmoduleError {
-    /// Error from gitoxide library operations
     #[error("Gitoxide operation failed: {0}")]
-    #[allow(dead_code)]
     GitoxideError(String),
 
-    /// Error from git2 library operations (when git2-support feature is enabled)
     #[error("git2 operation failed: {0}")]
     #[cfg(feature = "git2-support")]
     Git2Error(#[from] git2::Error),
 
-    /// Error from Git CLI operations
     #[error("Git CLI operation failed: {0}")]
-    #[allow(dead_code)]
     CliError(String),
 
-    /// Configuration-related error
     #[error("Configuration error: {0}")]
-    #[allow(dead_code)]
     ConfigError(String),
 
-    /// I/O operation error
     #[error("IO error: {0}")]
     IoError(#[from] std::io::Error),
 
-    /// Submodule not found in repository
     #[error("Submodule {name} not found")]
     SubmoduleNotFound { name: String },
 
-    /// Sparse checkout configuration error
     #[error("Invalid sparse checkout configuration: {reason}")]
     SparseCheckoutError { reason: String },
 
-    /// Repository access or validation error
     #[error("Repository not found or invalid")]
-    #[allow(dead_code)]
     RepositoryError,
 }
 
 /// Status information for a submodule
 #[derive(Debug, Clone)]
 pub struct SubmoduleStatus {
-    /// Path to the submodule directory
-    #[allow(dead_code)]
     pub path: String,
-    /// Whether the submodule working directory is clean
     pub is_clean: bool,
-    /// Current commit hash of the submodule
     pub current_commit: Option<String>,
-    /// Whether the submodule has remote repositories configured
     pub has_remotes: bool,
-    /// Whether the submodule is initialized
-    #[allow(dead_code)]
     pub is_initialized: bool,
-    /// Whether the submodule is active
-    #[allow(dead_code)]
     pub is_active: bool,
-    /// Sparse checkout status for this submodule
     pub sparse_status: SparseStatus,
 }
 
 /// Sparse checkout status
 #[derive(Debug, Clone)]
 pub enum SparseStatus {
-    /// Sparse checkout is not enabled for this submodule
     NotEnabled,
-    /// Sparse checkout is enabled but not configured
     NotConfigured,
-    /// Sparse checkout configuration matches expected paths
     Correct,
-    /// Sparse checkout configuration doesn't match expected paths
     Mismatch {
-        /// Expected sparse checkout paths
         expected: Vec<String>,
-        /// Actual sparse checkout paths
         actual: Vec<String>,
     },
 }
 
-/// Main gitoxide-based submodule manager
+/// Main gitoxide-maximized submodule manager
 pub struct GitoxideSubmoduleManager {
-    /// The main repository instance
     repo: Repository,
-    /// Configuration for submodules
     config: Config,
-    /// Path to the configuration file
     config_path: PathBuf,
 }
 
 impl GitoxideSubmoduleManager {
+    /// Recursively remove empty parent directories up to (but not including) the modules root.
+    fn cleanup_empty_module_parents(modules_dir: &std::path::Path, modules_root: &std::path::Path) {
+        let mut current = modules_dir.parent();
+        // Stop at the parent of modules_root, so we may remove modules_root itself if empty
+        let stop = modules_root.parent();
+        while let Some(dir) = current {
+            if Some(dir) == stop { break; }
+            if std::fs::read_dir(dir).map(|mut i| i.next().is_none()).unwrap_or(false) {
+                let _ = std::fs::remove_dir(dir);
+            } else {
+                break;
+            }
+            current = dir.parent();
+        }
+    }
 
     pub fn new(config_path: PathBuf) -> Result<Self, SubmoduleError> {
         // Use gix::discover for repository detection
@@ -195,139 +179,216 @@ impl GitoxideSubmoduleManager {
         }
     }
 
-    /// Add a submodule using the fallback chain: gitoxide -> git2 -> CLI
+    /// Add a submodule using CLI + basic configuration (temporarily disabling git2)
     pub fn add_submodule(&mut self, name: String, path: String, url: String, sparse_paths: Option<Vec<String>>) -> Result<(), SubmoduleError> {
-        // Clean up any existing submodule state using git commands
-        self.cleanup_existing_submodule(&path)?;
+        eprintln!("DEBUG: Starting add_submodule for {} at {} with sparse_paths: {:?}", name, path, sparse_paths);
 
-        // Try gitoxide first, then git2, then CLI
-        let result = self.add_submodule_with_gix(&name, &path, &url)
-            .or_else(|_| {
-                #[cfg(feature = "git2-support")]
-                {
-                    self.add_submodule_with_git2(&name, &path, &url)
-                }
-                #[cfg(not(feature = "git2-support"))]
-                {
-                    Err(SubmoduleError::GitoxideError("git2 not available".to_string()))
-                }
-            })
-            .or_else(|_| self.add_submodule_with_cli(&name, &path, &url));
-
-        match result {
-            Ok(_) => {
-                // Configure after successful creation
-                self.configure_submodule_post_creation(&name, &path, sparse_paths.clone())?;
-                self.update_toml_config(name.clone(), path, url, sparse_paths)?;
-                println!("Added submodule {}", name);
-                Ok(())
-            }
-            Err(e) => Err(e)
+        // --- Robust cleanup before attempting to add ---
+        let submodule_path = std::path::Path::new(&path);
+        if submodule_path.exists() {
+            eprintln!("DEBUG: Removing existing submodule directory: {}", path);
+            std::fs::remove_dir_all(submodule_path).map_err(SubmoduleError::IoError)?;
         }
-    }
+        // Remove .git/modules/<submodule> if it exists (leftover from failed adds)
+        // Handles nested submodule paths (e.g., lib/foo/bar)
+        let git_dir = self.repo.git_dir();
+        let mut modules_dir = git_dir.join("modules");
+        for part in path.split('/') {
+            modules_dir = modules_dir.join(part);
+        }
 
-    /// Clean up existing submodule state using git commands only
-    fn cleanup_existing_submodule(&self, path: &str) -> Result<(), SubmoduleError> {
+        // Debug output before cleanup
+        eprintln!("DEBUG: Before cleanup:");
+        eprintln!("  modules_dir exists: {}", modules_dir.exists());
+        eprintln!("  modules_dir: {}", modules_dir.display());
+        let parent_dir = modules_dir.parent().unwrap_or_else(|| std::path::Path::new(""));
+        eprintln!("  parent_dir exists: {}", parent_dir.exists());
+        eprintln!("  parent_dir: {}", parent_dir.display());
+        eprintln!("  modules_root: {}", git_dir.join("modules").display());
+
+        if modules_dir.exists() {
+            eprintln!("DEBUG: Removing existing .git/modules entry: {}", modules_dir.display());
+            match std::fs::remove_dir_all(&modules_dir) {
+                Ok(_) => eprintln!("DEBUG: Successfully removed {}", modules_dir.display()),
+                Err(e) => eprintln!("ERROR: Failed to remove {}: {}", modules_dir.display(), e),
+            }
+            let modules_root = git_dir.join("modules");
+            Self::cleanup_empty_module_parents(&modules_dir, &modules_root);
+        }
+
+        // Debug output after cleanup
+        eprintln!("DEBUG: After cleanup:");
+        eprintln!("  modules_dir exists: {}", modules_dir.exists());
+        eprintln!("  parent_dir exists: {}", parent_dir.exists());
+        eprintln!("  modules_root exists: {}", git_dir.join("modules").exists());
+
+        // Step 1: Ensure .git/modules and all parent dirs for the submodule exist
+        let modules_root = git_dir.join("modules");
+        // (removed unused variable submodule_modules_dir)
+        if !modules_root.exists() {
+            eprintln!("DEBUG: Creating modules_root: {}", modules_root.display());
+            std::fs::create_dir_all(&modules_root).map_err(SubmoduleError::IoError)?;
+        }
+        // DO NOT create parent directories for the submodule's modules path.
+        // Git expects to create .git/modules/<submodule> itself.
+
+        // Step 2: Try to deinit the submodule in case git has internal state
         let workdir = self.repo.workdir().unwrap_or_else(|| std::path::Path::new("."));
-
-        // Use git to deinitialize the submodule if it exists
-        let _deinit_output = Command::new("git")
-            .args(["submodule", "deinit", "-f", path])
+        let deinit_output = std::process::Command::new("git")
+            .args(["submodule", "deinit", "-f", &path])
             .current_dir(workdir)
-            .output()
-            .map_err(SubmoduleError::IoError)?;
+            .output();
+        match deinit_output {
+            Ok(output) => {
+                if !output.status.success() {
+                    let stderr = String::from_utf8_lossy(&output.stderr);
+                    eprintln!("DEBUG: git submodule deinit failed (may be harmless): {}", stderr);
+                } else {
+                    eprintln!("DEBUG: git submodule deinit succeeded");
+                }
+            }
+            Err(e) => {
+                eprintln!("DEBUG: git submodule deinit command failed to run: {}", e);
+            }
+        }
 
-        // Remove from git index if present
-        let _rm_output = Command::new("git")
-            .args(["rm", "--cached", "-f", path])
-            .current_dir(workdir)
-            .output()
-            .map_err(SubmoduleError::IoError)?;
+        // Diagnostics: print .git/modules tree and git config before add
+        use std::process::Command;
+        eprintln!("==== DIAGNOSTIC: ls -lR .git/modules ====");
+        let ls_output = Command::new("ls")
+            .args(&["-lR", git_dir.join("modules").to_str().unwrap_or(".git/modules")])
+            .output();
+        match ls_output {
+            Ok(output) => {
+                eprintln!("{}", String::from_utf8_lossy(&output.stdout));
+                eprintln!("{}", String::from_utf8_lossy(&output.stderr));
+            }
+            Err(e) => eprintln!("ls failed: {}", e),
+        }
 
-        // Clean any remaining files in the working directory
-        let _clean_output = Command::new("git")
-            .args(["clean", "-fd", path])
+        eprintln!("==== DIAGNOSTIC: git config --list --show-origin ====");
+        let config_output = Command::new("git")
+            .args(&["config", "--list", "--show-origin"])
             .current_dir(workdir)
-            .output()
-            .map_err(SubmoduleError::IoError)?;
+            .output();
+        match config_output {
+            Ok(output) => {
+                eprintln!("{}", String::from_utf8_lossy(&output.stdout));
+                eprintln!("{}", String::from_utf8_lossy(&output.stderr));
+            }
+            Err(e) => eprintln!("git config failed: {}", e),
+        }
+
+        // Try to remove from index in case submodule is still registered
+        eprintln!("==== DIAGNOSTIC: git rm --cached <path> ====");
+        let rm_output = Command::new("git")
+            .args(&["rm", "--cached", &path])
+            .current_dir(workdir)
+            .output();
+        match rm_output {
+            Ok(output) => {
+                eprintln!("{}", String::from_utf8_lossy(&output.stdout));
+                eprintln!("{}", String::from_utf8_lossy(&output.stderr));
+            }
+            Err(e) => eprintln!("git rm --cached failed: {}", e),
+        }
+
+        // (No-op: function now defined as an impl method and called above)
+
+        // Try git2 first if enabled, fall back to CLI if not available or fails
+        #[cfg(feature = "git2-support")]
+        {
+            match self.add_submodule_git2(&name, &path, &url) {
+                Ok(_) => eprintln!("DEBUG: git2 submodule add completed"),
+                Err(e) => {
+                    eprintln!("DEBUG: git2 submodule add failed: {e}, falling back to CLI");
+                    self.add_submodule_cli(&name, &path, &url)?;
+                    eprintln!("DEBUG: CLI submodule add completed");
+                }
+            }
+        }
+        #[cfg(not(feature = "git2-support"))]
+        {
+            self.add_submodule_cli(&name, &path, &url)?;
+            eprintln!("DEBUG: CLI submodule add completed");
+        }
+
+        // Configure after creation
+        self.configure_submodule_post_creation(&name, &path, sparse_paths.clone())?;
+        eprintln!("DEBUG: Post-creation configuration completed");
+
+        self.update_toml_config(name.clone(), path, url, sparse_paths)?;
+        eprintln!("DEBUG: TOML config updated");
+
+        println!("Added submodule {}", name);
 
         Ok(())
     }
 
-    /// Add submodule using gitoxide (primary method)
-    fn add_submodule_with_gix(&self, _name: &str, _path: &str, _url: &str) -> Result<(), SubmoduleError> {
-        // TODO: Implement gitoxide submodule add when available
-        // For now, return an error to trigger fallback
-        Err(SubmoduleError::GitoxideError("Gitoxide submodule add not yet implemented".to_string()))
-    }
-
     #[cfg(feature = "git2-support")]
-    fn add_submodule_with_git2(&self, _name: &str, path: &str, url: &str) -> Result<(), SubmoduleError> {
+    fn add_submodule_git2(&self, _name: &str, path: &str, url: &str) -> Result<(), SubmoduleError> {
         let git2_repo = git2::Repository::open(self.repo.git_dir())?;
+
         let submodule_path = std::path::Path::new(path);
 
-        // Let git2 handle all directory creation and management
+        // Remove existing directory if it exists to avoid conflicts
+        if submodule_path.exists() {
+            std::fs::remove_dir_all(submodule_path)?;
+        }
+
+        // Create parent directories if they don't exist
+        if let Some(parent) = submodule_path.parent() {
+            std::fs::create_dir_all(parent)?;
+        }
+
+        // Step 1: Add submodule to parent repository - this registers it in .gitmodules and index
         let mut submodule = git2_repo.submodule(url, submodule_path, false)?;
 
-        // Initialize the submodule configuration
+        // Step 2: Initialize the submodule configuration
         submodule.init(false)?;
 
-        // Set up the subrepository for cloning
+        // Step 3: Set up the subrepository for cloning
         let _sub_repo = submodule.repo_init(true)?;
 
-        // Clone the repository
+        // Step 4: Clone the repository
         let _cloned_repo = submodule.clone(None)?;
 
-        // Add the submodule to the index and finalize
+        // Step 5: Add the submodule to the index and finalize
         submodule.add_to_index(true)?;
         submodule.add_finalize()?;
 
         Ok(())
     }
 
-    fn add_submodule_with_cli(&self, _name: &str, path: &str, url: &str) -> Result<(), SubmoduleError> {
+    fn add_submodule_cli(&self, _name: &str, path: &str, url: &str) -> Result<(), SubmoduleError> {
         let workdir = self.repo.workdir().unwrap_or_else(|| std::path::Path::new("."));
+
+        // Remove existing directory if it exists to avoid conflicts
+        let submodule_path = std::path::Path::new(path);
+        if submodule_path.exists() {
+            std::fs::remove_dir_all(submodule_path)?;
+        }
+
+        // Create parent directories if they don't exist
+        if let Some(parent) = submodule_path.parent() {
+            std::fs::create_dir_all(parent)?;
+        }
 
         // Configure git to allow file protocol for tests
         let _config_output = Command::new("git")
             .args(["config", "protocol.file.allow", "always"])
             .current_dir(workdir)
-            .output()
-            .map_err(SubmoduleError::IoError)?;
+            .output()?;
 
         // Use --force to ensure git overwrites any stale state
         let output = Command::new("git")
             .args(["submodule", "add", "--force", url, path])
             .current_dir(workdir)
-            .output()
-            .map_err(SubmoduleError::IoError)?;
+            .output()?;
 
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
             return Err(SubmoduleError::CliError(format!("Git submodule add failed: {}", stderr)));
-        }
-
-        // Initialize and update the submodule to ensure it's properly checked out
-        let init_output = Command::new("git")
-            .args(["submodule", "init", path])
-            .current_dir(workdir)
-            .output()
-            .map_err(SubmoduleError::IoError)?;
-
-        if !init_output.status.success() {
-            let stderr = String::from_utf8_lossy(&init_output.stderr);
-            return Err(SubmoduleError::CliError(format!("Git submodule init failed: {}", stderr)));
-        }
-
-        let update_output = Command::new("git")
-            .args(["submodule", "update", path])
-            .current_dir(workdir)
-            .output()
-            .map_err(SubmoduleError::IoError)?;
-
-        if !update_output.status.success() {
-            let stderr = String::from_utf8_lossy(&update_output.stderr);
-            return Err(SubmoduleError::CliError(format!("Git submodule update failed: {}", stderr)));
         }
 
         Ok(())
@@ -574,7 +635,7 @@ impl GitoxideSubmoduleManager {
         if needs_add {
             // Submodule not registered yet, add it first
             eprintln!("DEBUG: Submodule not registered in .gitmodules, adding first");
-            self.add_submodule_with_cli(name, path_str, url_str)?;
+            self.add_submodule_cli(name, path_str, url_str)?;
         } else {
             // Submodule is registered, just initialize and update
             let init_output = Command::new("git")
@@ -610,7 +671,32 @@ impl GitoxideSubmoduleManager {
         Ok(())
     }
 
+    /// GITOXIDE API: Clone using gix - temporarily disabled due to API changes
+    fn clone_with_gix(&self, url: &str, path: &str) -> Result<(), SubmoduleError> {
+        // TODO: Fix gitoxide clone API - the prepare_clone API has changed
+        // For now, fall back to CLI
+        eprintln!("DEBUG: Gitoxide clone API needs updating, falling back to CLI");
+        self.clone_with_cli(url, path)
+    }
 
+    /// Fallback clone using CLI
+    fn clone_with_cli(&self, url: &str, path: &str) -> Result<(), SubmoduleError> {
+        // Create parent directories if they don't exist
+        if let Some(parent) = Path::new(path).parent() {
+            fs::create_dir_all(parent)?;
+        }
+
+        let output = Command::new("git")
+            .args(["clone", url, path])
+            .output()?;
+
+        if !output.status.success() {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            return Err(SubmoduleError::CliError(format!("Git clone failed: {}", stderr)));
+        }
+
+        Ok(())
+    }
 
     /// Check all submodules using gitoxide APIs where possible
     pub fn check_all_submodules(&self) -> Result<(), SubmoduleError> {
@@ -653,7 +739,7 @@ impl GitoxideSubmoduleManager {
                     println!("  ✅ Git repository exists");
 
                     if status.is_clean {
-                        println!("  ��� Working tree is clean");
+                        println!("  ✅ Working tree is clean");
                     } else {
                         println!("  ⚠️  Working tree has changes");
                     }
