@@ -58,12 +58,11 @@ jobs:
       with:
         submodules: recursive
 
-    - name: Install Rust
-      uses: dtolnay/rust-toolchain@stable
+    - name: Install Rust nightly
+      uses: dtolnay/rust-toolchain@nightly
 
     - name: Install cargo-docs-rs
       run: cargo install cargo-docs-rs
 
     - name: Check docs.rs build
       run: cargo docs-rs
-
