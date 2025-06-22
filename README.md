@@ -384,10 +384,9 @@ We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) f
 2. **Create a feature branch**: `git checkout -b feature/amazing-feature`
 3. **Set up development environment**: `mise install` (installs all tools and git hooks)
 4. **Make your changes** and add tests if applicable
-5. **Run the test suite**: `mise run ci` (or `hk ci`)
-6. **Commit your changes**: `git commit -m 'Add amazing feature'` (hooks run automatically)
-7. **Push to your branch**: `git push origin feature/amazing-feature`
-8. **Open a Pull Request**
+5. **Commit your changes**: `git commit -m 'Add amazing feature'` (hooks run automatically)
+6. **Push to your branch**: `git push origin feature/amazing-feature` (they'll actually run again in check mode, so they need to pass)
+7. **Open a Pull Request**
 
 ### Development Guidelines
 
@@ -395,7 +394,7 @@ We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) f
 - Add tests for new functionality. I'm not big on unit tests, but integration tests are essential.
 - Update documentation for user-facing changes
 - Use conventional commit messages
-- Run `mise run ci` or `hk ci` before submitting PR
+- Run `mise run ci` or `hk run ci` before submitting PR
 - Pre-commit hooks will automatically format code and run basic checks
 - All automated checks must pass before PR can be merged
 
