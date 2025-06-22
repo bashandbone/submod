@@ -239,13 +239,94 @@ submod sync
 
 - Rust 1.87 or later
 - Git
+- [Mise](https://mise.jdx.dev/) (recommended) - for tool management and task running
 
-### Building from Source
+### Quick Setup with Mise (Recommended)
 
 ```bash
 # Clone the repository
 git clone https://github.com/bashandbone/submod.git
 cd submod
+
+# Install mise if you haven't already
+curl https://mise.run | sh
+
+# Install all development tools and dependencies
+mise install
+
+# Build the project
+mise run build
+# or: mise run b (alias)
+
+# Run tests
+mise run test
+
+# Run the full CI suite (build + lint + test)
+mise run ci
+```
+
+### Available Mise Tasks
+
+```bash
+# Build the project
+mise run build          # or: mise run b
+
+# Run tests
+mise run test
+
+# Lint with clippy
+mise run lint
+
+# Run full CI pipeline
+mise run ci
+
+# Clean build artifacts
+mise run clean
+
+# Cut a new release (maintainers only)
+mise run release
+```
+
+### Git Hooks with hk
+
+This project uses [hk](https://github.com/jdx/hk) for automated git hooks that ensure code quality:
+
+```bash
+# Install git hooks (done automatically with mise install)
+hk install
+
+# Run pre-commit checks manually
+hk pre-commit
+
+# Run all linters and checks
+hk check
+
+# Auto-fix issues where possible
+hk fix
+
+# Run CI checks locally
+hk ci
+```
+
+The pre-commit hooks automatically run:
+- **cargo fmt** - Code formatting
+- **cargo clippy** - Linting
+- **cargo test** - Test suite
+- **typos** - Spell checking
+- **prettier** - TOML/YAML formatting
+- **cargo deny** - Security and license auditing
+
+### Manual Setup (Alternative)
+
+If you prefer not to use mise:
+
+```bash
+# Clone the repository
+git clone https://github.com/bashandbone/submod.git
+cd submod
+
+# Install Rust if needed
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 
 # Build the project
 cargo build
@@ -260,20 +341,22 @@ cargo test
 ### Running Tests
 
 ```bash
-# Run all tests
-cargo test
+# Using mise (recommended)
+mise run test           # Run all tests
+mise run ci             # Run full CI suite
 
-# Run integration tests only
-cargo test --test integration_tests
+# Using hk
+hk test                 # Run tests only
+hk ci                   # Run CI checks
 
-# Run with the test script for better reporting
-./scripts/run-tests.sh
+# Using cargo directly
+cargo test              # Run all tests
+cargo test --test integration_tests  # Integration tests only
 
-# Run performance tests
-./scripts/run-tests.sh --performance
-
-# Filter specific tests
-./scripts/run-tests.sh --filter sparse_checkout
+# Using the test script
+./scripts/run-tests.sh --verbose     # Comprehensive reporting
+./scripts/run-tests.sh --performance # Include performance tests
+./scripts/run-tests.sh --filter sparse_checkout  # Filter tests
 ```
 
 ### Project Structure
@@ -299,11 +382,12 @@ We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) f
 
 1. **Fork the repository**
 2. **Create a feature branch**: `git checkout -b feature/amazing-feature`
-3. **Make your changes** and add tests if applicable (test anything that has a result)
-4. **Run the test suite**: `./scripts/run-tests.sh`
-5. **Commit your changes**: `git commit -m 'Add amazing feature'`
-6. **Push to your branch**: `git push origin feature/amazing-feature`
-7. **Open a Pull Request**
+3. **Set up development environment**: `mise install` (installs all tools and git hooks)
+4. **Make your changes** and add tests if applicable
+5. **Run the test suite**: `mise run ci` (or `hk ci`)
+6. **Commit your changes**: `git commit -m 'Add amazing feature'` (hooks run automatically)
+7. **Push to your branch**: `git push origin feature/amazing-feature`
+8. **Open a Pull Request**
 
 ### Development Guidelines
 
@@ -311,7 +395,9 @@ We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) f
 - Add tests for new functionality. I'm not big on unit tests, but integration tests are essential.
 - Update documentation for user-facing changes
 - Use conventional commit messages
-- Ensure all tests pass before submitting PR
+- Run `mise run ci` or `hk ci` before submitting PR
+- Pre-commit hooks will automatically format code and run basic checks
+- All automated checks must pass before PR can be merged
 
 ## 🔍 Troubleshooting
 
