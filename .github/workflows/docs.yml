@@ -42,14 +42,6 @@ jobs:
             - name: Build documentation
               run: cargo doc --all-features --no-deps
 
-            - name: Deploy to GitHub Pages
-              if: github.ref == 'refs/heads/main'
-              uses: peaceiris/actions-gh-pages@v4
-              with:
-                  github_token: ${{ secrets.GITHUB_TOKEN }}
-                  publish_dir: ./target/doc
-                  force_orphan: true
-
     docs_rs_check:
         name: Check docs.rs compatibility
         runs-on: ubuntu-latest
