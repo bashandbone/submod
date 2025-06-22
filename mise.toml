@@ -36,25 +36,13 @@ alias = 'b' # `mise run b`
 [tasks.test]
 description = 'Run automated tests'
 # multiple commands are run in series
-run = [
-    'cargo test',
-]
-dir = "{{cwd}}" # run in user's cwd, default is the project's base directory
+run = "hk run test"
+alias = 't' # `mise run t`
 
 [tasks.lint]
-description = 'Lint with clippy'
-env = { RUST_BACKTRACE = '1' } # env vars for the script
-# you can specify a multiline script instead of individual commands
-run = """
-#!/usr/bin/env bash
-cargo clippy
-"""
+description = 'Full linting of the codebase'
+run = "hk run check"
 
 [tasks.ci] # only dependencies to be run
 description = 'Run CI tasks'
 depends = ['build', 'lint', 'test']
-
-[tasks.release]
-confirm = 'Are you sure you want to cut a new release?'
-description = 'Cut a new release'
-file = 'scripts/release.sh' # execute an external script
