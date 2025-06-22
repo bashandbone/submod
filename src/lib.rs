@@ -3,7 +3,9 @@
 //! This library exists only for testing purposes. We're a CLI tool, not a library.
 //! You're welcome to use it as a library, but we don't guarantee any API stability.
 
+/// Configuration management for submodules
 pub mod config;
+/// Gitoxide-based submodule management implementation
 pub mod gitoxide_manager;
 
 pub use config::{Config, SubmoduleConfig, SubmoduleGitOptions, SubmoduleDefaults};

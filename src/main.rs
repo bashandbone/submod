@@ -1,3 +1,8 @@
+//! Submod - Git submodule manager with sparse checkout support
+//!
+//! A CLI tool for managing Git submodules with advanced features like sparse checkout
+//! support using the gitoxide library for high performance operations.
+
 mod config;
 mod commands;
 mod gitoxide_manager;

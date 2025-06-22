@@ -9,7 +9,6 @@ use serde::{Deserialize, Serialize};
 /**========================================================================
  **                  Wrappers for Gix Submodule Config
  *========================================================================**/
-
 /// Serializable wrapper for [`Ignore`] config
 #[derive(Debug, Default, Clone, Copy, Ord, PartialOrd, Eq, PartialEq, Hash)]
 pub struct SerializableIgnore(pub Ignore);
@@ -29,7 +28,6 @@ pub struct SerializableUpdate(pub Update);
 /**========================================================================
  **               Implement Serialize/Deserialize for Config
  *========================================================================**/
-
 /// implements Serialize for [`SerializableIgnore`]
 impl Serialize for SerializableIgnore {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
@@ -227,20 +225,27 @@ impl From<SerializableUpdate> for Update {
 }
 
 /// Git options for a submodule
+/// Git-specific options for submodule configuration
 #[derive(Debug, Default, Clone, Ord, PartialOrd, Eq, PartialEq, Hash, Serialize, Deserialize)]
 pub struct SubmoduleGitOptions {
+    /// How to handle dirty files when updating submodules
     #[serde(default)]
     pub ignore: Option<SerializableIgnore>,
+    /// Whether to fetch submodules recursively
     #[serde(default)]
     pub fetch_recurse: Option<SerializableFetchRecurse>,
+    /// Branch to track for the submodule
     #[serde(default)]
     pub branch: Option<SerializableBranch>,
+    /// Update strategy for the submodule
     #[serde(default)]
     pub update: Option<SerializableUpdate>,
 }
 
 // Default implementation for [`SubmoduleGitOptions`]
 impl SubmoduleGitOptions {
+    /// Create a new instance with default git options
+    #[allow(dead_code)]
     pub fn new() -> Self {
         Self {
             ignore: Some(SerializableIgnore(Ignore::default())),
@@ -255,22 +260,32 @@ impl SubmoduleGitOptions {
 #[derive(Debug, Default, Clone, Ord, PartialOrd, Eq, PartialEq, Hash, Serialize, Deserialize)]
 pub struct SubmoduleDefaults(pub SubmoduleGitOptions);
 impl SubmoduleDefaults {
+    /// Create new default submodule configuration
+    #[allow(dead_code)]
     pub fn new() -> Self {
         Self(SubmoduleGitOptions::new())
     }
 }
 
+/// Configuration for a single submodule
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct SubmoduleConfig {
+    /// Git-specific options for this submodule
     #[serde(flatten)]
     pub git_options: SubmoduleGitOptions,
+    /// Whether this submodule is active
     pub active: bool,
+    /// Path where the submodule should be checked out
     pub path: Option<String>,
+    /// URL of the submodule repository
     pub url: Option<String>,
+    /// Sparse checkout paths for this submodule
     pub sparse_paths: Option<Vec<String>>,
 }
 
 impl SubmoduleConfig {
+    /// Create a new submodule configuration with defaults
+    #[allow(dead_code)]
     pub fn new() -> Self {
         Self {
             git_options: SubmoduleGitOptions::new(),
@@ -282,12 +297,14 @@ impl SubmoduleConfig {
     }
     /// Check if our active setting matches what git would report
     /// `git_active_state` should be the result of calling git's active check
+    #[allow(dead_code)]
     pub fn active_setting_matches_git(&self, git_active_state: bool) -> bool {
         self.active == git_active_state
     }
 
 }
 
+/// Main configuration structure for the submod tool
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Config {
     /// Global default settings that apply to all submodules
@@ -300,6 +317,7 @@ pub struct Config {
 
 
 impl Config {
+    /// Load configuration from a TOML file
     pub fn load(path: &Path) -> Result<Self> {
         if !path.exists() {
             return Ok(Config {
@@ -315,6 +333,7 @@ impl Config {
             .with_context(|| "Failed to parse TOML config")
     }
 
+    /// Save configuration to a TOML file
     pub fn save(&self, path: &Path) -> Result<()> {
         self.save_with_toml_edit(path)
     }
@@ -443,14 +462,17 @@ impl Config {
         self.defaults.0.fetch_recurse.is_none()
     }
 
+    /// Add a submodule configuration
     pub fn add_submodule(&mut self, name: String, submodule: SubmoduleConfig) {
         self.submodules.insert(name, submodule);
     }
 
+    /// Get an iterator over all submodule configurations
     pub fn get_submodules(&self) -> impl Iterator<Item = (&String, &SubmoduleConfig)> {
         self.submodules.iter()
     }
 
+    /// Get the effective setting for a submodule, falling back to defaults
     pub fn get_effective_setting(&self, submodule: &SubmoduleConfig, setting: &str) -> Option<String> {
         // Check submodule-specific setting first, then fall back to defaults
         match setting {
