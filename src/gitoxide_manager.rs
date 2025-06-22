@@ -12,60 +12,99 @@ use crate::config::{Config, SubmoduleConfig, SubmoduleGitOptions};
 /// Custom error types for submodule operations
 #[derive(Debug, thiserror::Error)]
 pub enum SubmoduleError {
+    /// Error from gitoxide library operations
     #[error("Gitoxide operation failed: {0}")]
+    #[allow(dead_code)]
     GitoxideError(String),
 
+    /// Error from git2 library operations (when git2-support feature is enabled)
     #[error("git2 operation failed: {0}")]
     #[cfg(feature = "git2-support")]
     Git2Error(#[from] git2::Error),
 
+    /// Error from Git CLI operations
     #[error("Git CLI operation failed: {0}")]
+    #[allow(dead_code)]
     CliError(String),
 
+    /// Configuration-related error
     #[error("Configuration error: {0}")]
+    #[allow(dead_code)]
     ConfigError(String),
 
+    /// I/O operation error
     #[error("IO error: {0}")]
     IoError(#[from] std::io::Error),
 
+    /// Submodule not found in repository
     #[error("Submodule {name} not found")]
-    SubmoduleNotFound { name: String },
+    #[allow(dead_code)]
+    SubmoduleNotFound { 
+        /// Name of the submodule that was not found
+        name: String 
+    },
 
+    /// Sparse checkout configuration error
     #[error("Invalid sparse checkout configuration: {reason}")]
-    SparseCheckoutError { reason: String },
+    #[allow(dead_code)]
+    SparseCheckoutError { 
+        /// Reason for the sparse checkout error
+        reason: String 
+    },
 
+    /// Repository access or validation error
     #[error("Repository not found or invalid")]
+    #[allow(dead_code)]
     RepositoryError,
 }
 
 /// Status information for a submodule
 #[derive(Debug, Clone)]
 pub struct SubmoduleStatus {
+    /// Path to the submodule directory
+    #[allow(dead_code)]
     pub path: String,
+    /// Whether the submodule working directory is clean
     pub is_clean: bool,
+    /// Current commit hash of the submodule
     pub current_commit: Option<String>,
+    /// Whether the submodule has remote repositories configured
     pub has_remotes: bool,
+    /// Whether the submodule is initialized
+    #[allow(dead_code)]
     pub is_initialized: bool,
+    /// Whether the submodule is active
+    #[allow(dead_code)]
     pub is_active: bool,
+    /// Sparse checkout status for this submodule
     pub sparse_status: SparseStatus,
 }
 
 /// Sparse checkout status
 #[derive(Debug, Clone)]
 pub enum SparseStatus {
+    /// Sparse checkout is not enabled for this submodule
     NotEnabled,
+    /// Sparse checkout is enabled but not configured
     NotConfigured,
+    /// Sparse checkout configuration matches expected paths
     Correct,
+    /// Sparse checkout configuration doesn't match expected paths
     Mismatch {
+        /// Expected sparse checkout paths
         expected: Vec<String>,
+        /// Actual sparse checkout paths
         actual: Vec<String>,
     },
 }
 
-/// Main gitoxide-maximized submodule manager
+/// Main gitoxide-based submodule manager
 pub struct GitoxideSubmoduleManager {
+    /// The main repository instance
     repo: Repository,
+    /// Configuration for submodules
     config: Config,
+    /// Path to the configuration file
     config_path: PathBuf,
 }
 
@@ -86,6 +125,7 @@ impl GitoxideSubmoduleManager {
         }
     }
 
+    /// Create a new GitoxideSubmoduleManager instance
     pub fn new(config_path: PathBuf) -> Result<Self, SubmoduleError> {
         // Use gix::discover for repository detection
         let repo = gix::discover(".")
@@ -672,6 +712,7 @@ impl GitoxideSubmoduleManager {
     }
 
     /// GITOXIDE API: Clone using gix - temporarily disabled due to API changes
+    #[allow(dead_code)]
     fn clone_with_gix(&self, url: &str, path: &str) -> Result<(), SubmoduleError> {
         // TODO: Fix gitoxide clone API - the prepare_clone API has changed
         // For now, fall back to CLI
@@ -680,6 +721,7 @@ impl GitoxideSubmoduleManager {
     }
 
     /// Fallback clone using CLI
+    #[allow(dead_code)]
     fn clone_with_cli(&self, url: &str, path: &str) -> Result<(), SubmoduleError> {
         // Create parent directories if they don't exist
         if let Some(parent) = Path::new(path).parent() {
@@ -739,7 +781,7 @@ impl GitoxideSubmoduleManager {
                     println!("  ✅ Git repository exists");
 
                     if status.is_clean {
-                        println!("  ✅ Working tree is clean");
+                        println!("  ��� Working tree is clean");
                     } else {
                         println!("  ⚠️  Working tree has changes");
                     }

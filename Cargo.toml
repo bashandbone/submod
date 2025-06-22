@@ -6,6 +6,12 @@ rust-version = "1.87"
 description = "Git submodule manager with sparse checkout support using gitoxide"
 authors = ["Adam Poulemanos <89049923+bashandbone@users.noreply.github.com>"]
 license = "MIT" # Plain MIT license: plainlicense.org/licenses/permissive/mit/
+repository = "https://github.com/bashandbone/submod"
+homepage = "https://github.com/bashandbone/submod"
+documentation = "https://docs.rs/submod"
+readme = "README.md"
+keywords = ["git", "submodule", "gitoxide", "cli", "sparse-checkout"]
+categories = ["command-line-utilities", "development-tools"]
 
 resolver = "3"
 
@@ -48,3 +54,41 @@ git2-support = ["git2"]
 [dev-dependencies]
 tempfile = "3.14.0"
 serde_json = "1.0.140"
+
+[lints.rust]
+# Deny unsafe code unless explicitly allowed
+unsafe_code = "forbid"
+# Warn about unused items
+unused = { level = "warn", priority = -1 }
+# Warn about missing documentation
+missing_docs = "warn"
+# Warn about unreachable code
+unreachable_code = "warn"
+
+[lints.clippy]
+# Pedantic lints for high code quality
+pedantic = { level = "warn", priority = -1 }
+# Nursery lints for cutting-edge suggestions
+nursery = { level = "warn", priority = -1 }
+# Performance lints
+perf = { level = "warn", priority = -1 }
+# Cargo-specific lints
+cargo = { level = "warn", priority = -1 }
+# Complexity lints
+complexity = { level = "warn", priority = -1 }
+# Correctness lints (deny these as they indicate bugs)
+correctness = { level = "deny", priority = -1 }
+# Style lints
+style = { level = "warn", priority = -1 }
+# Suspicious constructs
+suspicious = { level = "warn", priority = -1 }
+
+# Allow some pedantic lints that can be overly strict for CLI tools
+too_many_lines = "allow"
+module_name_repetitions = "allow"
+missing_errors_doc = "allow"
+missing_panics_doc = "allow"
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
