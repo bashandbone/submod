@@ -57,10 +57,10 @@ jobs:
                   $MISE trust -y
                   $MISE install -y
                   $MISE reshim
-                  hk install --mise
+                  $HOME/.local/share/mise/shims/hk install --mise
 
             - name: Run hk ci workflow
-              run: hk run ci
+              run: $HOME/.local/share/mise/shims/hk run ci
 
     security_audit:
         name: Security Audit
