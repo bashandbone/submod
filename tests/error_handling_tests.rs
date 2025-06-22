@@ -59,7 +59,7 @@ mod tests {
         harness.init_git_repo().expect("Failed to init git repo");
 
         // Try to use a non-existent config file
-        let output = harness
+        harness
             .run_submod(&["--config", "/nonexistent/path/config.toml", "check"])
             .expect("Failed to run submod");
 
