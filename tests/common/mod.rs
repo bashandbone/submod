@@ -60,15 +60,16 @@ impl TestHarness {
 
     /// Initialize a git repository in the working directory
     pub fn init_git_repo(&self) -> Result<(), Box<dyn std::error::Error>> {
-        // HARD CLEANUP: Remove any stale .git/modules and lib/ directories before each test
-        let git_modules = Path::new(".git/modules");
-        if git_modules.exists() {
-            fs::remove_dir_all(git_modules)?;
-        }
-        let lib_dir = Path::new("lib");
-        if lib_dir.exists() {
-            fs::remove_dir_all(lib_dir)?;
-        }
+        // Use git commands for cleanup instead of direct filesystem operations
+        let _ = Command::new("git")
+            .args(["submodule", "deinit", "--all", "-f"])
+            .current_dir(&self.work_dir)
+            .output();
+        
+        let _ = Command::new("git")
+            .args(["clean", "-fdx"])
+            .current_dir(&self.work_dir)
+            .output();
         let output = Command::new("git")
             .args(["init"])
             .current_dir(&self.work_dir)
@@ -130,7 +131,14 @@ impl TestHarness {
         // Create a working copy to add content
         let work_copy = self.temp_dir.path().join(format!("{}_work", name));
         Command::new("git")
-            .args(["clone", remote_dir.to_str().unwrap(), work_copy.to_str().unwrap()])
+            .args(["init"])
+            .arg(&work_copy)
+            .output()?;
+
+        // Set up remote
+        Command::new("git")
+            .args(["remote", "add", "origin", remote_dir.to_str().unwrap()])
+            .current_dir(&work_copy)
             .output()?;
 
         // Add some content
