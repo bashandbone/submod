@@ -1,4 +1,4 @@
-#![doc = r#"
+#![doc = r"
 Main entry point for the submod CLI tool.
 
 Parses command-line arguments and dispatches submodule management commands using the
@@ -15,7 +15,7 @@ and syncing submodules with advanced features like sparse checkout.
 - `sync`: Run check, init, and update in sequence.
 
 Exits with an error if any operation fails.
-"#]
+"]
 
 mod commands;
 mod config;

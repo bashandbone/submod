@@ -1,4 +1,4 @@
-#![doc = r#"
+#![doc = r"
 Configuration types and utilities for submod.
 
 Defines serializable wrappers for git submodule options, project-level defaults, and submodule
@@ -18,7 +18,7 @@ Features:
 
 TODO:
 - Add validation for config values when loading from file.
-"#]
+"]
 
 use anyhow::{Context, Result};
 use bstr::BStr;

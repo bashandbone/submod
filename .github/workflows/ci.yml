@@ -60,7 +60,7 @@ jobs:
                   hk install --mise
 
             - name: Run hk ci workflow
-              run: hk ci
+              run: hk run ci
 
     security_audit:
         name: Security Audit
