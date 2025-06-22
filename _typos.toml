@@ -1,0 +1,28 @@
+[default]
+locale = "en-us"
+check-file = true
+check-filename = true
+extend-ignore-re = ["(?s)(#|//)\\s*spellchecker:off.*?\\n\\s*(#|//)\\s*spellchecker:on"]
+extend-ignore-identifiers-re = [
+  "iif",
+  "iife",
+  "i18n",
+  "i18next",
+  "i18n-t",
+  "i18n-tc",
+  "strat",
+  "Inferrable",
+]
+
+[files]
+ignore-hidden = false
+ignore-files = true
+extend-exclude = [
+  "/usr/**/*",
+  "/tmp/**/*",
+  "/**/node_modules/**",
+  ".venv/",
+  ".git/",
+  "target/",
+  "docs/"
+]

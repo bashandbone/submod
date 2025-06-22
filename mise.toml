@@ -1,15 +1,60 @@
 [tools]
 bun = "latest"   # We use bun to run mcp tool development servers. Totally optional, but helpful.
 cargo-binstall = "latest"  # For installing binaries from crates.io
-"cargo:cargo-audit" = "latest"
-"cargo:cargo-deny" = "latest"
-"cargo:cargo-nextest" = "latest"
-"cargo:cargo-watch" = "latest"
-hk = "latest"
+"cargo:cargo-audit" = "latest" # For auditing dependencies for security vulnerabilities.
+"cargo:cargo-deny" = "latest" # For checking licenses and other policies.
+"cargo:cargo-nextest" = "latest" # For running tests in parallel.
+"cargo:cargo-watch" = "latest" # For watching files and rerunning commands.
+hk = "latest"   # Handles git hooks, like pre-commit.
+jq = "latest"
+"npm:prettier" = "latest"
+"npm:prettier-plugin-toml" = "latest"
+pkl = "latest"  # pkl for `hk`, which handles git hooks
 rust = "1.87"   # The minimum Rust version we support; mise just makes sure it's there.
+typos = "latest"
 uv = "latest"   # Another runner for MCP servers.
 
 [env]
 CARGO_TARGET_DIR = "target"
-RUST_BACKTRACE = "1"
 RUST_TEST_THREADS=1
+HK_MISE=1
+
+
+[tasks.cleancache]
+run = "rm -rf .cache"
+hide = true # hide this task from the list
+
+[tasks.clean]
+depends = ['cleancache']
+run = "cargo clean" # runs as a shell command
+
+[tasks.build]
+description = 'Build the CLI'
+run = "cargo build"
+alias = 'b' # `mise run b`
+
+[tasks.test]
+description = 'Run automated tests'
+# multiple commands are run in series
+run = [
+    'cargo test',
+]
+dir = "{{cwd}}" # run in user's cwd, default is the project's base directory
+
+[tasks.lint]
+description = 'Lint with clippy'
+env = { RUST_BACKTRACE = '1' } # env vars for the script
+# you can specify a multiline script instead of individual commands
+run = """
+#!/usr/bin/env bash
+cargo clippy
+"""
+
+[tasks.ci] # only dependencies to be run
+description = 'Run CI tasks'
+depends = ['build', 'lint', 'test']
+
+[tasks.release]
+confirm = 'Are you sure you want to cut a new release?'
+description = 'Cut a new release'
+file = 'scripts/release.sh' # execute an external script

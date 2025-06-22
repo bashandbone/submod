@@ -60,30 +60,30 @@ cargo install --path .
 
 1. **Initialize a config file** in your git repository:
 
-   ```bash
-   # Create a basic submod.toml configuration
-   cat > submod.toml << EOF
-   [defaults]
-   ignore = "dirty"
+    ```bash
+    # Create a basic submod.toml configuration
+    cat > submod.toml << EOF
+    [defaults]
+    ignore = "dirty"
 
-   [my-submodule]
-   path = "vendor/my-lib"
-   url = "https://github.com/example/my-lib.git"
-   sparse_paths = ["src/", "include/", "*.md"]
-   EOF
-   ```
+    [my-submodule]
+    path = "vendor/my-lib"
+    url = "https://github.com/example/my-lib.git"
+    sparse_paths = ["src/", "include/", "*.md"]
+    EOF
+    ```
 
 2. **Initialize your submodules**:
 
-   ```bash
-   submod init
-   ```
+    ```bash
+    submod init
+    ```
 
 3. **Check status**:
 
-   ```bash
-   submod check
-   ```
+    ```bash
+    submod check
+    ```
 
 ## ⚙️ Configuration
 

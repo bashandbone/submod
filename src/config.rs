@@ -28,7 +28,6 @@ use std::fs;
 use std::{collections::HashMap, path::Path};
 use toml_edit::{Array, DocumentMut, Item, Table, value};
 
-
 /// Serializable wrapper for [`Ignore`] config
 #[derive(Debug, Default, Clone, Copy, Ord, PartialOrd, Eq, PartialEq, Hash)]
 pub struct SerializableIgnore(pub Ignore);

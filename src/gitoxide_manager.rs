@@ -84,7 +84,6 @@ pub enum SubmoduleError {
         name: String,
     },
 
-
     /// Repository access or validation error
     #[error("Repository not found or invalid")]
     #[allow(dead_code)]

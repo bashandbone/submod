@@ -125,7 +125,7 @@ git checkout -b fix/issue-number-description
 
 Briefly describe your changes in the commit message. Keep commits focused and atomic.
 
-```plaintext
+````plaintext
 
 feat: Add support for super-unicorn submodules :unicorn:
 
@@ -139,31 +139,31 @@ My philosophy on testing is to "test what matters." Tests focus on integration a
 
    ```bash
    cargo test --test unit_tests
-   ```
+````
 
 2. **Integration Tests** - Test complete workflows
 
-   ```bash
-   cargo test --test integration_tests
-   ```
+    ```bash
+    cargo test --test integration_tests
+    ```
 
 3. **Configuration Tests** - Test TOML parsing and validation
 
-   ```bash
-   cargo test --test config_tests
-   ```
+    ```bash
+    cargo test --test config_tests
+    ```
 
 4. **Sparse Checkout Tests** - Test sparse checkout functionality
 
-   ```bash
-   cargo test --test sparse_checkout_tests
-   ```
+    ```bash
+    cargo test --test sparse_checkout_tests
+    ```
 
 5. **Error Handling Tests** - Test error conditions and edge cases
 
-   ```bash
-   cargo test --test error_handling_tests
-   ```
+    ```bash
+    cargo test --test error_handling_tests
+    ```
 
 ### Running All Tests
 
@@ -255,20 +255,24 @@ git push origin feature/your-feature-name
 
 ```markdown
 ## Description
+
 Brief description of the changes and motivation.
 
 ## Type of Change
+
 - [ ] Bug fix (non-breaking change that fixes an issue)
 - [ ] New feature (non-breaking change that adds functionality)
 - [ ] Breaking change (fix or feature that causes existing functionality to change)
 - [ ] Documentation update
 
 ## Testing
+
 - [ ] I have added tests that prove my fix is effective or that my feature works
 - [ ] New and existing unit tests pass locally with my changes
 - [ ] I have run the full test suite (`./scripts/run-tests.sh`)
 
 ## Checklist
+
 - [ ] My code follows the project's style guidelines
 - [ ] I have performed a self-review of my own code
 - [ ] I have commented my code, particularly in hard-to-understand areas
@@ -276,6 +280,7 @@ Brief description of the changes and motivation.
 - [ ] My changes generate no new warnings
 
 ## Related Issues
+
 Fixes #(issue number)
 ```
 
@@ -315,29 +320,32 @@ cargo clippy --all-targets --all-features -- -D warnings
 #### Specific Guidelines
 
 1. **Error Handling**
-   - Use `anyhow::Result` for application errors
-   - Use `thiserror` for library errors
-   - Provide context with `.with_context()`
+
+    - Use `anyhow::Result` for application errors
+    - Use `thiserror` for library errors
+    - Provide context with `.with_context()`
 
 2. **Documentation**
-   - All public APIs must have doc comments
-   - Include examples in doc comments when helpful
-   - Use `#[doc = "..."]` for complex documentation
+
+    - All public APIs must have doc comments
+    - Include examples in doc comments when helpful
+    - Use `#[doc = "..."]` for complex documentation
 
 3. **Naming Conventions**
-   - Use descriptive names for variables and functions
-   - Prefer full words over abbreviations
-   - Use `snake_case` for functions and variables
-   - Use `PascalCase` for types and enums
+
+    - Use descriptive names for variables and functions
+    - Prefer full words over abbreviations
+    - Use `snake_case` for functions and variables
+    - Use `PascalCase` for types and enums
 
 4. **Code Organization**
-   - Group related functionality into modules
-   - Keep functions focused and single-purpose
-   - Use appropriate visibility (`pub`, `pub(crate)`, private)
+    - Group related functionality into modules
+    - Keep functions focused and single-purpose
+    - Use appropriate visibility (`pub`, `pub(crate)`, private)
 
 #### Example Code Style
 
-```rust
+````rust
 use anyhow::{Context, Result};
 use std::path::Path;
 
@@ -388,13 +396,13 @@ impl SubmoduleConfig {
         Ok(())
     }
 }
-```
+````
 
 ## 📚 Documentation
 
 ### Documentation Requirements
 
-- **Public APIs** - All public functions, structs, and modules. We aren't a library, so there really *isn't* a public API, but we still document everything.
+- **Public APIs** - All public functions, structs, and modules. We aren't a library, so there really _isn't_ a public API, but we still document everything.
 - **Complex algorithms** - Explain the approach and reasoning (if you need them for a submodule handling tool... I'll have questions)
 - **Configuration options** - Document all settings and their effects
 - **Error conditions** - When and why functions might fail
@@ -403,7 +411,7 @@ impl SubmoduleConfig {
 
 Common sense documentation style applies. If a function's purpose is obvious and it's well-typed, a sentence is probably enough. If it has complex logic or side effects, provide a detailed explanation.
 
-```rust
+````rust
 /// Short one-line description.
 ///
 /// Longer description explaining the purpose, behavior, and any important
@@ -433,7 +441,7 @@ Common sense documentation style applies. If a function's purpose is obvious and
 pub fn example_function(input: &str) -> Result<String> {
     // Implementation...
 }
-```
+````
 
 ### Updating Documentation
 
@@ -457,12 +465,13 @@ When reporting bugs, please include:
 
 ### Bug Report Template
 
-```markdown
+````markdown
 **Describe the bug**
 A clear and concise description of what the bug is.
 
 **To Reproduce**
 Steps to reproduce the behavior:
+
 1. Run command '...'
 2. See error
 
@@ -470,6 +479,7 @@ Steps to reproduce the behavior:
 A clear description of what you expected to happen.
 
 **Environment:**
+
 - OS: [e.g. Ubuntu 22.04, macOS 13.0, Windows 11]
 - Rust version: [e.g. 1.75.0]
 - submod version: [e.g. 0.1.0]
@@ -482,6 +492,7 @@ A clear description of what you expected to happen.
 # If you have super secret private repos on it
 # feel free to censor/change them
 ```
+````
 
 **Additional context**
 Add any other context about the problem here.
@@ -535,4 +546,4 @@ Every contribution, no matter how small, makes `submod` better for everyone. We 
 
 ---
 
-*This contributing guide is a living document. If you find areas for improvement, please suggest changes!*
+_This contributing guide is a living document. If you find areas for improvement, please suggest changes!_

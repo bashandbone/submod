@@ -1,0 +1,8 @@
+tabWidth = 4
+useTabs = false
+
+[[overrides]]
+files = ["*.json", "*.jsonc", "*.json5"]
+tabWidth = 2
+useTabs = false
+parser = "json"

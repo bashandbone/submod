@@ -1,102 +1,97 @@
 name: CI
 
 on:
-  push:
-    branches: [ main, develop ]
-  pull_request:
-    branches: [ main, develop ]
+    push:
+        branches: [main, develop]
+    pull_request:
+        branches: [main, develop]
 
 env:
-  CARGO_TERM_COLOR: always
+    CARGO_TERM_COLOR: always
 
 jobs:
-  test:
-    name: Test Suite
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        rust:
-          - stable
-          - beta
-          - nightly
-    steps:
-    - uses: actions/checkout@v4
-      with:
-        submodules: recursive
+    test:
+        name: Test Suite
+        runs-on: ubuntu-latest
+        strategy:
+            matrix:
+                rust:
+                    - stable
+                    - beta
+                    - nightly
+        steps:
+            - uses: actions/checkout@v4
+              with:
+                  submodules: recursive
 
-    - name: Install Rust
-      uses: dtolnay/rust-toolchain@master
-      with:
-        toolchain: ${{ matrix.rust }}
-        components: rustfmt, clippy
+            - name: Install Rust
+              uses: dtolnay/rust-toolchain@master
+              with:
+                  toolchain: ${{ matrix.rust }}
+                  components: rustfmt, clippy
 
-    - name: Cache cargo registry
-      uses: actions/cache@v4
-      with:
-        path: ~/.cargo/registry
-        key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+            - name: Cache cargo registry
+              uses: actions/cache@v4
+              with:
+                  path: ~/.cargo/registry
+                  key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
 
-    - name: Cache cargo index
-      uses: actions/cache@v4
-      with:
-        path: ~/.cargo/git
-        key: ${{ runner.os }}-cargo-index-${{ hashFiles('**/Cargo.lock') }}
+            - name: Cache cargo index
+              uses: actions/cache@v4
+              with:
+                  path: ~/.cargo/git
+                  key: ${{ runner.os }}-cargo-index-${{ hashFiles('**/Cargo.lock') }}
 
-    - name: Cache cargo build
-      uses: actions/cache@v4
-      with:
-        path: target
-        key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
+            - name: Cache cargo build
+              uses: actions/cache@v4
+              with:
+                  path: target
+                  key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
 
-    - name: Check formatting
-      run: cargo fmt --all -- --check
+            - name: Set up mise
+              run: |
+                  curl https://mise.run | sh
+                  echo "$HOME/.local/share/mise/bin" >> $GITHUB_PATH
+                  echo "$HOME/.local/share/mise/shims" >> $GITHUB_PATH
+                  MISE="$HOME/.local/bin/mise"
+                  $MISE trust -y
+                  $MISE install -y
+                  $MISE reshim
+                  hk install --mise
 
-    - name: Run clippy
-      run: cargo clippy --all-targets --all-features -- -D warnings
+            - name: Run hk ci workflow
+              run: hk ci
 
-    - name: Build
-      run: cargo build --verbose
+    security_audit:
+        name: Security Audit
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+            - uses: rustsec/audit-check@v1.4.1
+              with:
+                  token: ${{ secrets.GITHUB_TOKEN }}
 
-    - name: Run tests
-      run: cargo test --verbose
+    coverage:
+        name: Code Coverage
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+              with:
+                  submodules: recursive
 
-    - name: Run tests with all features
-      run: cargo test --all-features --verbose
+            - name: Install Rust
+              uses: dtolnay/rust-toolchain@stable
+              with:
+                  components: llvm-tools-preview
 
-    - name: Run tests without default features
-      run: cargo test --no-default-features --verbose
+            - name: Install cargo-llvm-cov
+              uses: taiki-e/install-action@cargo-llvm-cov
 
-  security_audit:
-    name: Security Audit
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v4
-    - uses: rustsec/audit-check@v1.4.1
-      with:
-        token: ${{ secrets.GITHUB_TOKEN }}
+            - name: Generate code coverage
+              run: cargo llvm-cov --all-features --workspace --lcov --output-path lcov.info
 
-  coverage:
-    name: Code Coverage
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v4
-      with:
-        submodules: recursive
-
-    - name: Install Rust
-      uses: dtolnay/rust-toolchain@stable
-      with:
-        components: llvm-tools-preview
-
-    - name: Install cargo-llvm-cov
-      uses: taiki-e/install-action@cargo-llvm-cov
-
-    - name: Generate code coverage
-      run: cargo llvm-cov --all-features --workspace --lcov --output-path lcov.info
-
-    - name: Upload coverage to Codecov
-      uses: codecov/codecov-action@v4
-      with:
-        files: lcov.info
-        fail_ci_if_error: true
-
+            - name: Upload coverage to Codecov
+              uses: codecov/codecov-action@v4
+              with:
+                  files: lcov.info
+                  fail_ci_if_error: true
