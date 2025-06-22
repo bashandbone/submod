@@ -80,6 +80,12 @@ impl TestHarness {
             return Err(format!("Failed to init git repo: {stderr}").into());
         }
 
+        // Ensure we're on the main branch
+        Command::new("git")
+            .args(["checkout", "-b", "main"])
+            .current_dir(&self.work_dir)
+            .output()?;
+
         // Configure git user for tests
         Command::new("git")
             .args(["config", "user.name", "Test User"])
@@ -128,11 +134,23 @@ impl TestHarness {
             .arg(&remote_dir)
             .output()?;
 
+        // Set the default branch to main for the bare repository
+        Command::new("git")
+            .args(["symbolic-ref", "HEAD", "refs/heads/main"])
+            .current_dir(&remote_dir)
+            .output()?;
+
         // Create a working copy to add content
         let work_copy = self.temp_dir.path().join(format!("{name}_work"));
         Command::new("git")
             .args(["init"])
             .arg(&work_copy)
+            .output()?;
+
+        // Set the default branch to main for the working copy
+        Command::new("git")
+            .args(["checkout", "-b", "main"])
+            .current_dir(&work_copy)
             .output()?;
 
         // Set up remote
@@ -181,10 +199,16 @@ impl TestHarness {
             .current_dir(&work_copy)
             .output()?;
 
-        Command::new("git")
-            .args(["push", "origin", "main"])
+        let push_output = Command::new("git")
+            .args(["push", "--no-verify", "origin", "main"])
             .current_dir(&work_copy)
             .output()?;
+
+        // Check if push was successful
+        if !push_output.status.success() {
+            let stderr = String::from_utf8_lossy(&push_output.stderr);
+            return Err(format!("Failed to push to remote: {}", stderr).into());
+        }
 
         Ok(remote_dir)
     }
