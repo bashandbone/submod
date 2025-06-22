@@ -1,47 +1,372 @@
-# `submod` crate
+# `submod`
 
-A lightweight CLI tool for managing git submodules. It provides a simple interface to set up, update, and manage submodules in your git repositories. Built ontop of `gitoxide` and `git2` libraries, it aims to be fast and efficient.
+[![Crates.io](https://img.shields.io/crates/v/submod.svg)](https://crates.io/crates/submod)
+[![Documentation](https://docs.rs/submod/badge.svg)](https://docs.rs/submod)
+[![License](https://img.shields.io/badge/license-MIT%2FApache--2.0-blue.svg)](LICENSE)
+[![Rust](https://img.shields.io/badge/rust-1.87%2B-blue.svg)](https://www.rust-lang.org)
 
-## Features
+A lightweight, fast CLI tool for managing git submodules with advanced sparse checkout support. Built on top of `gitoxide` and `git2` libraries for maximum performance and reliability.
 
-- Toml-based configuration to define submodules, sparse-checkout paths, and other settings.
-- Set global submodule settings with submodule-specific overrides.
-- Support for adding, removing, and updating submodules with ease.
-- Automatic handling of sparse-checkout paths and configuration.
+## 🚀 Features
 
-## Motivation
+- **TOML-based configuration** - Define submodules, sparse-checkout paths, and settings in a simple config file
+- **Global defaults with overrides** - Set project-wide submodule settings with per-submodule customization
+- **Sparse checkout support** - Efficiently checkout only the parts of submodules you need
+- **Fast operations** - Leverages `gitoxide` for high-performance git operations
+- **Robust fallbacks** - Automatic fallback to `git2` and CLI when needed
+- **Comprehensive commands** - Add, check, init, update, reset, and sync submodules with ease
+- **Developer-friendly** - Clear status reporting and error messages
 
-I have multiple projects (at @knitli and @plainlicense) that use submodules for core features, and I found scripting initialization and management was tedious and error-prone. This tool aims to simplify the process of managing submodules, especially when dealing with sparse checkouts and multiple repositories. The documentation for `git submodule` and `git sparse-checkout` isn't always clear, and this tool aims to provide a more user-friendly interface.
+## 📋 Table of Contents
 
-I see the current state of submodule management as a barrier to contributions to projects that use submodules and for new developers generally. `submod` makes it easier for developers to work with submodules, especially in larger projects where submodules are used extensively.
+- [Installation](#-installation)
+- [Quick Start](#-quick-start)
+- [Configuration](#-configuration)
+- [Commands](#-commands)
+- [Usage Examples](#-usage-examples)
+- [Development](#-development)
+- [Contributing](#-contributing)
+- [License](#-license)
 
-## Installation
+## 🔧 Installation
 
 ### Using Cargo
-
-You can install the `submod` crate using Cargo:
 
 ```bash
 cargo install submod
 ```
 
-If you don't have Cargo installed, you can follow the instructions on the [Rust installation page](https://www.rust-lang.org/tools/install).
-
 ### Using Mise
 
-[Mise (docs)][mise-docs] ([repo][mise-repo]) is a project management tool and package manager.
-
-The workflow I use for my repos (including this one) is to use Mise to bootstrap developer setup, which includes installing `submod` and other tools.
-You can install `submod` using Mise with the following command:
+[Mise](https://mise.jdx.dev/) is a project management tool and package manager that can manage your development environment.
 
 ```bash
-# the '-g' flag installs the package globally, leave it out for a project-specific installation
+# Global installation
 mise use -g cargo:submod@latest
+
+# Project-specific installation
+mise use cargo:submod@latest
 ```
 
-## Usage
+### From Source
 
-TODO: Add usage examples and documentation
+```bash
+git clone https://github.com/yourusername/submod.git
+cd submod
+cargo install --path .
+```
 
-[mise-docs]: https://mise.jdx.dev/ "Mise documentation"
-[mise-repo]: https://github.com/jdx/mise "Mise GitHub repository"
+## 🚀 Quick Start
+
+1. **Initialize a config file** in your git repository:
+
+   ```bash
+   # Create a basic submod.toml configuration
+   cat > submod.toml << EOF
+   [defaults]
+   ignore = "dirty"
+
+   [my-submodule]
+   path = "vendor/my-lib"
+   url = "https://github.com/example/my-lib.git"
+   sparse_paths = ["src/", "include/", "*.md"]
+   EOF
+   ```
+
+2. **Initialize your submodules**:
+
+   ```bash
+   submod init
+   ```
+
+3. **Check status**:
+
+   ```bash
+   submod check
+   ```
+
+## ⚙️ Configuration
+
+Create a `submod.toml` file in your repository root:
+
+```toml
+# Global defaults applied to all submodules
+[defaults]
+ignore = "dirty"          # ignore dirty state in status
+update = "checkout"       # update method
+branch = "main"          # default branch to track
+
+# Individual submodule configuration
+[vendor-utils]
+path = "vendor/utils"
+url = "https://github.com/example/utils.git"
+sparse_paths = ["src/", "include/", "*.md"]
+ignore = "all"           # override default ignore setting
+active = true            # whether submodule is active
+
+[my-submodule]
+path = "libs/my-submodule"
+url = "https://github.com/example/my-submodule.git"
+sparse_paths = ["src/core/", "docs/"]
+branch = "develop"       # track specific branch
+```
+
+### Configuration Options
+
+#### Global Defaults
+
+- `ignore`: How to handle dirty submodules (`all`, `dirty`, `untracked`, `none`)
+- `update`: Update strategy (`checkout`, `rebase`, `merge`, `none`, `!command`)
+- `branch`: Default branch to track (`.` for current superproject branch)
+- `fetchRecurse`: Fetch recursion (`always`, `on-demand`, `never`)
+
+#### Per-Submodule Settings
+
+- `path`: Local path where submodule should be placed
+- `url`: Git repository URL
+- `sparse_paths`: Array of paths to include in sparse checkout
+- `active`: Whether the submodule is active (default: `true`)
+- All global defaults can be overridden per submodule
+
+## 📖 Commands
+
+### `submod add`
+
+Add a new submodule to your configuration and repository:
+
+```bash
+submod add my-lib libs/my-lib https://github.com/example/my-lib.git \
+  --sparse-paths "src/,include/" \
+  --settings "ignore=all"
+```
+
+### `submod check`
+
+Check the status of all configured submodules:
+
+```bash
+submod check
+```
+
+### `submod init`
+
+Initialize all missing submodules:
+
+```bash
+submod init
+```
+
+### `submod update`
+
+Update all submodules to their latest commits:
+
+```bash
+submod update
+```
+
+### `submod reset`
+
+Hard reset submodules (stash changes, reset --hard, clean):
+
+```bash
+# Reset all submodules
+submod reset --all
+
+# Reset specific submodules
+submod reset my-lib vendor-utils
+```
+
+### `submod sync`
+
+Run a complete sync (check + init + update):
+
+```bash
+submod sync
+```
+
+## 💻 Usage Examples
+
+### Basic Workflow
+
+```bash
+# Start with checking current state
+submod check
+
+# Initialize any missing submodules
+submod init
+
+# Update everything to latest
+submod update
+
+# Or do it all at once
+submod sync
+```
+
+### Adding Submodules with Sparse Checkout
+
+```bash
+# Add a submodule that only checks out specific directories
+submod add react-components src/components https://github.com/company/react-components.git \
+  --sparse-paths "src/Button/,src/Input/,README.md"
+```
+
+### Working with Different Configurations
+
+```bash
+# Use a custom config file
+submod --config my-custom.toml check
+
+# Check status with custom config
+submod --config production.toml sync
+```
+
+### Handling Problematic Submodules
+
+```bash
+# Reset a problematic submodule
+submod reset my-problematic-submodule
+
+# Check what's wrong
+submod check
+
+# Re-sync everything
+submod sync
+```
+
+## 🛠️ Development
+
+### Prerequisites
+
+- Rust 1.87 or later
+- Git
+
+### Building from Source
+
+```bash
+# Clone the repository
+git clone https://github.com/bashandbone/submod.git
+cd submod
+
+# Build the project
+cargo build
+
+# Run tests
+cargo test
+
+# Or use the comprehensive test runner
+./scripts/run_tests.sh --verbose
+```
+
+### Running Tests
+
+```bash
+# Run all tests
+cargo test
+
+# Run integration tests only
+cargo test --test integration_tests
+
+# Run with the test script for better reporting
+./scripts/run_tests.sh
+
+# Run performance tests
+./scripts/run_tests.sh --performance
+
+# Filter specific tests
+./scripts/run_tests.sh --filter sparse_checkout
+```
+
+### Project Structure
+
+```plaintext
+submod/
+├── src/
+│   ├── main.rs              # CLI entry point
+│   ├── commands.rs          # Command definitions
+│   ├── config.rs            # TOML configuration handling
+│   └── gitoxide_manager.rs  # Core submodule operations
+├── tests/                   # Integration tests
+├── sample_config/           # Example configurations
+├── scripts/                 # Development scripts
+└── docs/                    # Documentation
+```
+
+## 🤝 Contributing
+
+We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details.
+
+### Quick Contributing Steps
+
+1. **Fork the repository**
+2. **Create a feature branch**: `git checkout -b feature/amazing-feature`
+3. **Make your changes** and add tests if applicable (test anything that has a result)
+4. **Run the test suite**: `./scripts/run_tests.sh`
+5. **Commit your changes**: `git commit -m 'Add amazing feature'`
+6. **Push to your branch**: `git push origin feature/amazing-feature`
+7. **Open a Pull Request**
+
+### Development Guidelines
+
+- Follow Rust best practices and idioms
+- Add tests for new functionality. I'm not big on unit tests, but integration tests are essential.
+- Update documentation for user-facing changes
+- Use conventional commit messages
+- Ensure all tests pass before submitting PR
+
+## 🔍 Troubleshooting
+
+### Common Issues
+
+**Submodule not initializing:**
+
+```bash
+# Check if the URL is accessible
+git ls-remote <submodule-url>
+
+# Verify your configuration
+submod check
+```
+
+**Sparse checkout not working:**
+
+- Ensure paths in `sparse_paths` are relative to the submodule root
+- Check that the submodule repository contains the specified paths
+- Verify sparse checkout is enabled: `git config core.sparseCheckout` in the submodule
+
+**Permission issues:**
+
+- Ensure you have proper SSH keys set up for private repositories
+- Check if your Git credentials are configured correctly
+
+## 📋 Motivation
+
+Managing git submodules, especially with sparse checkouts, can be complex and error-prone. Traditional git submodule commands require multiple steps and careful attention to configuration details.
+
+This tool was created to:
+
+- **Reduce barriers to contribution** - Make it easier for new developers to work with projects using submodules
+- **Simplify complex workflows** - Handle initialization, updates, and sparse checkout configuration automatically
+- **Provide better tooling** - Clear status reporting and error messages
+- **Leverage modern Git libraries** - Use `gitoxide` for better performance and reliability
+
+The tool is actively used in multiple projects at [@knitli](https://github.com/knitli) and [@plainlicense](https://github.com/plainlicense), where submodules are essential for sharing core functionality across repositories.
+
+## 📄 License
+
+This project is licensed under the [Plain MIT License](https://plainlicense.org/licenses/permissive/mit/).
+
+## 🙏 Acknowledgments
+
+- [gitoxide](https://github.com/Byron/gitoxide) - Fast and safe pure Rust implementation of Git
+- [git2-rs](https://github.com/rust-lang/git2-rs) - Rust bindings to libgit2
+- [clap](https://github.com/clap-rs/clap) - Command line argument parser
+
+---
+
+<div align="center">
+
+**[Homepage](https://github.com/bashandbone/submod)** • **[Documentation](https://docs.rs/submod)** • **[Crate](https://crates.io/crates/submod)**
+
+Made with ❤️ for the Rust and Git communities
+
+</div>

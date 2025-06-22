@@ -19,8 +19,8 @@ pub enum Commands {
 Add {
     /// Submodule name
     name: String,
-    /// Local folder path
-    folder: String,
+    /// Local path for the submodule
+    path: String,
     /// Git repository URL
     url: String,
     /// Sparse checkout paths (comma-separated)

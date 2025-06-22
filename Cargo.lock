@@ -2045,6 +2045,8 @@ dependencies = [
  "gix-submodule",
  "serde",
  "serde_json",
+ "tempfile",
+ "thiserror",
  "toml",
  "toml_edit",
 ]

@@ -1,0 +1,4 @@
+[tools]
+bun = "latest"
+cargo-binstall = "latest"
+rust = "1.87"
