@@ -210,9 +210,7 @@ ignore = "all"
         println!("Many patterns sparse checkout time: {duration:?}");
 
         // Verify sparse checkout was configured
-        let sparse_file = harness
-            .work_dir
-            .join("lib/many-patterns/.git/info/sparse-checkout");
+        let sparse_file = harness.get_sparse_checkout_file_path("lib/many-patterns");
         assert!(sparse_file.exists());
 
         let sparse_content = fs::read_to_string(&sparse_file).expect("Failed to read sparse file");
@@ -417,18 +415,18 @@ ignore = "all"
         let harness = TestHarness::new().expect("Failed to create test harness");
         harness.init_git_repo().expect("Failed to init git repo");
 
-        let unicode_config = r#"[测试-submodule]
+        let unicode_config = r#"["测试-submodule"]
 path = "lib/测试"
 url = "https://github.com/用户/项目.git"
 active = true
 sparse_paths = ["源码/", "文档/", "*.md"]
 
-[émoji-test-🚀]
+["émoji-test-🚀"]
 path = "lib/émoji🚀"
 url = "https://github.com/user/émoji-repo.git"
 active = true
 
-[special-chars-!@#$%]
+["special-chars-!@#$%"]
 path = "lib/special"
 url = "https://github.com/user/special-chars.git"
 active = true

@@ -44,9 +44,9 @@ pub struct SerializableBranch(pub Branch);
 #[derive(Debug, Default, Clone, Ord, PartialOrd, Eq, PartialEq, Hash)]
 pub struct SerializableUpdate(pub Update);
 
-/**========================================================================
- **               Implement Serialize/Deserialize for Config
- *========================================================================**/
+// ========================================================================
+// Implement Serialize/Deserialize for Config
+// ========================================================================
 /// implements Serialize for [`SerializableIgnore`]
 impl Serialize for SerializableIgnore {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
