@@ -1,0 +1,1071 @@
+[33;1mwarning[0m: ignoring --test-threads because --no-capture is specified
+[1m[32m    Finished[0m ]8;;https://doc.rust-lang.org/cargo/reference/profiles.html#default-profiles\`test` profile [unoptimized + debuginfo]]8;;\ target(s) in 0.49s
+────────────
+[32;1m Nextest run[0m ID [1m88f3d136-81ea-48d8-9eaa-1462b7d4337b[0m with nextest profile: [1mdefault[0m
+[32;1m    Starting[0m [1m55[0m tests across [1m7[0m binaries
+[32;1m       START[0m             [35;1msubmod::config_tests[0m [36mtests[0m[36m::[0m[34;1mtest_config_modification_via_add_command[0m
+
+running 1 test
+test tests::test_config_modification_via_add_command ... 
+thread 'tests::test_config_modification_via_add_command' panicked at tests/config_tests.rs:197:14:
+Failed to add submodule: "Command failed:\nstdout: \nstderr: Error: Failed to add submodule: Git CLI operation failed: Git submodule add failed: fatal: 'lib/new' does not have a commit checked out\n\n\nStack backtrace:\n   0: anyhow::error::<impl anyhow::Error>::msg\n             at /home/knitli/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/anyhow-1.0.98/src/backtrace.rs:27:14\n   1: submod::main::{{closure}}\n             at /home/knitli/submod/src/main.rs:71:30\n   2: core::result::Result<T,E>::map_err\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/result.rs:856:27\n   3: submod::main\n             at /home/knitli/submod/src/main.rs:69:13\n   4: core::ops::function::FnOnce::call_once\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/ops/function.rs:250:5\n   5: std::sys::backtrace::__rust_begin_short_backtrace\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/sys/backtrace.rs:152:18\n   6: std::rt::lang_start::{{closure}}\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/rt.rs:199:18\n   7: core::ops::function::impls::<impl core::ops::function::FnOnce<A> for &F>::call_once\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/ops/function.rs:284:13\n   8: std::panicking::try::do_call\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/panicking.rs:589:40\n   9: std::panicking::try\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/panicking.rs:552:19\n  10: std::panic::catch_unwind\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/panic.rs:359:14\n  11: std::rt::lang_start_internal::{{closure}}\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/rt.rs:168:24\n  12: std::panicking::try::do_call\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/panicking.rs:589:40\n  13: std::panicking::try\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/panicking.rs:552:19\n  14: std::panic::catch_unwind\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/panic.rs:359:14\n  15: std::rt::lang_start_internal\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/rt.rs:164:5\n  16: std::rt::lang_start\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/rt.rs:198:5\n  17: main\n  18: <unknown>\n  19: __libc_start_main\n  20: _start\n"
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/panicking.rs:697:5
+   1: core::panicking::panic_fmt
+             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/panicking.rs:75:14
+   2: core::result::unwrap_failed
+             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/result.rs:1704:5
+   3: core::result::Result<T,E>::expect
+             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/result.rs:1061:23
+   4: config_tests::tests::test_config_modification_via_add_command
+             at ./tests/config_tests.rs:188:9
+   5: config_tests::tests::test_config_modification_via_add_command::{{closure}}
+             at ./tests/config_tests.rs:164:50
+   6: core::ops::function::FnOnce::call_once
+             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/ops/function.rs:250:5
+   7: core::ops::function::FnOnce::call_once
+             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/ops/function.rs:250:5
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+FAILED
+
+failures:
+
+failures:
+    tests::test_config_modification_via_add_command
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 8 filtered out; finished in 1.99s
+
+[31;1m        FAIL[0m [   2.001s] [35;1msubmod::config_tests[0m [36mtests[0m[36m::[0m[34;1mtest_config_modification_via_add_command[0m
+[32;1m       START[0m             [35;1msubmod::config_tests[0m [36mtests[0m[36m::[0m[34;1mtest_config_serialization_roundtrip[0m
+
+running 1 test
+test tests::test_config_serialization_roundtrip ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 8 filtered out; finished in 1.04s
+
+[32;1m        PASS[0m [   1.053s] [35;1msubmod::config_tests[0m [36mtests[0m[36m::[0m[34;1mtest_config_serialization_roundtrip[0m
+[32;1m       START[0m             [35;1msubmod::config_tests[0m [36mtests[0m[36m::[0m[34;1mtest_config_validation_missing_required_fields[0m
+
+running 1 test
+test tests::test_config_validation_missing_required_fields ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 8 filtered out; finished in 1.09s
+
+[32;1m        PASS[0m [   1.100s] [35;1msubmod::config_tests[0m [36mtests[0m[36m::[0m[34;1mtest_config_validation_missing_required_fields[0m
+[32;1m       START[0m             [35;1msubmod::config_tests[0m [36mtests[0m[36m::[0m[34;1mtest_config_with_all_git_options[0m
+
+running 1 test
+test tests::test_config_with_all_git_options ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 8 filtered out; finished in 1.14s
+
+[32;1m        PASS[0m [   1.144s] [35;1msubmod::config_tests[0m [36mtests[0m[36m::[0m[34;1mtest_config_with_all_git_options[0m
+[32;1m       START[0m             [35;1msubmod::config_tests[0m [36mtests[0m[36m::[0m[34;1mtest_config_with_comments_and_formatting[0m
+
+running 1 test
+test tests::test_config_with_comments_and_formatting ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 8 filtered out; finished in 1.16s
+
+[32;1m        PASS[0m [   1.165s] [35;1msubmod::config_tests[0m [36mtests[0m[36m::[0m[34;1mtest_config_with_comments_and_formatting[0m
+[32;1m       START[0m             [35;1msubmod::config_tests[0m [36mtests[0m[36m::[0m[34;1mtest_config_with_special_characters_in_paths[0m
+
+running 1 test
+test tests::test_config_with_special_characters_in_paths ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 8 filtered out; finished in 1.17s
+
+[32;1m        PASS[0m [   1.176s] [35;1msubmod::config_tests[0m [36mtests[0m[36m::[0m[34;1mtest_config_with_special_characters_in_paths[0m
+[32;1m       START[0m             [35;1msubmod::config_tests[0m [36mtests[0m[36m::[0m[34;1mtest_defaults_inheritance[0m
+
+running 1 test
+test tests::test_defaults_inheritance ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 8 filtered out; finished in 1.11s
+
+[32;1m        PASS[0m [   1.123s] [35;1msubmod::config_tests[0m [36mtests[0m[36m::[0m[34;1mtest_defaults_inheritance[0m
+[32;1m       START[0m             [35;1msubmod::config_tests[0m [36mtests[0m[36m::[0m[34;1mtest_empty_defaults_section[0m
+
+running 1 test
+test tests::test_empty_defaults_section ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 8 filtered out; finished in 1.01s
+
+[32;1m        PASS[0m [   1.015s] [35;1msubmod::config_tests[0m [36mtests[0m[36m::[0m[34;1mtest_empty_defaults_section[0m
+[32;1m       START[0m             [35;1msubmod::config_tests[0m [36mtests[0m[36m::[0m[34;1mtest_invalid_config_handling[0m
+
+running 1 test
+test tests::test_invalid_config_handling ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.65s
+
+[32;1m        PASS[0m [   0.659s] [35;1msubmod::config_tests[0m [36mtests[0m[36m::[0m[34;1mtest_invalid_config_handling[0m
+[32;1m       START[0m             [35;1msubmod::error_handling_tests[0m [36mtests[0m[36m::[0m[34;1mtest_concurrent_operations[0m
+
+running 1 test
+test tests::test_concurrent_operations ... 
+thread 'tests::test_concurrent_operations' panicked at tests/error_handling_tests.rs:219:14:
+Failed to add submodule: "Command failed:\nstdout: \nstderr: Error: Failed to add submodule: Git CLI operation failed: Git submodule add failed: fatal: 'lib/concurrent' does not have a commit checked out\n\n\nStack backtrace:\n   0: anyhow::error::<impl anyhow::Error>::msg\n             at /home/knitli/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/anyhow-1.0.98/src/backtrace.rs:27:14\n   1: submod::main::{{closure}}\n             at /home/knitli/submod/src/main.rs:71:30\n   2: core::result::Result<T,E>::map_err\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/result.rs:856:27\n   3: submod::main\n             at /home/knitli/submod/src/main.rs:69:13\n   4: core::ops::function::FnOnce::call_once\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/ops/function.rs:250:5\n   5: std::sys::backtrace::__rust_begin_short_backtrace\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/sys/backtrace.rs:152:18\n   6: std::rt::lang_start::{{closure}}\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/rt.rs:199:18\n   7: core::ops::function::impls::<impl core::ops::function::FnOnce<A> for &F>::call_once\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/ops/function.rs:284:13\n   8: std::panicking::try::do_call\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/panicking.rs:589:40\n   9: std::panicking::try\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/panicking.rs:552:19\n  10: std::panic::catch_unwind\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/panic.rs:359:14\n  11: std::rt::lang_start_internal::{{closure}}\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/rt.rs:168:24\n  12: std::panicking::try::do_call\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/panicking.rs:589:40\n  13: std::panicking::try\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/panicking.rs:552:19\n  14: std::panic::catch_unwind\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/panic.rs:359:14\n  15: std::rt::lang_start_internal\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/rt.rs:164:5\n  16: std::rt::lang_start\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/rt.rs:198:5\n  17: main\n  18: <unknown>\n  19: __libc_start_main\n  20: _start\n"
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/panicking.rs:697:5
+   1: core::panicking::panic_fmt
+             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/panicking.rs:75:14
+   2: core::result::unwrap_failed
+             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/result.rs:1704:5
+   3: core::result::Result<T,E>::expect
+             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/result.rs:1061:23
+   4: error_handling_tests::tests::test_concurrent_operations
+             at ./tests/error_handling_tests.rs:217:9
+   5: error_handling_tests::tests::test_concurrent_operations::{{closure}}
+             at ./tests/error_handling_tests.rs:207:36
+   6: core::ops::function::FnOnce::call_once
+             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/ops/function.rs:250:5
+   7: core::ops::function::FnOnce::call_once
+             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/ops/function.rs:250:5
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+FAILED
+
+failures:
+
+failures:
+    tests::test_concurrent_operations
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 13 filtered out; finished in 1.11s
+
+[31;1m        FAIL[0m [   1.123s] [35;1msubmod::error_handling_tests[0m [36mtests[0m[36m::[0m[34;1mtest_concurrent_operations[0m
+[32;1m       START[0m             [35;1msubmod::error_handling_tests[0m [36mtests[0m[36m::[0m[34;1mtest_config_file_locked[0m
+
+running 1 test
+test tests::test_config_file_locked ... 
+thread 'tests::test_config_file_locked' panicked at tests/error_handling_tests.rs:375:9:
+assertion failed: stderr.contains("Permission denied") ||
+    stderr.contains("Failed to save config")
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/panicking.rs:697:5
+   1: core::panicking::panic_fmt
+             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/panicking.rs:75:14
+   2: core::panicking::panic
+             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/panicking.rs:145:5
+   3: error_handling_tests::tests::test_config_file_locked
+             at ./tests/error_handling_tests.rs:375:9
+   4: error_handling_tests::tests::test_config_file_locked::{{closure}}
+             at ./tests/error_handling_tests.rs:346:33
+   5: core::ops::function::FnOnce::call_once
+             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/ops/function.rs:250:5
+   6: core::ops::function::FnOnce::call_once
+             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/ops/function.rs:250:5
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+FAILED
+
+failures:
+
+failures:
+    tests::test_config_file_locked
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 13 filtered out; finished in 1.07s
+
+[31;1m        FAIL[0m [   1.077s] [35;1msubmod::error_handling_tests[0m [36mtests[0m[36m::[0m[34;1mtest_config_file_locked[0m
+[32;1m       START[0m             [35;1msubmod::error_handling_tests[0m [36mtests[0m[36m::[0m[34;1mtest_corrupted_config_file[0m
+
+running 1 test
+test tests::test_corrupted_config_file ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 13 filtered out; finished in 1.00s
+
+[32;1m        PASS[0m [   1.006s] [35;1msubmod::error_handling_tests[0m [36mtests[0m[36m::[0m[34;1mtest_corrupted_config_file[0m
+[32;1m       START[0m             [35;1msubmod::error_handling_tests[0m [36mtests[0m[36m::[0m[34;1mtest_disk_space_exhaustion_simulation[0m
+
+running 1 test
+test tests::test_disk_space_exhaustion_simulation ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 13 filtered out; finished in 1.13s
+
+[32;1m        PASS[0m [   1.142s] [35;1msubmod::error_handling_tests[0m [36mtests[0m[36m::[0m[34;1mtest_disk_space_exhaustion_simulation[0m
+[32;1m       START[0m             [35;1msubmod::error_handling_tests[0m [36mtests[0m[36m::[0m[34;1mtest_invalid_command_line_arguments[0m
+
+running 1 test
+test tests::test_invalid_command_line_arguments ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 13 filtered out; finished in 0.64s
+
+[32;1m        PASS[0m [   0.643s] [35;1msubmod::error_handling_tests[0m [36mtests[0m[36m::[0m[34;1mtest_invalid_command_line_arguments[0m
+[32;1m       START[0m             [35;1msubmod::error_handling_tests[0m [36mtests[0m[36m::[0m[34;1mtest_invalid_config_file_path[0m
+
+running 1 test
+test tests::test_invalid_config_file_path ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 13 filtered out; finished in 0.59s
+
+[32;1m        PASS[0m [   0.601s] [35;1msubmod::error_handling_tests[0m [36mtests[0m[36m::[0m[34;1mtest_invalid_config_file_path[0m
+[32;1m       START[0m             [35;1msubmod::error_handling_tests[0m [36mtests[0m[36m::[0m[34;1mtest_invalid_git_url[0m
+
+running 1 test
+test tests::test_invalid_git_url ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 13 filtered out; finished in 12.03s
+
+[32;1m        PASS[0m [  12.036s] [35;1msubmod::error_handling_tests[0m [36mtests[0m[36m::[0m[34;1mtest_invalid_git_url[0m
+[32;1m       START[0m             [35;1msubmod::error_handling_tests[0m [36mtests[0m[36m::[0m[34;1mtest_invalid_sparse_checkout_patterns[0m
+
+running 1 test
+test tests::test_invalid_sparse_checkout_patterns ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 13 filtered out; finished in 1.86s
+
+[32;1m        PASS[0m [   1.862s] [35;1msubmod::error_handling_tests[0m [36mtests[0m[36m::[0m[34;1mtest_invalid_sparse_checkout_patterns[0m
+[32;1m       START[0m             [35;1msubmod::error_handling_tests[0m [36mtests[0m[36m::[0m[34;1mtest_malformed_git_repository[0m
+
+running 1 test
+test tests::test_malformed_git_repository ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 13 filtered out; finished in 0.90s
+
+[32;1m        PASS[0m [   0.902s] [35;1msubmod::error_handling_tests[0m [36mtests[0m[36m::[0m[34;1mtest_malformed_git_repository[0m
+[32;1m       START[0m             [35;1msubmod::error_handling_tests[0m [36mtests[0m[36m::[0m[34;1mtest_missing_submodule_for_operations[0m
+
+running 1 test
+test tests::test_missing_submodule_for_operations ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 13 filtered out; finished in 0.72s
+
+[32;1m        PASS[0m [   0.724s] [35;1msubmod::error_handling_tests[0m [36mtests[0m[36m::[0m[34;1mtest_missing_submodule_for_operations[0m
+[32;1m       START[0m             [35;1msubmod::error_handling_tests[0m [36mtests[0m[36m::[0m[34;1mtest_network_timeout_simulation[0m
+
+running 1 test
+test tests::test_network_timeout_simulation ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 13 filtered out; finished in 0.90s
+
+[32;1m        PASS[0m [   0.904s] [35;1msubmod::error_handling_tests[0m [36mtests[0m[36m::[0m[34;1mtest_network_timeout_simulation[0m
+[32;1m       START[0m             [35;1msubmod::error_handling_tests[0m [36mtests[0m[36m::[0m[34;1mtest_not_in_git_repository[0m
+
+running 1 test
+test tests::test_not_in_git_repository ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 13 filtered out; finished in 0.46s
+
+[32;1m        PASS[0m [   0.471s] [35;1msubmod::error_handling_tests[0m [36mtests[0m[36m::[0m[34;1mtest_not_in_git_repository[0m
+[32;1m       START[0m             [35;1msubmod::error_handling_tests[0m [36mtests[0m[36m::[0m[34;1mtest_permission_denied_scenarios[0m
+
+running 1 test
+test tests::test_permission_denied_scenarios ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 13 filtered out; finished in 1.10s
+
+[32;1m        PASS[0m [   1.110s] [35;1msubmod::error_handling_tests[0m [36mtests[0m[36m::[0m[34;1mtest_permission_denied_scenarios[0m
+[32;1m       START[0m             [35;1msubmod::error_handling_tests[0m [36mtests[0m[36m::[0m[34;1mtest_recovery_from_partial_operations[0m
+
+running 1 test
+test tests::test_recovery_from_partial_operations ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 13 filtered out; finished in 1.14s
+
+[32;1m        PASS[0m [   1.147s] [35;1msubmod::error_handling_tests[0m [36mtests[0m[36m::[0m[34;1mtest_recovery_from_partial_operations[0m
+[32;1m       START[0m             [35;1msubmod::integration_tests[0m [36mtests[0m[36m::[0m[34;1mtest_add_submodule_basic[0m
+
+running 1 test
+test tests::test_add_submodule_basic ... 
+thread 'tests::test_add_submodule_basic' panicked at tests/integration_tests.rs:61:14:
+Failed to add submodule: "Command failed:\nstdout: \nstderr: Error: Failed to add submodule: Git CLI operation failed: Git submodule add failed: fatal: 'lib/test' does not have a commit checked out\n\n\nStack backtrace:\n   0: anyhow::error::<impl anyhow::Error>::msg\n             at /home/knitli/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/anyhow-1.0.98/src/backtrace.rs:27:14\n   1: submod::main::{{closure}}\n             at /home/knitli/submod/src/main.rs:71:30\n   2: core::result::Result<T,E>::map_err\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/result.rs:856:27\n   3: submod::main\n             at /home/knitli/submod/src/main.rs:69:13\n   4: core::ops::function::FnOnce::call_once\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/ops/function.rs:250:5\n   5: std::sys::backtrace::__rust_begin_short_backtrace\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/sys/backtrace.rs:152:18\n   6: std::rt::lang_start::{{closure}}\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/rt.rs:199:18\n   7: core::ops::function::impls::<impl core::ops::function::FnOnce<A> for &F>::call_once\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/ops/function.rs:284:13\n   8: std::panicking::try::do_call\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/panicking.rs:589:40\n   9: std::panicking::try\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/panicking.rs:552:19\n  10: std::panic::catch_unwind\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/panic.rs:359:14\n  11: std::rt::lang_start_internal::{{closure}}\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/rt.rs:168:24\n  12: std::panicking::try::do_call\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/panicking.rs:589:40\n  13: std::panicking::try\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/panicking.rs:552:19\n  14: std::panic::catch_unwind\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/panic.rs:359:14\n  15: std::rt::lang_start_internal\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/rt.rs:164:5\n  16: std::rt::lang_start\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/rt.rs:198:5\n  17: main\n  18: <unknown>\n  19: __libc_start_main\n  20: _start\n"
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/panicking.rs:697:5
+   1: core::panicking::panic_fmt
+             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/panicking.rs:75:14
+   2: core::result::unwrap_failed
+             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/result.rs:1704:5
+   3: core::result::Result<T,E>::expect
+             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/result.rs:1061:23
+   4: integration_tests::tests::test_add_submodule_basic
+             at ./tests/integration_tests.rs:59:22
+   5: integration_tests::tests::test_add_submodule_basic::{{closure}}
+             at ./tests/integration_tests.rs:49:34
+   6: core::ops::function::FnOnce::call_once
+             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/ops/function.rs:250:5
+   7: core::ops::function::FnOnce::call_once
+             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/ops/function.rs:250:5
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+FAILED
+
+failures:
+
+failures:
+    tests::test_add_submodule_basic
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 13 filtered out; finished in 1.18s
+
+[31;1m        FAIL[0m [   1.191s] [35;1msubmod::integration_tests[0m [36mtests[0m[36m::[0m[34;1mtest_add_submodule_basic[0m
+[32;1m       START[0m             [35;1msubmod::integration_tests[0m [36mtests[0m[36m::[0m[34;1mtest_add_submodule_with_sparse_paths[0m
+
+running 1 test
+test tests::test_add_submodule_with_sparse_paths ... 
+thread 'tests::test_add_submodule_with_sparse_paths' panicked at tests/integration_tests.rs:97:14:
+Failed to add submodule: "Command failed:\nstdout: \nstderr: Error: Failed to add submodule: Git CLI operation failed: Git submodule add failed: fatal: 'lib/sparse' does not have a commit checked out\n\n\nStack backtrace:\n   0: anyhow::error::<impl anyhow::Error>::msg\n             at /home/knitli/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/anyhow-1.0.98/src/backtrace.rs:27:14\n   1: submod::main::{{closure}}\n             at /home/knitli/submod/src/main.rs:71:30\n   2: core::result::Result<T,E>::map_err\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/result.rs:856:27\n   3: submod::main\n             at /home/knitli/submod/src/main.rs:69:13\n   4: core::ops::function::FnOnce::call_once\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/ops/function.rs:250:5\n   5: std::sys::backtrace::__rust_begin_short_backtrace\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/sys/backtrace.rs:152:18\n   6: std::rt::lang_start::{{closure}}\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/rt.rs:199:18\n   7: core::ops::function::impls::<impl core::ops::function::FnOnce<A> for &F>::call_once\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/ops/function.rs:284:13\n   8: std::panicking::try::do_call\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/panicking.rs:589:40\n   9: std::panicking::try\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/panicking.rs:552:19\n  10: std::panic::catch_unwind\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/panic.rs:359:14\n  11: std::rt::lang_start_internal::{{closure}}\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/rt.rs:168:24\n  12: std::panicking::try::do_call\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/panicking.rs:589:40\n  13: std::panicking::try\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/panicking.rs:552:19\n  14: std::panic::catch_unwind\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/panic.rs:359:14\n  15: std::rt::lang_start_internal\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/rt.rs:164:5\n  16: std::rt::lang_start\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/rt.rs:198:5\n  17: main\n  18: <unknown>\n  19: __libc_start_main\n  20: _start\n"
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/panicking.rs:697:5
+   1: core::panicking::panic_fmt
+             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/panicking.rs:75:14
+   2: core::result::unwrap_failed
+             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/result.rs:1704:5
+   3: core::result::Result<T,E>::expect
+             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/result.rs:1061:23
+   4: integration_tests::tests::test_add_submodule_with_sparse_paths
+             at ./tests/integration_tests.rs:88:22
+   5: integration_tests::tests::test_add_submodule_with_sparse_paths::{{closure}}
+             at ./tests/integration_tests.rs:78:46
+   6: core::ops::function::FnOnce::call_once
+             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/ops/function.rs:250:5
+   7: core::ops::function::FnOnce::call_once
+             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/ops/function.rs:250:5
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+FAILED
+
+failures:
+
+failures:
+    tests::test_add_submodule_with_sparse_paths
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 13 filtered out; finished in 1.21s
+
+[31;1m        FAIL[0m [   1.222s] [35;1msubmod::integration_tests[0m [36mtests[0m[36m::[0m[34;1mtest_add_submodule_with_sparse_paths[0m
+[32;1m       START[0m             [35;1msubmod::integration_tests[0m [36mtests[0m[36m::[0m[34;1mtest_check_command_with_empty_config[0m
+
+running 1 test
+test tests::test_check_command_with_empty_config ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 13 filtered out; finished in 0.63s
+
+[32;1m        PASS[0m [   0.632s] [35;1msubmod::integration_tests[0m [36mtests[0m[36m::[0m[34;1mtest_check_command_with_empty_config[0m
+[32;1m       START[0m             [35;1msubmod::integration_tests[0m [36mtests[0m[36m::[0m[34;1mtest_check_command_with_no_config[0m
+
+running 1 test
+test tests::test_check_command_with_no_config ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 13 filtered out; finished in 0.60s
+
+[32;1m        PASS[0m [   0.604s] [35;1msubmod::integration_tests[0m [36mtests[0m[36m::[0m[34;1mtest_check_command_with_no_config[0m
+[32;1m       START[0m             [35;1msubmod::integration_tests[0m [36mtests[0m[36m::[0m[34;1mtest_config_with_defaults[0m
+
+running 1 test
+test tests::test_config_with_defaults ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 13 filtered out; finished in 0.76s
+
+[32;1m        PASS[0m [   0.765s] [35;1msubmod::integration_tests[0m [36mtests[0m[36m::[0m[34;1mtest_config_with_defaults[0m
+[32;1m       START[0m             [35;1msubmod::integration_tests[0m [36mtests[0m[36m::[0m[34;1mtest_custom_config_file[0m
+
+running 1 test
+test tests::test_custom_config_file ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 13 filtered out; finished in 0.60s
+
+[32;1m        PASS[0m [   0.606s] [35;1msubmod::integration_tests[0m [36mtests[0m[36m::[0m[34;1mtest_custom_config_file[0m
+[32;1m       START[0m             [35;1msubmod::integration_tests[0m [36mtests[0m[36m::[0m[34;1mtest_error_handling_invalid_git_repo[0m
+
+running 1 test
+test tests::test_error_handling_invalid_git_repo ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 13 filtered out; finished in 0.48s
+
+[32;1m        PASS[0m [   0.487s] [35;1msubmod::integration_tests[0m [36mtests[0m[36m::[0m[34;1mtest_error_handling_invalid_git_repo[0m
+[32;1m       START[0m             [35;1msubmod::integration_tests[0m [36mtests[0m[36m::[0m[34;1mtest_error_handling_invalid_url[0m
+
+running 1 test
+test tests::test_error_handling_invalid_url ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 13 filtered out; finished in 0.94s
+
+[32;1m        PASS[0m [   0.946s] [35;1msubmod::integration_tests[0m [36mtests[0m[36m::[0m[34;1mtest_error_handling_invalid_url[0m
+[32;1m       START[0m             [35;1msubmod::integration_tests[0m [36mtests[0m[36m::[0m[34;1mtest_init_command[0m
+
+running 1 test
+test tests::test_init_command ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 13 filtered out; finished in 1.14s
+
+[32;1m        PASS[0m [   1.148s] [35;1msubmod::integration_tests[0m [36mtests[0m[36m::[0m[34;1mtest_init_command[0m
+[32;1m       START[0m             [35;1msubmod::integration_tests[0m [36mtests[0m[36m::[0m[34;1mtest_reset_all_command[0m
+
+running 1 test
+test tests::test_reset_all_command ... 
+thread 'tests::test_reset_all_command' panicked at tests/integration_tests.rs:229:14:
+Failed to add submodule 1: "Command failed:\nstdout: \nstderr: Error: Failed to add submodule: Git CLI operation failed: Git submodule add failed: fatal: 'lib/reset1' does not have a commit checked out\n\n\nStack backtrace:\n   0: anyhow::error::<impl anyhow::Error>::msg\n             at /home/knitli/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/anyhow-1.0.98/src/backtrace.rs:27:14\n   1: submod::main::{{closure}}\n             at /home/knitli/submod/src/main.rs:71:30\n   2: core::result::Result<T,E>::map_err\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/result.rs:856:27\n   3: submod::main\n             at /home/knitli/submod/src/main.rs:69:13\n   4: core::ops::function::FnOnce::call_once\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/ops/function.rs:250:5\n   5: std::sys::backtrace::__rust_begin_short_backtrace\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/sys/backtrace.rs:152:18\n   6: std::rt::lang_start::{{closure}}\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/rt.rs:199:18\n   7: core::ops::function::impls::<impl core::ops::function::FnOnce<A> for &F>::call_once\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/ops/function.rs:284:13\n   8: std::panicking::try::do_call\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/panicking.rs:589:40\n   9: std::panicking::try\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/panicking.rs:552:19\n  10: std::panic::catch_unwind\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/panic.rs:359:14\n  11: std::rt::lang_start_internal::{{closure}}\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/rt.rs:168:24\n  12: std::panicking::try::do_call\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/panicking.rs:589:40\n  13: std::panicking::try\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/panicking.rs:552:19\n  14: std::panic::catch_unwind\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/panic.rs:359:14\n  15: std::rt::lang_start_internal\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/rt.rs:164:5\n  16: std::rt::lang_start\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/rt.rs:198:5\n  17: main\n  18: <unknown>\n  19: __libc_start_main\n  20: _start\n"
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/panicking.rs:697:5
+   1: core::panicking::panic_fmt
+             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/panicking.rs:75:14
+   2: core::result::unwrap_failed
+             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/result.rs:1704:5
+   3: core::result::Result<T,E>::expect
+             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/result.rs:1061:23
+   4: integration_tests::tests::test_reset_all_command
+             at ./tests/integration_tests.rs:227:9
+   5: integration_tests::tests::test_reset_all_command::{{closure}}
+             at ./tests/integration_tests.rs:213:32
+   6: core::ops::function::FnOnce::call_once
+             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/ops/function.rs:250:5
+   7: core::ops::function::FnOnce::call_once
+             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/ops/function.rs:250:5
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+FAILED
+
+failures:
+
+failures:
+    tests::test_reset_all_command
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 13 filtered out; finished in 1.31s
+
+[31;1m        FAIL[0m [   1.324s] [35;1msubmod::integration_tests[0m [36mtests[0m[36m::[0m[34;1mtest_reset_all_command[0m
+[32;1m       START[0m             [35;1msubmod::integration_tests[0m [36mtests[0m[36m::[0m[34;1mtest_reset_command[0m
+
+running 1 test
+test tests::test_reset_command ... 
+thread 'tests::test_reset_command' panicked at tests/integration_tests.rs:191:14:
+Failed to add submodule: "Command failed:\nstdout: \nstderr: Error: Failed to add submodule: Git CLI operation failed: Git submodule add failed: fatal: 'lib/reset' does not have a commit checked out\n\n\nStack backtrace:\n   0: anyhow::error::<impl anyhow::Error>::msg\n             at /home/knitli/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/anyhow-1.0.98/src/backtrace.rs:27:14\n   1: submod::main::{{closure}}\n             at /home/knitli/submod/src/main.rs:71:30\n   2: core::result::Result<T,E>::map_err\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/result.rs:856:27\n   3: submod::main\n             at /home/knitli/submod/src/main.rs:69:13\n   4: core::ops::function::FnOnce::call_once\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/ops/function.rs:250:5\n   5: std::sys::backtrace::__rust_begin_short_backtrace\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/sys/backtrace.rs:152:18\n   6: std::rt::lang_start::{{closure}}\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/rt.rs:199:18\n   7: core::ops::function::impls::<impl core::ops::function::FnOnce<A> for &F>::call_once\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/ops/function.rs:284:13\n   8: std::panicking::try::do_call\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/panicking.rs:589:40\n   9: std::panicking::try\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/panicking.rs:552:19\n  10: std::panic::catch_unwind\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/panic.rs:359:14\n  11: std::rt::lang_start_internal::{{closure}}\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/rt.rs:168:24\n  12: std::panicking::try::do_call\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/panicking.rs:589:40\n  13: std::panicking::try\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/panicking.rs:552:19\n  14: std::panic::catch_unwind\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/panic.rs:359:14\n  15: std::rt::lang_start_internal\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/rt.rs:164:5\n  16: std::rt::lang_start\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/rt.rs:198:5\n  17: main\n  18: <unknown>\n  19: __libc_start_main\n  20: _start\n"
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/panicking.rs:697:5
+   1: core::panicking::panic_fmt
+             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/panicking.rs:75:14
+   2: core::result::unwrap_failed
+             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/result.rs:1704:5
+   3: core::result::Result<T,E>::expect
+             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/result.rs:1061:23
+   4: integration_tests::tests::test_reset_command
+             at ./tests/integration_tests.rs:189:9
+   5: integration_tests::tests::test_reset_command::{{closure}}
+             at ./tests/integration_tests.rs:179:28
+   6: core::ops::function::FnOnce::call_once
+             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/ops/function.rs:250:5
+   7: core::ops::function::FnOnce::call_once
+             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/ops/function.rs:250:5
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+FAILED
+
+failures:
+
+failures:
+    tests::test_reset_command
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 13 filtered out; finished in 1.12s
+
+[31;1m        FAIL[0m [   1.134s] [35;1msubmod::integration_tests[0m [36mtests[0m[36m::[0m[34;1mtest_reset_command[0m
+[32;1m       START[0m             [35;1msubmod::integration_tests[0m [36mtests[0m[36m::[0m[34;1mtest_sparse_checkout_mismatch_detection[0m
+
+running 1 test
+test tests::test_sparse_checkout_mismatch_detection ... 
+thread 'tests::test_sparse_checkout_mismatch_detection' panicked at tests/integration_tests.rs:396:14:
+Failed to add submodule: "Command failed:\nstdout: \nstderr: Error: Failed to add submodule: Git CLI operation failed: Git submodule add failed: fatal: 'lib/mismatch' does not have a commit checked out\n\n\nStack backtrace:\n   0: anyhow::error::<impl anyhow::Error>::msg\n             at /home/knitli/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/anyhow-1.0.98/src/backtrace.rs:27:14\n   1: submod::main::{{closure}}\n             at /home/knitli/submod/src/main.rs:71:30\n   2: core::result::Result<T,E>::map_err\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/result.rs:856:27\n   3: submod::main\n             at /home/knitli/submod/src/main.rs:69:13\n   4: core::ops::function::FnOnce::call_once\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/ops/function.rs:250:5\n   5: std::sys::backtrace::__rust_begin_short_backtrace\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/sys/backtrace.rs:152:18\n   6: std::rt::lang_start::{{closure}}\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/rt.rs:199:18\n   7: core::ops::function::impls::<impl core::ops::function::FnOnce<A> for &F>::call_once\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/ops/function.rs:284:13\n   8: std::panicking::try::do_call\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/panicking.rs:589:40\n   9: std::panicking::try\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/panicking.rs:552:19\n  10: std::panic::catch_unwind\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/panic.rs:359:14\n  11: std::rt::lang_start_internal::{{closure}}\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/rt.rs:168:24\n  12: std::panicking::try::do_call\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/panicking.rs:589:40\n  13: std::panicking::try\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/panicking.rs:552:19\n  14: std::panic::catch_unwind\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/panic.rs:359:14\n  15: std::rt::lang_start_internal\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/rt.rs:164:5\n  16: std::rt::lang_start\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/rt.rs:198:5\n  17: main\n  18: <unknown>\n  19: __libc_start_main\n  20: _start\n"
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/panicking.rs:697:5
+   1: core::panicking::panic_fmt
+             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/panicking.rs:75:14
+   2: core::result::unwrap_failed
+             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/result.rs:1704:5
+   3: core::result::Result<T,E>::expect
+             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/result.rs:1061:23
+   4: integration_tests::tests::test_sparse_checkout_mismatch_detection
+             at ./tests/integration_tests.rs:387:9
+   5: integration_tests::tests::test_sparse_checkout_mismatch_detection::{{closure}}
+             at ./tests/integration_tests.rs:377:49
+   6: core::ops::function::FnOnce::call_once
+             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/ops/function.rs:250:5
+   7: core::ops::function::FnOnce::call_once
+             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/ops/function.rs:250:5
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+FAILED
+
+failures:
+
+failures:
+    tests::test_sparse_checkout_mismatch_detection
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 13 filtered out; finished in 1.18s
+
+[31;1m        FAIL[0m [   1.191s] [35;1msubmod::integration_tests[0m [36mtests[0m[36m::[0m[34;1mtest_sparse_checkout_mismatch_detection[0m
+[32;1m       START[0m             [35;1msubmod::integration_tests[0m [36mtests[0m[36m::[0m[34;1mtest_sync_command[0m
+
+running 1 test
+test tests::test_sync_command ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 13 filtered out; finished in 1.17s
+
+[32;1m        PASS[0m [   1.173s] [35;1msubmod::integration_tests[0m [36mtests[0m[36m::[0m[34;1mtest_sync_command[0m
+[32;1m       START[0m             [35;1msubmod::integration_tests[0m [36mtests[0m[36m::[0m[34;1mtest_update_command[0m
+
+running 1 test
+test tests::test_update_command ... 
+thread 'tests::test_update_command' panicked at tests/integration_tests.rs:168:14:
+Failed to add submodule: "Command failed:\nstdout: \nstderr: Error: Failed to add submodule: Git CLI operation failed: Git submodule add failed: fatal: 'lib/update' does not have a commit checked out\n\n\nStack backtrace:\n   0: anyhow::error::<impl anyhow::Error>::msg\n             at /home/knitli/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/anyhow-1.0.98/src/backtrace.rs:27:14\n   1: submod::main::{{closure}}\n             at /home/knitli/submod/src/main.rs:71:30\n   2: core::result::Result<T,E>::map_err\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/result.rs:856:27\n   3: submod::main\n             at /home/knitli/submod/src/main.rs:69:13\n   4: core::ops::function::FnOnce::call_once\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/ops/function.rs:250:5\n   5: std::sys::backtrace::__rust_begin_short_backtrace\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/sys/backtrace.rs:152:18\n   6: std::rt::lang_start::{{closure}}\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/rt.rs:199:18\n   7: core::ops::function::impls::<impl core::ops::function::FnOnce<A> for &F>::call_once\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/ops/function.rs:284:13\n   8: std::panicking::try::do_call\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/panicking.rs:589:40\n   9: std::panicking::try\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/panicking.rs:552:19\n  10: std::panic::catch_unwind\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/panic.rs:359:14\n  11: std::rt::lang_start_internal::{{closure}}\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/rt.rs:168:24\n  12: std::panicking::try::do_call\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/panicking.rs:589:40\n  13: std::panicking::try\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/panicking.rs:552:19\n  14: std::panic::catch_unwind\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/panic.rs:359:14\n  15: std::rt::lang_start_internal\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/rt.rs:164:5\n  16: std::rt::lang_start\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/rt.rs:198:5\n  17: main\n  18: <unknown>\n  19: __libc_start_main\n  20: _start\n"
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/panicking.rs:697:5
+   1: core::panicking::panic_fmt
+             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/panicking.rs:75:14
+   2: core::result::unwrap_failed
+             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/result.rs:1704:5
+   3: core::result::Result<T,E>::expect
+             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/result.rs:1061:23
+   4: integration_tests::tests::test_update_command
+             at ./tests/integration_tests.rs:166:9
+   5: integration_tests::tests::test_update_command::{{closure}}
+             at ./tests/integration_tests.rs:156:29
+   6: core::ops::function::FnOnce::call_once
+             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/ops/function.rs:250:5
+   7: core::ops::function::FnOnce::call_once
+             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/ops/function.rs:250:5
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+FAILED
+
+failures:
+
+failures:
+    tests::test_update_command
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 13 filtered out; finished in 1.18s
+
+[31;1m        FAIL[0m [   1.188s] [35;1msubmod::integration_tests[0m [36mtests[0m[36m::[0m[34;1mtest_update_command[0m
+[32;1m       START[0m             [35;1msubmod::performance_tests[0m [36mtests[0m[36m::[0m[34;1mtest_concurrent_check_operations[0m
+
+running 1 test
+test tests::test_concurrent_check_operations ... 
+thread 'tests::test_concurrent_check_operations' panicked at tests/performance_tests.rs:299:18:
+Failed to add submodule: "Command failed:\nstdout: \nstderr: Error: Failed to add submodule: Git CLI operation failed: Git submodule add failed: fatal: 'lib/concurrent0' does not have a commit checked out\n\n\nStack backtrace:\n   0: anyhow::error::<impl anyhow::Error>::msg\n             at /home/knitli/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/anyhow-1.0.98/src/backtrace.rs:27:14\n   1: submod::main::{{closure}}\n             at /home/knitli/submod/src/main.rs:71:30\n   2: core::result::Result<T,E>::map_err\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/result.rs:856:27\n   3: submod::main\n             at /home/knitli/submod/src/main.rs:69:13\n   4: core::ops::function::FnOnce::call_once\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/ops/function.rs:250:5\n   5: std::sys::backtrace::__rust_begin_short_backtrace\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/sys/backtrace.rs:152:18\n   6: std::rt::lang_start::{{closure}}\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/rt.rs:199:18\n   7: core::ops::function::impls::<impl core::ops::function::FnOnce<A> for &F>::call_once\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/ops/function.rs:284:13\n   8: std::panicking::try::do_call\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/panicking.rs:589:40\n   9: std::panicking::try\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/panicking.rs:552:19\n  10: std::panic::catch_unwind\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/panic.rs:359:14\n  11: std::rt::lang_start_internal::{{closure}}\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/rt.rs:168:24\n  12: std::panicking::try::do_call\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/panicking.rs:589:40\n  13: std::panicking::try\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/panicking.rs:552:19\n  14: std::panic::catch_unwind\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/panic.rs:359:14\n  15: std::rt::lang_start_internal\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/rt.rs:164:5\n  16: std::rt::lang_start\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/rt.rs:198:5\n  17: main\n  18: <unknown>\n  19: __libc_start_main\n  20: _start\n"
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/panicking.rs:697:5
+   1: core::panicking::panic_fmt
+             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/panicking.rs:75:14
+   2: core::result::unwrap_failed
+             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/result.rs:1704:5
+   3: core::result::Result<T,E>::expect
+             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/result.rs:1061:23
+   4: performance_tests::tests::test_concurrent_check_operations
+             at ./tests/performance_tests.rs:292:13
+   5: performance_tests::tests::test_concurrent_check_operations::{{closure}}
+             at ./tests/performance_tests.rs:281:42
+   6: core::ops::function::FnOnce::call_once
+             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/ops/function.rs:250:5
+   7: core::ops::function::FnOnce::call_once
+             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/ops/function.rs:250:5
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+FAILED
+
+failures:
+
+failures:
+    tests::test_concurrent_check_operations
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 8 filtered out; finished in 1.15s
+
+[31;1m        FAIL[0m [   1.157s] [35;1msubmod::performance_tests[0m [36mtests[0m[36m::[0m[34;1mtest_concurrent_check_operations[0m
+[32;1m       START[0m             [35;1msubmod::performance_tests[0m [36mtests[0m[36m::[0m[34;1mtest_config_serialization_performance[0m
+
+running 1 test
+test tests::test_config_serialization_performance ... 
+thread 'tests::test_config_serialization_performance' panicked at tests/performance_tests.rs:256:18:
+Failed to add submodule: "Command failed:\nstdout: \nstderr: Error: Failed to add submodule: Git CLI operation failed: Git submodule add failed: fatal: 'lib/serial0' does not have a commit checked out\n\n\nStack backtrace:\n   0: anyhow::error::<impl anyhow::Error>::msg\n             at /home/knitli/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/anyhow-1.0.98/src/backtrace.rs:27:14\n   1: submod::main::{{closure}}\n             at /home/knitli/submod/src/main.rs:71:30\n   2: core::result::Result<T,E>::map_err\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/result.rs:856:27\n   3: submod::main\n             at /home/knitli/submod/src/main.rs:69:13\n   4: core::ops::function::FnOnce::call_once\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/ops/function.rs:250:5\n   5: std::sys::backtrace::__rust_begin_short_backtrace\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/sys/backtrace.rs:152:18\n   6: std::rt::lang_start::{{closure}}\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/rt.rs:199:18\n   7: core::ops::function::impls::<impl core::ops::function::FnOnce<A> for &F>::call_once\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/ops/function.rs:284:13\n   8: std::panicking::try::do_call\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/panicking.rs:589:40\n   9: std::panicking::try\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/panicking.rs:552:19\n  10: std::panic::catch_unwind\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/panic.rs:359:14\n  11: std::rt::lang_start_internal::{{closure}}\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/rt.rs:168:24\n  12: std::panicking::try::do_call\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/panicking.rs:589:40\n  13: std::panicking::try\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/panicking.rs:552:19\n  14: std::panic::catch_unwind\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/panic.rs:359:14\n  15: std::rt::lang_start_internal\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/rt.rs:164:5\n  16: std::rt::lang_start\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/rt.rs:198:5\n  17: main\n  18: <unknown>\n  19: __libc_start_main\n  20: _start\n"
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/panicking.rs:697:5
+   1: core::panicking::panic_fmt
+             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/panicking.rs:75:14
+   2: core::result::unwrap_failed
+             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/result.rs:1704:5
+   3: core::result::Result<T,E>::expect
+             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/result.rs:1061:23
+   4: performance_tests::tests::test_config_serialization_performance
+             at ./tests/performance_tests.rs:249:13
+   5: performance_tests::tests::test_config_serialization_performance::{{closure}}
+             at ./tests/performance_tests.rs:229:47
+   6: core::ops::function::FnOnce::call_once
+             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/ops/function.rs:250:5
+   7: core::ops::function::FnOnce::call_once
+             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/ops/function.rs:250:5
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+FAILED
+
+failures:
+
+failures:
+    tests::test_config_serialization_performance
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 8 filtered out; finished in 5.05s
+
+[31;1m        FAIL[0m [   5.060s] [35;1msubmod::performance_tests[0m [36mtests[0m[36m::[0m[34;1mtest_config_serialization_performance[0m
+[32;1m       START[0m             [35;1msubmod::performance_tests[0m [36mtests[0m[36m::[0m[34;1mtest_config_with_unicode_and_special_chars[0m
+
+running 1 test
+test tests::test_config_with_unicode_and_special_chars ... 
+thread 'tests::test_config_with_unicode_and_special_chars' panicked at tests/performance_tests.rs:444:14:
+Failed to run check: "Command failed:\nstdout: \nstderr: Error: Failed to create manager: Configuration error: Failed to load config: Failed to parse TOML config\n\nStack backtrace:\n   0: anyhow::error::<impl anyhow::Error>::msg\n             at /home/knitli/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/anyhow-1.0.98/src/backtrace.rs:27:14\n   1: submod::main::{{closure}}\n             at /home/knitli/submod/src/main.rs:75:30\n   2: core::result::Result<T,E>::map_err\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/result.rs:856:27\n   3: submod::main\n             at /home/knitli/submod/src/main.rs:74:27\n   4: core::ops::function::FnOnce::call_once\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/ops/function.rs:250:5\n   5: std::sys::backtrace::__rust_begin_short_backtrace\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/sys/backtrace.rs:152:18\n   6: std::rt::lang_start::{{closure}}\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/rt.rs:199:18\n   7: core::ops::function::impls::<impl core::ops::function::FnOnce<A> for &F>::call_once\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/ops/function.rs:284:13\n   8: std::panicking::try::do_call\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/panicking.rs:589:40\n   9: std::panicking::try\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/panicking.rs:552:19\n  10: std::panic::catch_unwind\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/panic.rs:359:14\n  11: std::rt::lang_start_internal::{{closure}}\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/rt.rs:168:24\n  12: std::panicking::try::do_call\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/panicking.rs:589:40\n  13: std::panicking::try\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/panicking.rs:552:19\n  14: std::panic::catch_unwind\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/panic.rs:359:14\n  15: std::rt::lang_start_internal\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/rt.rs:164:5\n  16: std::rt::lang_start\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/rt.rs:198:5\n  17: main\n  18: <unknown>\n  19: __libc_start_main\n  20: _start\n"
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/panicking.rs:697:5
+   1: core::panicking::panic_fmt
+             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/panicking.rs:75:14
+   2: core::result::unwrap_failed
+             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/result.rs:1704:5
+   3: core::result::Result<T,E>::expect
+             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/result.rs:1061:23
+   4: performance_tests::tests::test_config_with_unicode_and_special_chars
+             at ./tests/performance_tests.rs:442:22
+   5: performance_tests::tests::test_config_with_unicode_and_special_chars::{{closure}}
+             at ./tests/performance_tests.rs:416:52
+   6: core::ops::function::FnOnce::call_once
+             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/ops/function.rs:250:5
+   7: core::ops::function::FnOnce::call_once
+             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/ops/function.rs:250:5
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+FAILED
+
+failures:
+
+failures:
+    tests::test_config_with_unicode_and_special_chars
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.68s
+
+[31;1m        FAIL[0m [   0.696s] [35;1msubmod::performance_tests[0m [36mtests[0m[36m::[0m[34;1mtest_config_with_unicode_and_special_chars[0m
+[32;1m       START[0m             [35;1msubmod::performance_tests[0m [36mtests[0m[36m::[0m[34;1mtest_deep_directory_structure[0m
+
+running 1 test
+test tests::test_deep_directory_structure ... 
+thread 'tests::test_deep_directory_structure' panicked at tests/performance_tests.rs:159:18:
+Failed to add deep submodule: "Command failed:\nstdout: \nstderr: Error: Failed to add submodule: Git CLI operation failed: Git submodule add failed: fatal: 'level1/level2/level3/level4/level5' does not have a commit checked out\n\n\nStack backtrace:\n   0: anyhow::error::<impl anyhow::Error>::msg\n             at /home/knitli/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/anyhow-1.0.98/src/backtrace.rs:27:14\n   1: submod::main::{{closure}}\n             at /home/knitli/submod/src/main.rs:71:30\n   2: core::result::Result<T,E>::map_err\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/result.rs:856:27\n   3: submod::main\n             at /home/knitli/submod/src/main.rs:69:13\n   4: core::ops::function::FnOnce::call_once\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/ops/function.rs:250:5\n   5: std::sys::backtrace::__rust_begin_short_backtrace\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/sys/backtrace.rs:152:18\n   6: std::rt::lang_start::{{closure}}\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/rt.rs:199:18\n   7: core::ops::function::impls::<impl core::ops::function::FnOnce<A> for &F>::call_once\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/ops/function.rs:284:13\n   8: std::panicking::try::do_call\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/panicking.rs:589:40\n   9: std::panicking::try\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/panicking.rs:552:19\n  10: std::panic::catch_unwind\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/panic.rs:359:14\n  11: std::rt::lang_start_internal::{{closure}}\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/rt.rs:168:24\n  12: std::panicking::try::do_call\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/panicking.rs:589:40\n  13: std::panicking::try\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/panicking.rs:552:19\n  14: std::panic::catch_unwind\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/panic.rs:359:14\n  15: std::rt::lang_start_internal\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/rt.rs:164:5\n  16: std::rt::lang_start\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/rt.rs:198:5\n  17: main\n  18: <unknown>\n  19: __libc_start_main\n  20: _start\n"
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/panicking.rs:697:5
+   1: core::panicking::panic_fmt
+             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/panicking.rs:75:14
+   2: core::result::unwrap_failed
+             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/result.rs:1704:5
+   3: core::result::Result<T,E>::expect
+             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/result.rs:1061:23
+   4: performance_tests::tests::test_deep_directory_structure
+             at ./tests/performance_tests.rs:157:13
+   5: performance_tests::tests::test_deep_directory_structure::{{closure}}
+             at ./tests/performance_tests.rs:139:39
+   6: core::ops::function::FnOnce::call_once
+             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/ops/function.rs:250:5
+   7: core::ops::function::FnOnce::call_once
+             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/ops/function.rs:250:5
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+FAILED
+
+failures:
+
+failures:
+    tests::test_deep_directory_structure
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 8 filtered out; finished in 1.21s
+
+[31;1m        FAIL[0m [   1.224s] [35;1msubmod::performance_tests[0m [36mtests[0m[36m::[0m[34;1mtest_deep_directory_structure[0m
+[32;1m       START[0m             [35;1msubmod::performance_tests[0m [36mtests[0m[36m::[0m[34;1mtest_file_system_performance[0m
+
+running 1 test
+test tests::test_file_system_performance ... 
+thread 'tests::test_file_system_performance' panicked at tests/performance_tests.rs:393:14:
+Failed to add submodule: "Command failed:\nstdout: \nstderr: Error: Failed to add submodule: Git CLI operation failed: Git submodule add failed: fatal: 'lib/fs-perf' does not have a commit checked out\n\n\nStack backtrace:\n   0: anyhow::error::<impl anyhow::Error>::msg\n             at /home/knitli/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/anyhow-1.0.98/src/backtrace.rs:27:14\n   1: submod::main::{{closure}}\n             at /home/knitli/submod/src/main.rs:71:30\n   2: core::result::Result<T,E>::map_err\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/result.rs:856:27\n   3: submod::main\n             at /home/knitli/submod/src/main.rs:69:13\n   4: core::ops::function::FnOnce::call_once\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/ops/function.rs:250:5\n   5: std::sys::backtrace::__rust_begin_short_backtrace\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/sys/backtrace.rs:152:18\n   6: std::rt::lang_start::{{closure}}\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/rt.rs:199:18\n   7: core::ops::function::impls::<impl core::ops::function::FnOnce<A> for &F>::call_once\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/ops/function.rs:284:13\n   8: std::panicking::try::do_call\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/panicking.rs:589:40\n   9: std::panicking::try\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/panicking.rs:552:19\n  10: std::panic::catch_unwind\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/panic.rs:359:14\n  11: std::rt::lang_start_internal::{{closure}}\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/rt.rs:168:24\n  12: std::panicking::try::do_call\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/panicking.rs:589:40\n  13: std::panicking::try\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/panicking.rs:552:19\n  14: std::panic::catch_unwind\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/panic.rs:359:14\n  15: std::rt::lang_start_internal\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/rt.rs:164:5\n  16: std::rt::lang_start\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/rt.rs:198:5\n  17: main\n  18: <unknown>\n  19: __libc_start_main\n  20: _start\n"
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/panicking.rs:697:5
+   1: core::panicking::panic_fmt
+             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/panicking.rs:75:14
+   2: core::result::unwrap_failed
+             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/result.rs:1704:5
+   3: core::result::Result<T,E>::expect
+             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/result.rs:1061:23
+   4: performance_tests::tests::test_file_system_performance
+             at ./tests/performance_tests.rs:384:9
+   5: performance_tests::tests::test_file_system_performance::{{closure}}
+             at ./tests/performance_tests.rs:371:38
+   6: core::ops::function::FnOnce::call_once
+             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/ops/function.rs:250:5
+   7: core::ops::function::FnOnce::call_once
+             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/ops/function.rs:250:5
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+FAILED
+
+failures:
+
+failures:
+    tests::test_file_system_performance
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 8 filtered out; finished in 1.23s
+
+[31;1m        FAIL[0m [   1.243s] [35;1msubmod::performance_tests[0m [36mtests[0m[36m::[0m[34;1mtest_file_system_performance[0m
+[32;1m       START[0m             [35;1msubmod::performance_tests[0m [36mtests[0m[36m::[0m[34;1mtest_large_config_file_performance[0m
+
+running 1 test
+test tests::test_large_config_file_performance ... Large config creation time: 82.342µs
+Large config parse time: 16.637939ms
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.56s
+
+[32;1m        PASS[0m [   0.563s] [35;1msubmod::performance_tests[0m [36mtests[0m[36m::[0m[34;1mtest_large_config_file_performance[0m
+[32;1m       START[0m             [35;1msubmod::performance_tests[0m [36mtests[0m[36m::[0m[34;1mtest_memory_usage_with_large_operations[0m
+
+running 1 test
+test tests::test_memory_usage_with_large_operations ... 
+thread 'tests::test_memory_usage_with_large_operations' panicked at tests/performance_tests.rs:344:18:
+Failed to add submodule: "Command failed:\nstdout: \nstderr: Error: Failed to add submodule: Git CLI operation failed: Git submodule add failed: fatal: 'lib/memory0' does not have a commit checked out\n\n\nStack backtrace:\n   0: anyhow::error::<impl anyhow::Error>::msg\n             at /home/knitli/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/anyhow-1.0.98/src/backtrace.rs:27:14\n   1: submod::main::{{closure}}\n             at /home/knitli/submod/src/main.rs:71:30\n   2: core::result::Result<T,E>::map_err\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/result.rs:856:27\n   3: submod::main\n             at /home/knitli/submod/src/main.rs:69:13\n   4: core::ops::function::FnOnce::call_once\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/ops/function.rs:250:5\n   5: std::sys::backtrace::__rust_begin_short_backtrace\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/sys/backtrace.rs:152:18\n   6: std::rt::lang_start::{{closure}}\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/rt.rs:199:18\n   7: core::ops::function::impls::<impl core::ops::function::FnOnce<A> for &F>::call_once\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/ops/function.rs:284:13\n   8: std::panicking::try::do_call\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/panicking.rs:589:40\n   9: std::panicking::try\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/panicking.rs:552:19\n  10: std::panic::catch_unwind\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/panic.rs:359:14\n  11: std::rt::lang_start_internal::{{closure}}\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/rt.rs:168:24\n  12: std::panicking::try::do_call\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/panicking.rs:589:40\n  13: std::panicking::try\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/panicking.rs:552:19\n  14: std::panic::catch_unwind\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/panic.rs:359:14\n  15: std::rt::lang_start_internal\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/rt.rs:164:5\n  16: std::rt::lang_start\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/rt.rs:198:5\n  17: main\n  18: <unknown>\n  19: __libc_start_main\n  20: _start\n"
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/panicking.rs:697:5
+   1: core::panicking::panic_fmt
+             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/panicking.rs:75:14
+   2: core::result::unwrap_failed
+             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/result.rs:1704:5
+   3: core::result::Result<T,E>::expect
+             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/result.rs:1061:23
+   4: performance_tests::tests::test_memory_usage_with_large_operations
+             at ./tests/performance_tests.rs:335:13
+   5: performance_tests::tests::test_memory_usage_with_large_operations::{{closure}}
+             at ./tests/performance_tests.rs:321:49
+   6: core::ops::function::FnOnce::call_once
+             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/ops/function.rs:250:5
+   7: core::ops::function::FnOnce::call_once
+             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/ops/function.rs:250:5
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+FAILED
+
+failures:
+
+failures:
+    tests::test_memory_usage_with_large_operations
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 8 filtered out; finished in 1.05s
+
+[31;1m        FAIL[0m [   1.057s] [35;1msubmod::performance_tests[0m [36mtests[0m[36m::[0m[34;1mtest_memory_usage_with_large_operations[0m
+[32;1m       START[0m             [35;1msubmod::performance_tests[0m [36mtests[0m[36m::[0m[34;1mtest_multiple_submodules_performance[0m
+
+running 1 test
+test tests::test_multiple_submodules_performance ... Setup time for 10 remotes: 1.934077014s
+
+thread 'tests::test_multiple_submodules_performance' panicked at tests/performance_tests.rs:48:18:
+Failed to add submodule: "Command failed:\nstdout: \nstderr: Error: Failed to add submodule: Git CLI operation failed: Git submodule add failed: fatal: 'lib/perf0' does not have a commit checked out\n\n\nStack backtrace:\n   0: anyhow::error::<impl anyhow::Error>::msg\n             at /home/knitli/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/anyhow-1.0.98/src/backtrace.rs:27:14\n   1: submod::main::{{closure}}\n             at /home/knitli/submod/src/main.rs:71:30\n   2: core::result::Result<T,E>::map_err\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/result.rs:856:27\n   3: submod::main\n             at /home/knitli/submod/src/main.rs:69:13\n   4: core::ops::function::FnOnce::call_once\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/ops/function.rs:250:5\n   5: std::sys::backtrace::__rust_begin_short_backtrace\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/sys/backtrace.rs:152:18\n   6: std::rt::lang_start::{{closure}}\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/rt.rs:199:18\n   7: core::ops::function::impls::<impl core::ops::function::FnOnce<A> for &F>::call_once\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/ops/function.rs:284:13\n   8: std::panicking::try::do_call\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/panicking.rs:589:40\n   9: std::panicking::try\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/panicking.rs:552:19\n  10: std::panic::catch_unwind\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/panic.rs:359:14\n  11: std::rt::lang_start_internal::{{closure}}\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/rt.rs:168:24\n  12: std::panicking::try::do_call\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/panicking.rs:589:40\n  13: std::panicking::try\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/panicking.rs:552:19\n  14: std::panic::catch_unwind\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/panic.rs:359:14\n  15: std::rt::lang_start_internal\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/rt.rs:164:5\n  16: std::rt::lang_start\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/rt.rs:198:5\n  17: main\n  18: <unknown>\n  19: __libc_start_main\n  20: _start\n"
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/panicking.rs:697:5
+   1: core::panicking::panic_fmt
+             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/panicking.rs:75:14
+   2: core::result::unwrap_failed
+             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/result.rs:1704:5
+   3: core::result::Result<T,E>::expect
+             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/result.rs:1061:23
+   4: performance_tests::tests::test_multiple_submodules_performance
+             at ./tests/performance_tests.rs:39:13
+   5: performance_tests::tests::test_multiple_submodules_performance::{{closure}}
+             at ./tests/performance_tests.rs:17:46
+   6: core::ops::function::FnOnce::call_once
+             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/ops/function.rs:250:5
+   7: core::ops::function::FnOnce::call_once
+             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/ops/function.rs:250:5
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+FAILED
+
+failures:
+
+failures:
+    tests::test_multiple_submodules_performance
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 8 filtered out; finished in 2.88s
+
+[31;1m        FAIL[0m [   2.886s] [35;1msubmod::performance_tests[0m [36mtests[0m[36m::[0m[34;1mtest_multiple_submodules_performance[0m
+[32;1m       START[0m             [35;1msubmod::performance_tests[0m [36mtests[0m[36m::[0m[34;1mtest_sparse_checkout_with_many_patterns[0m
+
+running 1 test
+test tests::test_sparse_checkout_with_many_patterns ... 
+thread 'tests::test_sparse_checkout_with_many_patterns' panicked at tests/performance_tests.rs:207:14:
+Failed to add submodule with many patterns: "Command failed:\nstdout: \nstderr: Error: Failed to add submodule: Git CLI operation failed: Git submodule add failed: fatal: 'lib/many-patterns' does not have a commit checked out\n\n\nStack backtrace:\n   0: anyhow::error::<impl anyhow::Error>::msg\n             at /home/knitli/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/anyhow-1.0.98/src/backtrace.rs:27:14\n   1: submod::main::{{closure}}\n             at /home/knitli/submod/src/main.rs:71:30\n   2: core::result::Result<T,E>::map_err\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/result.rs:856:27\n   3: submod::main\n             at /home/knitli/submod/src/main.rs:69:13\n   4: core::ops::function::FnOnce::call_once\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/ops/function.rs:250:5\n   5: std::sys::backtrace::__rust_begin_short_backtrace\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/sys/backtrace.rs:152:18\n   6: std::rt::lang_start::{{closure}}\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/rt.rs:199:18\n   7: core::ops::function::impls::<impl core::ops::function::FnOnce<A> for &F>::call_once\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/ops/function.rs:284:13\n   8: std::panicking::try::do_call\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/panicking.rs:589:40\n   9: std::panicking::try\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/panicking.rs:552:19\n  10: std::panic::catch_unwind\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/panic.rs:359:14\n  11: std::rt::lang_start_internal::{{closure}}\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/rt.rs:168:24\n  12: std::panicking::try::do_call\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/panicking.rs:589:40\n  13: std::panicking::try\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/panicking.rs:552:19\n  14: std::panic::catch_unwind\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/panic.rs:359:14\n  15: std::rt::lang_start_internal\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/rt.rs:164:5\n  16: std::rt::lang_start\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/rt.rs:198:5\n  17: main\n  18: <unknown>\n  19: __libc_start_main\n  20: _start\n"
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/panicking.rs:697:5
+   1: core::panicking::panic_fmt
+             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/panicking.rs:75:14
+   2: core::result::unwrap_failed
+             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/result.rs:1704:5
+   3: core::result::Result<T,E>::expect
+             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/result.rs:1061:23
+   4: performance_tests::tests::test_sparse_checkout_with_many_patterns
+             at ./tests/performance_tests.rs:198:9
+   5: performance_tests::tests::test_sparse_checkout_with_many_patterns::{{closure}}
+             at ./tests/performance_tests.rs:179:49
+   6: core::ops::function::FnOnce::call_once
+             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/ops/function.rs:250:5
+   7: core::ops::function::FnOnce::call_once
+             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/ops/function.rs:250:5
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+FAILED
+
+failures:
+
+failures:
+    tests::test_sparse_checkout_with_many_patterns
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 8 filtered out; finished in 1.21s
+
+[31;1m        FAIL[0m [   1.217s] [35;1msubmod::performance_tests[0m [36mtests[0m[36m::[0m[34;1mtest_sparse_checkout_with_many_patterns[0m
+[32;1m       START[0m             [35;1msubmod::sparse_checkout_tests[0m [36mtests[0m[36m::[0m[34;1mtest_init_with_sparse_checkout[0m
+
+running 1 test
+test tests::test_init_with_sparse_checkout ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 8 filtered out; finished in 1.22s
+
+[32;1m        PASS[0m [   1.229s] [35;1msubmod::sparse_checkout_tests[0m [36mtests[0m[36m::[0m[34;1mtest_init_with_sparse_checkout[0m
+[32;1m       START[0m             [35;1msubmod::sparse_checkout_tests[0m [36mtests[0m[36m::[0m[34;1mtest_sparse_checkout_basic_setup[0m
+
+running 1 test
+test tests::test_sparse_checkout_basic_setup ... 
+thread 'tests::test_sparse_checkout_basic_setup' panicked at tests/sparse_checkout_tests.rs:35:14:
+Failed to add submodule: "Command failed:\nstdout: \nstderr: Error: Failed to add submodule: Git CLI operation failed: Git submodule add failed: fatal: 'lib/sparse-basic' does not have a commit checked out\n\n\nStack backtrace:\n   0: anyhow::error::<impl anyhow::Error>::msg\n             at /home/knitli/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/anyhow-1.0.98/src/backtrace.rs:27:14\n   1: submod::main::{{closure}}\n             at /home/knitli/submod/src/main.rs:71:30\n   2: core::result::Result<T,E>::map_err\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/result.rs:856:27\n   3: submod::main\n             at /home/knitli/submod/src/main.rs:69:13\n   4: core::ops::function::FnOnce::call_once\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/ops/function.rs:250:5\n   5: std::sys::backtrace::__rust_begin_short_backtrace\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/sys/backtrace.rs:152:18\n   6: std::rt::lang_start::{{closure}}\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/rt.rs:199:18\n   7: core::ops::function::impls::<impl core::ops::function::FnOnce<A> for &F>::call_once\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/ops/function.rs:284:13\n   8: std::panicking::try::do_call\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/panicking.rs:589:40\n   9: std::panicking::try\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/panicking.rs:552:19\n  10: std::panic::catch_unwind\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/panic.rs:359:14\n  11: std::rt::lang_start_internal::{{closure}}\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/rt.rs:168:24\n  12: std::panicking::try::do_call\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/panicking.rs:589:40\n  13: std::panicking::try\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/panicking.rs:552:19\n  14: std::panic::catch_unwind\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/panic.rs:359:14\n  15: std::rt::lang_start_internal\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/rt.rs:164:5\n  16: std::rt::lang_start\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/rt.rs:198:5\n  17: main\n  18: <unknown>\n  19: __libc_start_main\n  20: _start\n"
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/panicking.rs:697:5
+   1: core::panicking::panic_fmt
+             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/panicking.rs:75:14
+   2: core::result::unwrap_failed
+             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/result.rs:1704:5
+   3: core::result::Result<T,E>::expect
+             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/result.rs:1061:23
+   4: sparse_checkout_tests::tests::test_sparse_checkout_basic_setup
+             at ./tests/sparse_checkout_tests.rs:26:9
+   5: sparse_checkout_tests::tests::test_sparse_checkout_basic_setup::{{closure}}
+             at ./tests/sparse_checkout_tests.rs:16:42
+   6: core::ops::function::FnOnce::call_once
+             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/ops/function.rs:250:5
+   7: core::ops::function::FnOnce::call_once
+             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/ops/function.rs:250:5
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+FAILED
+
+failures:
+
+failures:
+    tests::test_sparse_checkout_basic_setup
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 8 filtered out; finished in 1.24s
+
+[31;1m        FAIL[0m [   1.249s] [35;1msubmod::sparse_checkout_tests[0m [36mtests[0m[36m::[0m[34;1mtest_sparse_checkout_basic_setup[0m
+[32;1m       START[0m             [35;1msubmod::sparse_checkout_tests[0m [36mtests[0m[36m::[0m[34;1mtest_sparse_checkout_complex_patterns[0m
+
+running 1 test
+test tests::test_sparse_checkout_complex_patterns ... 
+thread 'tests::test_sparse_checkout_complex_patterns' panicked at tests/sparse_checkout_tests.rs:195:14:
+Failed to add submodule: "Command failed:\nstdout: \nstderr: Error: Failed to add submodule: Git CLI operation failed: Git submodule add failed: fatal: 'lib/sparse-complex' does not have a commit checked out\n\n\nStack backtrace:\n   0: anyhow::error::<impl anyhow::Error>::msg\n             at /home/knitli/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/anyhow-1.0.98/src/backtrace.rs:27:14\n   1: submod::main::{{closure}}\n             at /home/knitli/submod/src/main.rs:71:30\n   2: core::result::Result<T,E>::map_err\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/result.rs:856:27\n   3: submod::main\n             at /home/knitli/submod/src/main.rs:69:13\n   4: core::ops::function::FnOnce::call_once\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/ops/function.rs:250:5\n   5: std::sys::backtrace::__rust_begin_short_backtrace\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/sys/backtrace.rs:152:18\n   6: std::rt::lang_start::{{closure}}\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/rt.rs:199:18\n   7: core::ops::function::impls::<impl core::ops::function::FnOnce<A> for &F>::call_once\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/ops/function.rs:284:13\n   8: std::panicking::try::do_call\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/panicking.rs:589:40\n   9: std::panicking::try\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/panicking.rs:552:19\n  10: std::panic::catch_unwind\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/panic.rs:359:14\n  11: std::rt::lang_start_internal::{{closure}}\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/rt.rs:168:24\n  12: std::panicking::try::do_call\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/panicking.rs:589:40\n  13: std::panicking::try\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/panicking.rs:552:19\n  14: std::panic::catch_unwind\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/panic.rs:359:14\n  15: std::rt::lang_start_internal\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/rt.rs:164:5\n  16: std::rt::lang_start\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/rt.rs:198:5\n  17: main\n  18: <unknown>\n  19: __libc_start_main\n  20: _start\n"
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/panicking.rs:697:5
+   1: core::panicking::panic_fmt
+             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/panicking.rs:75:14
+   2: core::result::unwrap_failed
+             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/result.rs:1704:5
+   3: core::result::Result<T,E>::expect
+             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/result.rs:1061:23
+   4: sparse_checkout_tests::tests::test_sparse_checkout_complex_patterns
+             at ./tests/sparse_checkout_tests.rs:186:9
+   5: sparse_checkout_tests::tests::test_sparse_checkout_complex_patterns::{{closure}}
+             at ./tests/sparse_checkout_tests.rs:176:47
+   6: core::ops::function::FnOnce::call_once
+             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/ops/function.rs:250:5
+   7: core::ops::function::FnOnce::call_once
+             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/ops/function.rs:250:5
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+FAILED
+
+failures:
+
+failures:
+    tests::test_sparse_checkout_complex_patterns
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 8 filtered out; finished in 1.24s
+
+[31;1m        FAIL[0m [   1.247s] [35;1msubmod::sparse_checkout_tests[0m [36mtests[0m[36m::[0m[34;1mtest_sparse_checkout_complex_patterns[0m
+[32;1m       START[0m             [35;1msubmod::sparse_checkout_tests[0m [36mtests[0m[36m::[0m[34;1mtest_sparse_checkout_disabled_detection[0m
+
+running 1 test
+test tests::test_sparse_checkout_disabled_detection ... 
+thread 'tests::test_sparse_checkout_disabled_detection' panicked at tests/sparse_checkout_tests.rs:147:14:
+Failed to add submodule: "Command failed:\nstdout: \nstderr: Error: Failed to add submodule: Git CLI operation failed: Git submodule add failed: fatal: 'lib/sparse-disabled' does not have a commit checked out\n\n\nStack backtrace:\n   0: anyhow::error::<impl anyhow::Error>::msg\n             at /home/knitli/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/anyhow-1.0.98/src/backtrace.rs:27:14\n   1: submod::main::{{closure}}\n             at /home/knitli/submod/src/main.rs:71:30\n   2: core::result::Result<T,E>::map_err\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/result.rs:856:27\n   3: submod::main\n             at /home/knitli/submod/src/main.rs:69:13\n   4: core::ops::function::FnOnce::call_once\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/ops/function.rs:250:5\n   5: std::sys::backtrace::__rust_begin_short_backtrace\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/sys/backtrace.rs:152:18\n   6: std::rt::lang_start::{{closure}}\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/rt.rs:199:18\n   7: core::ops::function::impls::<impl core::ops::function::FnOnce<A> for &F>::call_once\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/ops/function.rs:284:13\n   8: std::panicking::try::do_call\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/panicking.rs:589:40\n   9: std::panicking::try\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/panicking.rs:552:19\n  10: std::panic::catch_unwind\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/panic.rs:359:14\n  11: std::rt::lang_start_internal::{{closure}}\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/rt.rs:168:24\n  12: std::panicking::try::do_call\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/panicking.rs:589:40\n  13: std::panicking::try\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/panicking.rs:552:19\n  14: std::panic::catch_unwind\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/panic.rs:359:14\n  15: std::rt::lang_start_internal\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/rt.rs:164:5\n  16: std::rt::lang_start\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/rt.rs:198:5\n  17: main\n  18: <unknown>\n  19: __libc_start_main\n  20: _start\n"
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/panicking.rs:697:5
+   1: core::panicking::panic_fmt
+             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/panicking.rs:75:14
+   2: core::result::unwrap_failed
+             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/result.rs:1704:5
+   3: core::result::Result<T,E>::expect
+             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/result.rs:1061:23
+   4: sparse_checkout_tests::tests::test_sparse_checkout_disabled_detection
+             at ./tests/sparse_checkout_tests.rs:145:9
+   5: sparse_checkout_tests::tests::test_sparse_checkout_disabled_detection::{{closure}}
+             at ./tests/sparse_checkout_tests.rs:135:49
+   6: core::ops::function::FnOnce::call_once
+             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/ops/function.rs:250:5
+   7: core::ops::function::FnOnce::call_once
+             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/ops/function.rs:250:5
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+FAILED
+
+failures:
+
+failures:
+    tests::test_sparse_checkout_disabled_detection
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 8 filtered out; finished in 1.25s
+
+[31;1m        FAIL[0m [   1.260s] [35;1msubmod::sparse_checkout_tests[0m [36mtests[0m[36m::[0m[34;1mtest_sparse_checkout_disabled_detection[0m
+[32;1m       START[0m             [35;1msubmod::sparse_checkout_tests[0m [36mtests[0m[36m::[0m[34;1mtest_sparse_checkout_empty_patterns[0m
+
+running 1 test
+test tests::test_sparse_checkout_empty_patterns ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 8 filtered out; finished in 1.06s
+
+[32;1m        PASS[0m [   1.071s] [35;1msubmod::sparse_checkout_tests[0m [36mtests[0m[36m::[0m[34;1mtest_sparse_checkout_empty_patterns[0m
+[32;1m       START[0m             [35;1msubmod::sparse_checkout_tests[0m [36mtests[0m[36m::[0m[34;1mtest_sparse_checkout_mismatch_detection[0m
+
+running 1 test
+test tests::test_sparse_checkout_mismatch_detection ... 
+thread 'tests::test_sparse_checkout_mismatch_detection' panicked at tests/sparse_checkout_tests.rs:118:14:
+Failed to add submodule: "Command failed:\nstdout: \nstderr: Error: Failed to add submodule: Git CLI operation failed: Git submodule add failed: fatal: 'lib/sparse-mismatch' does not have a commit checked out\n\n\nStack backtrace:\n   0: anyhow::error::<impl anyhow::Error>::msg\n             at /home/knitli/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/anyhow-1.0.98/src/backtrace.rs:27:14\n   1: submod::main::{{closure}}\n             at /home/knitli/submod/src/main.rs:71:30\n   2: core::result::Result<T,E>::map_err\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/result.rs:856:27\n   3: submod::main\n             at /home/knitli/submod/src/main.rs:69:13\n   4: core::ops::function::FnOnce::call_once\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/ops/function.rs:250:5\n   5: std::sys::backtrace::__rust_begin_short_backtrace\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/sys/backtrace.rs:152:18\n   6: std::rt::lang_start::{{closure}}\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/rt.rs:199:18\n   7: core::ops::function::impls::<impl core::ops::function::FnOnce<A> for &F>::call_once\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/ops/function.rs:284:13\n   8: std::panicking::try::do_call\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/panicking.rs:589:40\n   9: std::panicking::try\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/panicking.rs:552:19\n  10: std::panic::catch_unwind\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/panic.rs:359:14\n  11: std::rt::lang_start_internal::{{closure}}\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/rt.rs:168:24\n  12: std::panicking::try::do_call\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/panicking.rs:589:40\n  13: std::panicking::try\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/panicking.rs:552:19\n  14: std::panic::catch_unwind\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/panic.rs:359:14\n  15: std::rt::lang_start_internal\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/rt.rs:164:5\n  16: std::rt::lang_start\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/rt.rs:198:5\n  17: main\n  18: <unknown>\n  19: __libc_start_main\n  20: _start\n"
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/panicking.rs:697:5
+   1: core::panicking::panic_fmt
+             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/panicking.rs:75:14
+   2: core::result::unwrap_failed
+             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/result.rs:1704:5
+   3: core::result::Result<T,E>::expect
+             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/result.rs:1061:23
+   4: sparse_checkout_tests::tests::test_sparse_checkout_mismatch_detection
+             at ./tests/sparse_checkout_tests.rs:109:9
+   5: sparse_checkout_tests::tests::test_sparse_checkout_mismatch_detection::{{closure}}
+             at ./tests/sparse_checkout_tests.rs:99:49
+   6: core::ops::function::FnOnce::call_once
+             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/ops/function.rs:250:5
+   7: core::ops::function::FnOnce::call_once
+             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/ops/function.rs:250:5
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+FAILED
+
+failures:
+
+failures:
+    tests::test_sparse_checkout_mismatch_detection
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 8 filtered out; finished in 1.37s
+
+[31;1m        FAIL[0m [   1.382s] [35;1msubmod::sparse_checkout_tests[0m [36mtests[0m[36m::[0m[34;1mtest_sparse_checkout_mismatch_detection[0m
+[32;1m       START[0m             [35;1msubmod::sparse_checkout_tests[0m [36mtests[0m[36m::[0m[34;1mtest_sparse_checkout_status_reporting[0m
+
+running 1 test
+test tests::test_sparse_checkout_status_reporting ... 
+thread 'tests::test_sparse_checkout_status_reporting' panicked at tests/sparse_checkout_tests.rs:263:14:
+Failed to add submodule: "Command failed:\nstdout: \nstderr: Error: Failed to add submodule: Git CLI operation failed: Git submodule add failed: fatal: 'lib/no-sparse' does not have a commit checked out\n\n\nStack backtrace:\n   0: anyhow::error::<impl anyhow::Error>::msg\n             at /home/knitli/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/anyhow-1.0.98/src/backtrace.rs:27:14\n   1: submod::main::{{closure}}\n             at /home/knitli/submod/src/main.rs:71:30\n   2: core::result::Result<T,E>::map_err\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/result.rs:856:27\n   3: submod::main\n             at /home/knitli/submod/src/main.rs:69:13\n   4: core::ops::function::FnOnce::call_once\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/ops/function.rs:250:5\n   5: std::sys::backtrace::__rust_begin_short_backtrace\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/sys/backtrace.rs:152:18\n   6: std::rt::lang_start::{{closure}}\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/rt.rs:199:18\n   7: core::ops::function::impls::<impl core::ops::function::FnOnce<A> for &F>::call_once\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/ops/function.rs:284:13\n   8: std::panicking::try::do_call\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/panicking.rs:589:40\n   9: std::panicking::try\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/panicking.rs:552:19\n  10: std::panic::catch_unwind\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/panic.rs:359:14\n  11: std::rt::lang_start_internal::{{closure}}\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/rt.rs:168:24\n  12: std::panicking::try::do_call\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/panicking.rs:589:40\n  13: std::panicking::try\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/panicking.rs:552:19\n  14: std::panic::catch_unwind\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/panic.rs:359:14\n  15: std::rt::lang_start_internal\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/rt.rs:164:5\n  16: std::rt::lang_start\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/rt.rs:198:5\n  17: main\n  18: <unknown>\n  19: __libc_start_main\n  20: _start\n"
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/panicking.rs:697:5
+   1: core::panicking::panic_fmt
+             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/panicking.rs:75:14
+   2: core::result::unwrap_failed
+             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/result.rs:1704:5
+   3: core::result::Result<T,E>::expect
+             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/result.rs:1061:23
+   4: sparse_checkout_tests::tests::test_sparse_checkout_status_reporting
+             at ./tests/sparse_checkout_tests.rs:261:9
+   5: sparse_checkout_tests::tests::test_sparse_checkout_status_reporting::{{closure}}
+             at ./tests/sparse_checkout_tests.rs:251:47
+   6: core::ops::function::FnOnce::call_once
+             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/ops/function.rs:250:5
+   7: core::ops::function::FnOnce::call_once
+             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/ops/function.rs:250:5
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+FAILED
+
+failures:
+
+failures:
+    tests::test_sparse_checkout_status_reporting
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 8 filtered out; finished in 1.31s
+
+[31;1m        FAIL[0m [   1.324s] [35;1msubmod::sparse_checkout_tests[0m [36mtests[0m[36m::[0m[34;1mtest_sparse_checkout_status_reporting[0m
+[32;1m       START[0m             [35;1msubmod::sparse_checkout_tests[0m [36mtests[0m[36m::[0m[34;1mtest_sparse_checkout_with_patterns[0m
+
+running 1 test
+test tests::test_sparse_checkout_with_patterns ... 
+thread 'tests::test_sparse_checkout_with_patterns' panicked at tests/sparse_checkout_tests.rs:83:14:
+Failed to add submodule: "Command failed:\nstdout: \nstderr: Error: Failed to add submodule: Git CLI operation failed: Git submodule add failed: fatal: 'lib/sparse-patterns' does not have a commit checked out\n\n\nStack backtrace:\n   0: anyhow::error::<impl anyhow::Error>::msg\n             at /home/knitli/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/anyhow-1.0.98/src/backtrace.rs:27:14\n   1: submod::main::{{closure}}\n             at /home/knitli/submod/src/main.rs:71:30\n   2: core::result::Result<T,E>::map_err\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/result.rs:856:27\n   3: submod::main\n             at /home/knitli/submod/src/main.rs:69:13\n   4: core::ops::function::FnOnce::call_once\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/ops/function.rs:250:5\n   5: std::sys::backtrace::__rust_begin_short_backtrace\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/sys/backtrace.rs:152:18\n   6: std::rt::lang_start::{{closure}}\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/rt.rs:199:18\n   7: core::ops::function::impls::<impl core::ops::function::FnOnce<A> for &F>::call_once\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/ops/function.rs:284:13\n   8: std::panicking::try::do_call\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/panicking.rs:589:40\n   9: std::panicking::try\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/panicking.rs:552:19\n  10: std::panic::catch_unwind\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/panic.rs:359:14\n  11: std::rt::lang_start_internal::{{closure}}\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/rt.rs:168:24\n  12: std::panicking::try::do_call\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/panicking.rs:589:40\n  13: std::panicking::try\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/panicking.rs:552:19\n  14: std::panic::catch_unwind\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/panic.rs:359:14\n  15: std::rt::lang_start_internal\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/rt.rs:164:5\n  16: std::rt::lang_start\n             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/rt.rs:198:5\n  17: main\n  18: <unknown>\n  19: __libc_start_main\n  20: _start\n"
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/std/src/panicking.rs:697:5
+   1: core::panicking::panic_fmt
+             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/panicking.rs:75:14
+   2: core::result::unwrap_failed
+             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/result.rs:1704:5
+   3: core::result::Result<T,E>::expect
+             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/result.rs:1061:23
+   4: sparse_checkout_tests::tests::test_sparse_checkout_with_patterns
+             at ./tests/sparse_checkout_tests.rs:74:9
+   5: sparse_checkout_tests::tests::test_sparse_checkout_with_patterns::{{closure}}
+             at ./tests/sparse_checkout_tests.rs:64:44
+   6: core::ops::function::FnOnce::call_once
+             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/ops/function.rs:250:5
+   7: core::ops::function::FnOnce::call_once
+             at /rustc/17067e9ac6d7ecb70e50f92c1944e545188d2359/library/core/src/ops/function.rs:250:5
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+FAILED
+
+failures:
+
+failures:
+    tests::test_sparse_checkout_with_patterns
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 8 filtered out; finished in 1.33s
+
+[31;1m        FAIL[0m [   1.342s] [35;1msubmod::sparse_checkout_tests[0m [36mtests[0m[36m::[0m[34;1mtest_sparse_checkout_with_patterns[0m
+[32;1m       START[0m             [35;1msubmod::sparse_checkout_tests[0m [36mtests[0m[36m::[0m[34;1mtest_sparse_checkout_with_sync_command[0m
+
+running 1 test
+test tests::test_sparse_checkout_with_sync_command ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 8 filtered out; finished in 1.27s
+
+[32;1m        PASS[0m [   1.277s] [35;1msubmod::sparse_checkout_tests[0m [36mtests[0m[36m::[0m[34;1mtest_sparse_checkout_with_sync_command[0m
+────────────
+[31;1m     Summary[0m [  75.293s] [1m55[0m tests run: [1m32[0m [32;1mpassed[0m, [1m23[0m [31;1mfailed[0m, [1m0[0m [33;1mskipped[0m
+[31;1m        FAIL[0m [   2.001s] [35;1msubmod::config_tests[0m [36mtests[0m[36m::[0m[34;1mtest_config_modification_via_add_command[0m
+[31;1m        FAIL[0m [   1.123s] [35;1msubmod::error_handling_tests[0m [36mtests[0m[36m::[0m[34;1mtest_concurrent_operations[0m
+[31;1m        FAIL[0m [   1.077s] [35;1msubmod::error_handling_tests[0m [36mtests[0m[36m::[0m[34;1mtest_config_file_locked[0m
+[31;1m        FAIL[0m [   1.191s] [35;1msubmod::integration_tests[0m [36mtests[0m[36m::[0m[34;1mtest_add_submodule_basic[0m
+[31;1m        FAIL[0m [   1.222s] [35;1msubmod::integration_tests[0m [36mtests[0m[36m::[0m[34;1mtest_add_submodule_with_sparse_paths[0m
+[31;1m        FAIL[0m [   1.324s] [35;1msubmod::integration_tests[0m [36mtests[0m[36m::[0m[34;1mtest_reset_all_command[0m
+[31;1m        FAIL[0m [   1.134s] [35;1msubmod::integration_tests[0m [36mtests[0m[36m::[0m[34;1mtest_reset_command[0m
+[31;1m        FAIL[0m [   1.191s] [35;1msubmod::integration_tests[0m [36mtests[0m[36m::[0m[34;1mtest_sparse_checkout_mismatch_detection[0m
+[31;1m        FAIL[0m [   1.188s] [35;1msubmod::integration_tests[0m [36mtests[0m[36m::[0m[34;1mtest_update_command[0m
+[31;1m        FAIL[0m [   1.157s] [35;1msubmod::performance_tests[0m [36mtests[0m[36m::[0m[34;1mtest_concurrent_check_operations[0m
+[31;1m        FAIL[0m [   5.060s] [35;1msubmod::performance_tests[0m [36mtests[0m[36m::[0m[34;1mtest_config_serialization_performance[0m
+[31;1m        FAIL[0m [   0.696s] [35;1msubmod::performance_tests[0m [36mtests[0m[36m::[0m[34;1mtest_config_with_unicode_and_special_chars[0m
+[31;1m        FAIL[0m [   1.224s] [35;1msubmod::performance_tests[0m [36mtests[0m[36m::[0m[34;1mtest_deep_directory_structure[0m
+[31;1m        FAIL[0m [   1.243s] [35;1msubmod::performance_tests[0m [36mtests[0m[36m::[0m[34;1mtest_file_system_performance[0m
+[31;1m        FAIL[0m [   1.057s] [35;1msubmod::performance_tests[0m [36mtests[0m[36m::[0m[34;1mtest_memory_usage_with_large_operations[0m
+[31;1m        FAIL[0m [   2.886s] [35;1msubmod::performance_tests[0m [36mtests[0m[36m::[0m[34;1mtest_multiple_submodules_performance[0m
+[31;1m        FAIL[0m [   1.217s] [35;1msubmod::performance_tests[0m [36mtests[0m[36m::[0m[34;1mtest_sparse_checkout_with_many_patterns[0m
+[31;1m        FAIL[0m [   1.249s] [35;1msubmod::sparse_checkout_tests[0m [36mtests[0m[36m::[0m[34;1mtest_sparse_checkout_basic_setup[0m
+[31;1m        FAIL[0m [   1.247s] [35;1msubmod::sparse_checkout_tests[0m [36mtests[0m[36m::[0m[34;1mtest_sparse_checkout_complex_patterns[0m
+[31;1m        FAIL[0m [   1.260s] [35;1msubmod::sparse_checkout_tests[0m [36mtests[0m[36m::[0m[34;1mtest_sparse_checkout_disabled_detection[0m
+[31;1m        FAIL[0m [   1.382s] [35;1msubmod::sparse_checkout_tests[0m [36mtests[0m[36m::[0m[34;1mtest_sparse_checkout_mismatch_detection[0m
+[31;1m        FAIL[0m [   1.324s] [35;1msubmod::sparse_checkout_tests[0m [36mtests[0m[36m::[0m[34;1mtest_sparse_checkout_status_reporting[0m
+[31;1m        FAIL[0m [   1.342s] [35;1msubmod::sparse_checkout_tests[0m [36mtests[0m[36m::[0m[34;1mtest_sparse_checkout_with_patterns[0m
+[31;1merror[0m: test run failed
