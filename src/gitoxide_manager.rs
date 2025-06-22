@@ -1,4 +1,4 @@
-#![doc = r#"
+#![doc = r"
 # Gitoxide-Based Submodule Manager
 
 Provides core logic for managing git submodules using the [`gitoxide`](https://github.com/Byron/gitoxide) library, with fallbacks to `git2` and the Git CLI when needed. Supports advanced features like sparse checkout and TOML-based configuration.
@@ -42,7 +42,7 @@ All operations return [`SubmoduleError`](src/gitoxide_manager.rs:14) for consist
 ## Usage
 
 Use this module as the backend for CLI commands to manage submodules in a repository. See the project [README](README.md) for usage examples and configuration details.
-"#]
+"]
 
 use crate::config::{Config, SubmoduleConfig, SubmoduleGitOptions};
 use gix::Repository;
@@ -387,33 +387,35 @@ impl GitoxideSubmoduleManager {
 
         // Clean up any existing broken submodule state
         let target_path = std::path::Path::new(workdir).join(path);
-        
+
         // Always try to clean up, even if the directory doesn't exist
         // because there might be git metadata left behind
-        
+
         // Try to deinitialize the submodule first
         let _ = Command::new("git")
             .args(["submodule", "deinit", "-f", path])
             .current_dir(workdir)
             .output();
-        
+
         // Remove the submodule from .gitmodules and .git/config
         let _ = Command::new("git")
             .args(["rm", "-f", path])
             .current_dir(workdir)
             .output();
-        
+
         // Remove the directory if it exists
         if target_path.exists() {
             let _ = std::fs::remove_dir_all(&target_path);
         }
-        
+
         // Clean up git modules directory
-        let git_modules_path = std::path::Path::new(workdir).join(".git/modules").join(path);
+        let git_modules_path = std::path::Path::new(workdir)
+            .join(".git/modules")
+            .join(path);
         if git_modules_path.exists() {
             let _ = std::fs::remove_dir_all(&git_modules_path);
         }
-        
+
         // Also try to clean up parent directories in git modules if they're empty
         if let Some(parent) = git_modules_path.parent() {
             let _ = std::fs::remove_dir(parent); // This will only succeed if empty

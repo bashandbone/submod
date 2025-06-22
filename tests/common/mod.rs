@@ -207,7 +207,7 @@ impl TestHarness {
         // Check if push was successful
         if !push_output.status.success() {
             let stderr = String::from_utf8_lossy(&push_output.stderr);
-            return Err(format!("Failed to push to remote: {}", stderr).into());
+            return Err(format!("Failed to push to remote: {stderr}").into());
         }
 
         Ok(remote_dir)
