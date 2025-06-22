@@ -366,14 +366,28 @@ impl TestHarness {
             .arg(&remote_dir)
             .output()?;
 
+        // Set the default branch to main for the bare repository
+        std::process::Command::new("git")
+            .args(["symbolic-ref", "HEAD", "refs/heads/main"])
+            .current_dir(&remote_dir)
+            .output()?;
+
         // Create a working copy to add content
         let work_copy = self.temp_dir.path().join(format!("{name}_work"));
         std::process::Command::new("git")
-            .args([
-                "clone",
-                remote_dir.to_str().unwrap(),
-                work_copy.to_str().unwrap(),
-            ])
+            .args(["init"])
+            .arg(&work_copy)
+            .output()?;
+
+        // Set up the main branch and remote
+        std::process::Command::new("git")
+            .args(["checkout", "-b", "main"])
+            .current_dir(&work_copy)
+            .output()?;
+
+        std::process::Command::new("git")
+            .args(["remote", "add", "origin", remote_dir.to_str().unwrap()])
+            .current_dir(&work_copy)
             .output()?;
 
         // Configure git
@@ -452,21 +466,36 @@ impl TestHarness {
             .current_dir(&work_copy)
             .output()?;
 
-        // Push everything
-        std::process::Command::new("git")
+        // Push everything with error checking
+        let push_main = std::process::Command::new("git")
             .args(["push", "origin", "main"])
             .current_dir(&work_copy)
             .output()?;
 
-        std::process::Command::new("git")
+        if !push_main.status.success() {
+            let stderr = String::from_utf8_lossy(&push_main.stderr);
+            return Err(format!("Failed to push main branch: {stderr}").into());
+        }
+
+        let push_develop = std::process::Command::new("git")
             .args(["push", "origin", "develop"])
             .current_dir(&work_copy)
             .output()?;
 
-        std::process::Command::new("git")
+        if !push_develop.status.success() {
+            let stderr = String::from_utf8_lossy(&push_develop.stderr);
+            return Err(format!("Failed to push develop branch: {stderr}").into());
+        }
+
+        let push_tags = std::process::Command::new("git")
             .args(["push", "origin", "--tags"])
             .current_dir(&work_copy)
             .output()?;
+
+        if !push_tags.status.success() {
+            let stderr = String::from_utf8_lossy(&push_tags.stderr);
+            return Err(format!("Failed to push tags: {stderr}").into());
+        }
 
         Ok(remote_dir)
     }
