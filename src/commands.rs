@@ -42,6 +42,7 @@ Reset {
     #[arg(short, long)]
     all: bool,
     /// Specific submodule names to reset
+    #[arg(required_unless_present = "all")]
     names: Vec<String>,
 },
 /// Run full sync: check, init, update

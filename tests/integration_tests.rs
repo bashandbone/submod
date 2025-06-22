@@ -94,7 +94,7 @@ mod tests {
         assert!(config.contains("sparse_paths = [\"src\", \"docs\"]"));
 
         // Verify sparse checkout is configured
-        let sparse_file = harness.work_dir.join("lib/sparse/.git/info/sparse-checkout");
+        let sparse_file = harness.get_sparse_checkout_file_path("lib/sparse");
         assert!(sparse_file.exists());
 
         let sparse_content = fs::read_to_string(sparse_file).expect("Failed to read sparse file");
@@ -133,7 +133,7 @@ sparse_paths = ["src"]
         assert!(harness.file_exists("lib/init/.git"));
 
         // Verify sparse checkout was configured
-        let sparse_file = harness.work_dir.join("lib/init/.git/info/sparse-checkout");
+        let sparse_file = harness.get_sparse_checkout_file_path("lib/init");
         assert!(sparse_file.exists());
     }
 
@@ -357,7 +357,7 @@ active = true
         ]).expect("Failed to add submodule");
 
         // Manually modify sparse-checkout file to create mismatch
-        let sparse_file = harness.work_dir.join("lib/mismatch/.git/info/sparse-checkout");
+        let sparse_file = harness.get_sparse_checkout_file_path("lib/mismatch");
         fs::write(&sparse_file, "include\nLICENSE\n").expect("Failed to modify sparse file");
 
         // Run check command

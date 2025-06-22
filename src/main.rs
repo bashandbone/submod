@@ -21,8 +21,24 @@ fn main() -> Result<()> {
                 paths.split(',')
                     .map(|s| s.trim().to_string())
                     .filter(|s| !s.is_empty())
-                    .collect()
+                    .collect::<Vec<String>>()
+                    .into_iter()
+                    .map(|s| {
+                        if s.contains('\0') {
+                            return Err(anyhow::anyhow!("Invalid sparse path pattern: contains null byte"));
+                        }
+                        Ok(s)
+                    })
+                    .collect::<Result<Vec<String>, _>>()
             });
+
+            let sparse_paths_vec = match sparse_paths_vec {
+                Some(result) => match result {
+                    Ok(paths) => Some(paths),
+                    Err(e) => return Err(e),
+                },
+                None => None,
+            };
 
             manager.add_submodule(name, path, url, sparse_paths_vec)
                 .map_err(|e| anyhow::anyhow!("Failed to add submodule: {}", e))?;
@@ -48,9 +64,15 @@ fn main() -> Result<()> {
                 .map_err(|e| anyhow::anyhow!("Failed to create manager: {}", e))?;
 
             // Update all submodules from config
-            for (name, _) in manager.config().get_submodules() {
-                manager.update_submodule(name)
-                    .map_err(|e| anyhow::anyhow!("Failed to update submodule {}: {}", name, e))?;
+            let submodules: Vec<_> = manager.config().get_submodules().collect();
+            if submodules.is_empty() {
+                println!("No submodules configured");
+            } else {
+                for (name, _) in submodules {
+                    manager.update_submodule(name)
+                        .map_err(|e| anyhow::anyhow!("Failed to update submodule {}: {}", name, e))?;
+                }
+                println!("Updated {} submodule(s)", manager.config().get_submodules().count());
             }
         }
         Commands::Reset { all, names } => {
@@ -64,8 +86,7 @@ fn main() -> Result<()> {
             };
 
             if submodules_to_reset.is_empty() {
-                println!("No submodules to reset");
-                return Ok(());
+                return Err(anyhow::anyhow!("No submodules specified for reset. Use --all to reset all submodules or specify submodule names."));
             }
 
             for name in submodules_to_reset {

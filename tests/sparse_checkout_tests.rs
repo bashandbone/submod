@@ -30,7 +30,7 @@ mod tests {
         ]).expect("Failed to add submodule");
 
         // Verify sparse-checkout file exists and has correct content
-        let sparse_file = harness.work_dir.join("lib/sparse-basic/.git/info/sparse-checkout");
+        let sparse_file = harness.get_sparse_checkout_file_path("lib/sparse-basic");
         assert!(sparse_file.exists());
 
         let sparse_content = fs::read_to_string(&sparse_file).expect("Failed to read sparse file");
@@ -72,7 +72,7 @@ mod tests {
             "--sparse-paths", "src/,*.md,Cargo.toml",
         ]).expect("Failed to add submodule");
 
-        let sparse_file = harness.work_dir.join("lib/sparse-patterns/.git/info/sparse-checkout");
+        let sparse_file = harness.get_sparse_checkout_file_path("lib/sparse-patterns");
         let sparse_content = fs::read_to_string(&sparse_file).expect("Failed to read sparse file");
 
         assert!(sparse_content.contains("src/"));
@@ -103,7 +103,7 @@ mod tests {
         ]).expect("Failed to add submodule");
 
         // Manually modify sparse-checkout file to create mismatch
-        let sparse_file = harness.work_dir.join("lib/sparse-mismatch/.git/info/sparse-checkout");
+        let sparse_file = harness.get_sparse_checkout_file_path("lib/sparse-mismatch");
         fs::write(&sparse_file, "tests\nexamples\n").expect("Failed to modify sparse file");
 
         // Run check command to detect mismatch
@@ -143,7 +143,7 @@ sparse_paths = ["src", "docs"]
         harness.create_config(&config_content).expect("Failed to create config");
 
         // Remove sparse-checkout file to simulate it not being configured
-        let sparse_file = harness.work_dir.join("lib/sparse-disabled/.git/info/sparse-checkout");
+        let sparse_file = harness.get_sparse_checkout_file_path("lib/sparse-disabled");
         if sparse_file.exists() {
             fs::remove_file(&sparse_file).expect("Failed to remove sparse file");
         }
@@ -170,7 +170,7 @@ sparse_paths = ["src", "docs"]
             "--sparse-paths", "src/,docs/,*.md,!tests/,!examples/",
         ]).expect("Failed to add submodule");
 
-        let sparse_file = harness.work_dir.join("lib/sparse-complex/.git/info/sparse-checkout");
+        let sparse_file = harness.get_sparse_checkout_file_path("lib/sparse-complex");
         let sparse_content = fs::read_to_string(&sparse_file).expect("Failed to read sparse file");
 
         assert!(sparse_content.contains("src/"));
@@ -204,7 +204,7 @@ sparse_paths = ["src", "docs", "*.md"]
         harness.run_submod_success(&["init"]).expect("Failed to run init");
 
         // Verify sparse checkout was configured during init
-        let sparse_file = harness.work_dir.join("lib/sparse-init/.git/info/sparse-checkout");
+        let sparse_file = harness.get_sparse_checkout_file_path("lib/sparse-init");
         assert!(sparse_file.exists());
 
         let sparse_content = fs::read_to_string(&sparse_file).expect("Failed to read sparse file");
@@ -274,7 +274,7 @@ sparse_paths = ["src", "docs", "*.md"]
             Ok(process_output) => {
                 if process_output.status.success() {
                     // If successful, sparse checkout should not be enabled
-                    let sparse_file = harness.work_dir.join("lib/sparse-empty/.git/info/sparse-checkout");
+                    let sparse_file = harness.get_sparse_checkout_file_path("lib/sparse-empty");
                     assert!(!sparse_file.exists() || fs::read_to_string(&sparse_file).unwrap().trim().is_empty());
                 }
             }
@@ -308,7 +308,7 @@ sparse_paths = ["src", "docs", "README.md"]
         harness.run_submod_success(&["sync"]).expect("Failed to run sync");
 
         // Verify sparse checkout was configured during sync
-        let sparse_file = harness.work_dir.join("lib/sparse-sync/.git/info/sparse-checkout");
+        let sparse_file = harness.get_sparse_checkout_file_path("lib/sparse-sync");
         assert!(sparse_file.exists());
 
         let sparse_content = fs::read_to_string(&sparse_file).expect("Failed to read sparse file");

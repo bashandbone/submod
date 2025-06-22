@@ -1,40 +1,50 @@
 {
   "mcpServers": {
     "context7": {
-      "alwaysAllow": [
-        "resolve-library-id",
-        "get-library-docs"
-      ],
-      "args": [
-        "--bun",
-        "@upstash/context7-mcp@latest"
-      ],
+      "alwaysAllow": ["resolve-library-id", "get-library-docs"],
+      "args": ["--bun", "@upstash/context7-mcp@latest"],
       "command": "bunx",
       "type": "stdio"
     },
     "fetch": {
-      "args": [
-        "mcp-server-fetch"
-      ],
-      "command": "uvx"
+      "args": ["mcp-server-fetch"],
+      "command": "uvx",
+      "alwaysAllow": ["fetch"]
     },
     "sequential-thinking": {
-      "alwaysAllow": [
-        "sequentialthinking"
-      ],
-      "args": [
-        "--bun",
-        "@modelcontextprotocol/server-sequential-thinking"
-      ],
+      "alwaysAllow": ["sequentialthinking"],
+      "args": ["--bun", "@modelcontextprotocol/server-sequential-thinking"],
       "command": "bunx",
       "type": "stdio"
     },
     "filesystem": {
       "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "~/submod"],
+      "alwaysAllow": [
+        "read_file",
+        "read_multiple_files",
+        "write_file",
+        "edit_file",
+        "create_directory",
+        "list_directory",
+        "directory_tree",
+        "move_file",
+        "search_files",
+        "get_file_info",
+        "list_allowed_directories"
+      ]
+    },
+    "mem0-memory-mcp": {
+      "command": "bunx",
       "args": [
-        "-y",
-        "@modelcontextprotocol/server-filesystem",
-        "~/submod"
+        "--bun",
+        "@smithery/cli@latest",
+        "run",
+        "@mem0ai/mem0-memory-mcp",
+        "--key",
+        "${env:MEM0}",
+        "--profile",
+        "${env:SMITHERY_PROFILE}"
       ]
     }
   }

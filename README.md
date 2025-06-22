@@ -254,7 +254,7 @@ cargo build
 cargo test
 
 # Or use the comprehensive test runner
-./scripts/run_tests.sh --verbose
+./scripts/run-tests.sh --verbose
 ```
 
 ### Running Tests
@@ -267,13 +267,13 @@ cargo test
 cargo test --test integration_tests
 
 # Run with the test script for better reporting
-./scripts/run_tests.sh
+./scripts/run-tests.sh
 
 # Run performance tests
-./scripts/run_tests.sh --performance
+./scripts/run-tests.sh --performance
 
 # Filter specific tests
-./scripts/run_tests.sh --filter sparse_checkout
+./scripts/run-tests.sh --filter sparse_checkout
 ```
 
 ### Project Structure
@@ -300,7 +300,7 @@ We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) f
 1. **Fork the repository**
 2. **Create a feature branch**: `git checkout -b feature/amazing-feature`
 3. **Make your changes** and add tests if applicable (test anything that has a result)
-4. **Run the test suite**: `./scripts/run_tests.sh`
+4. **Run the test suite**: `./scripts/run-tests.sh`
 5. **Commit your changes**: `git commit -m 'Add amazing feature'`
 6. **Push to your branch**: `git push origin feature/amazing-feature`
 7. **Open a Pull Request**

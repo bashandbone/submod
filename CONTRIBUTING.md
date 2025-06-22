@@ -82,7 +82,7 @@ cargo build
 cargo test
 
 # Run the comprehensive test suite
-./scripts/run_tests.sh
+./scripts/run-tests.sh
 ```
 
 ### 4. Install Development Tools
@@ -172,13 +172,13 @@ My philosophy on testing is to "test what matters." Tests focus on integration a
 cargo test
 
 # Comprehensive test suite with reporting
-./scripts/run_tests.sh --verbose
+./scripts/run-tests.sh --verbose
 
 # Include performance tests
-./scripts/run_tests.sh --performance
+./scripts/run-tests.sh --performance
 
 # Filter specific tests
-./scripts/run_tests.sh --filter sparse_checkout
+./scripts/run-tests.sh --filter sparse_checkout
 ```
 
 ### Writing Tests
@@ -235,7 +235,7 @@ fn test_submod_init_command() {
 Before submitting your PR, ensure:
 
 - [ ] **Code compiles** without warnings
-- [ ] **All tests pass** (`./scripts/run_tests.sh`)
+- [ ] **All tests pass** (`./scripts/run-tests.sh`)
 - [ ] **Code is formatted** (`cargo fmt`)
 - [ ] **Lints pass** (`cargo clippy`)
 - [ ] **Documentation is updated** if needed
@@ -266,7 +266,7 @@ Brief description of the changes and motivation.
 ## Testing
 - [ ] I have added tests that prove my fix is effective or that my feature works
 - [ ] New and existing unit tests pass locally with my changes
-- [ ] I have run the full test suite (`./scripts/run_tests.sh`)
+- [ ] I have run the full test suite (`./scripts/run-tests.sh`)
 
 ## Checklist
 - [ ] My code follows the project's style guidelines

@@ -1,4 +1,14 @@
 [tools]
-bun = "latest"
-cargo-binstall = "latest"
-rust = "1.87"
+bun = "latest"   # We use bun to run mcp tool development servers. Totally optional, but helpful.
+cargo-binstall = "latest"  # For installing binaries from crates.io
+"cargo:cargo-audit" = "latest"
+"cargo:cargo-deny" = "latest"
+"cargo:cargo-nextest" = "latest"
+"cargo:cargo-watch" = "latest"
+rust = "1.87"   # The minimum Rust version we support; mise just makes sure it's there.
+uv = "latest"   # Another runner for MCP servers.
+
+[env]
+CARGO_TARGET_DIR = "target"
+RUST_BACKTRACE = "1"
+RUST_TEST_THREADS=1

@@ -87,6 +87,9 @@ else
     cargo build --bin submod > /dev/null 2>&1
 fi
 
+# Force Rust tests to run serially to avoid git submodule race conditions
+export RUST_TEST_THREADS=1
+
 if [[ $? -eq 0 ]]; then
     print_success "Build completed successfully"
 else

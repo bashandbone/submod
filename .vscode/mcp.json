@@ -28,7 +28,11 @@
       "command": "uvx"
     },
     "filesystem": {
-      "args": ["--bun", "@modelcontextprotocol/server-filesystem", "${workspaceFolder}"],
+      "args": [
+        "--bun",
+        "@modelcontextprotocol/server-filesystem",
+        "${workspaceFolder}"
+      ],
       "command": "bunx"
     },
     "github-remote": {
@@ -62,8 +66,15 @@
         "--key",
         "${env:MEM0}",
         "--profile",
-        "${env:SMITHERY_PROFILE}",
+        "${env:SMITHERY_PROFILE}"
       ]
+    },
+    "tavily": {
+      "command": "bunx",
+      "args": ["--bun", "tavily-mcp@latest"],
+      "env": {
+        "TAVILY_API_KEY": "${env:tavily_api_key}"
+      }
     }
   },
 

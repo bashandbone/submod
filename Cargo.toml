@@ -5,6 +5,8 @@ edition = "2024"
 rust-version = "1.87"
 description = "Git submodule manager with sparse checkout support using gitoxide"
 authors = ["Adam Poulemanos <89049923+bashandbone@users.noreply.github.com>"]
+license = "MIT" # Plain MIT license: plainlicense.org/licenses/permissive/mit/
+
 resolver = "3"
 
 [dependencies]
@@ -30,6 +32,10 @@ thiserror = "2.0.12"
 # optional for better low-level ops; falls back to using `git` directly if not available
 git2 = { version = "0.20.2", optional = true }
 
+
+[lib]
+name = "submod"
+path = "src/lib.rs"
 
 [[bin]]
 name = "submod"
