@@ -6,6 +6,7 @@ cargo-binstall = "latest"  # For installing binaries from crates.io
 "cargo:cargo-deny" = "latest" # For checking licenses and other policies.
 "cargo:cargo-nextest" = "latest" # For running tests in parallel.
 "cargo:cargo-watch" = "latest" # For watching files and rerunning commands.
+gh = "latest"
 hk = "latest"   # Handles git hooks, like pre-commit.
 jq = "latest"
 "npm:prettier" = "latest"

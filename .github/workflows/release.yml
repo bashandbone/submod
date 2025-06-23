@@ -14,8 +14,20 @@ env:
     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
 jobs:
+  create-release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: taiki-e/create-gh-release-action@v1
+        if: github.event_name != 'workflow_dispatch'
+        with:
+          changelog: CHANGELOG.md
+          token: ${{ secrets.GITHUB_TOKEN }}
+          draft: true
+
   build:
     runs-on: ${{ matrix.os }}
+    needs: [create-release]
     strategy:
       fail-fast: false
       matrix:
@@ -50,33 +62,6 @@ jobs:
           features: git2/vendored-libgit2,git2/vendored-openssl
           dry-run: ${{ github.event_name == 'workflow_dispatch' }}
 
-  publish:
-      name: Publish to crates.io
-      needs: [build]
-      runs-on: ubuntu-latest
-      steps:
-          - uses: actions/checkout@v4
-            with:
-                submodules: recursive
-
-          - name: Install Rust
-            uses: dtolnay/rust-toolchain@stable
-
-          - name: Cache cargo registry
-            uses: actions/cache@v4
-            with:
-                path: ~/.cargo/registry
-                key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
-
-          - name: Cache cargo index
-            uses: actions/cache@v4
-            with:
-                path: ~/.cargo/git
-                key: ${{ runner.os }}-cargo-index-${{ hashFiles('**/Cargo.lock') }}
-
-          - name: Publish to crates.io
-            run: cargo publish --token ${{ secrets.CRATESIO_KEY }}
-
   github_release:
       name: Create GitHub Release
       needs: [build, publish]
@@ -100,3 +85,20 @@ jobs:
                 prerelease: false
             env:
                 GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  publish:
+      name: Publish to crates.io
+      needs: [build]
+      runs-on: ubuntu-latest
+      steps:
+          - uses: actions/checkout@v4
+            with:
+                submodules: recursive
+
+          - uses: actions-rs/toolchain@v1
+            with:
+                toolchain: stable
+                override: true
+          - uses: katyo/publish-crates@v2
+            with:
+                registry-token: ${{ secrets.CRATESIO_KEY }}
