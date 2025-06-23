@@ -155,12 +155,12 @@ mise run release       # Cut a new release (maintainers only)
 
 ```bash
 # Hook commands
-hk pre-commit          # Run pre-commit checks
-hk pre-push            # Run pre-push checks  
-hk check               # Run all linters
-hk fix                 # Auto-fix issues where possible
-hk test                # Run tests only
-hk ci                  # Run CI checks
+hk run pre-commit          # Run pre-commit checks
+hk run pre-push            # Run pre-push checks
+hk check                   # Run all linters
+hk fix                     # Auto-fix issues where possible
+hk run test                # Run tests only
+hk run ci                  # Run CI checks
 ```
 
 ### Automated Quality Checks
@@ -178,9 +178,10 @@ The pre-commit hooks automatically run these tools on every commit:
 ### Tool Integration
 
 Both tools work together seamlessly:
+
 - **mise** handles tool installation and version management
 - **hk** uses the tools installed by mise for git hooks
-- Both can run the same underlying commands (e.g., `mise run test` and `hk test`)
+- Both can run the same underlying commands (e.g., `mise run test` and `hk run test`)
 - CI uses the same tools for consistency between local and remote environments
 
 ## 🔄 Making Changes
@@ -219,7 +220,7 @@ feat: Add support for super-unicorn submodules :unicorn:
 
 ## 🧪 Testing
 
-My philosophy on testing is to "test what matters." Tests focus on integration and output -- if the tool performs as expected in realistic tests, then it's good. I'm not a fan of a flurry of unit tests that test implementation details and create a maintenance burden.
+My philosophy on testing is "test what matters." Tests focus on integration and output -- if the tool performs as expected in realistic tests, then it's good. I'm not a fan of a flurry of unit tests that test implementation details and create a maintenance burden.
 
 ### Test Categories
 
@@ -227,7 +228,7 @@ My philosophy on testing is to "test what matters." Tests focus on integration a
 
    ```bash
    cargo test --test unit_tests
-````
+   ```
 
 2. **Integration Tests** - Test complete workflows
 
@@ -261,14 +262,14 @@ mise run test           # Quick test run
 mise run ci             # Full CI suite (build + lint + test)
 
 # Using hk
-hk test                 # Run tests only
-hk ci                   # Run CI checks
-hk check                # Run all linters and checks
+hk run test                 # Run tests only
+hk run ci                   # Run CI checks
+hk check                    # Run all linters and checks
 
 # Using cargo directly
 cargo test              # Quick test run
 
-# Using the test script
+# Using the test script -- more granular control
 ./scripts/run-tests.sh --verbose     # Comprehensive test suite with reporting
 ./scripts/run-tests.sh --performance # Include performance tests
 ./scripts/run-tests.sh --filter sparse_checkout  # Filter specific tests
@@ -328,15 +329,16 @@ fn test_submod_init_command() {
 Before submitting your PR, ensure:
 
 - [ ] **Code compiles** without warnings
-- [ ] **All tests pass** (`mise run ci` or `hk ci`)
-- [ ] **Pre-commit hooks pass** (automatically run on commit, or manually with `hk pre-commit`)
+- [ ] **All tests pass** (will run in pre-commit and pre-push)
+- [ ] **Pre-commit hooks pass** (automatically run on commit, or manually with `hk run pre-commit`)
 - [ ] **Documentation is updated** if needed
 - [ ] **CHANGELOG is updated** for user-facing changes
 - [ ] **Commit messages follow conventions**
 
 **Note**: If you're using the recommended mise/hk setup, many checks are automated:
+
 - **Code formatting** (`cargo fmt`) - Auto-fixed by pre-commit hooks
-- **Linting** (`cargo clippy`) - Checked by pre-commit hooks  
+- **Linting** (`cargo clippy`) - Checked by pre-commit hooks
 - **Spell checking** (`typos`) - Checked and auto-fixed by pre-commit hooks
 - **TOML/YAML formatting** (`prettier`) - Auto-fixed by pre-commit hooks
 - **Security auditing** (`cargo deny`) - Checked by pre-commit hooks
@@ -347,7 +349,6 @@ Before submitting your PR, ensure:
 # Push your branch
 git push origin feature/your-feature-name
 
-# Create PR through GitHub web interface
 ```
 
 ### 3. PR Description Template
@@ -398,21 +399,32 @@ We follow standard Rust conventions with some project-specific guidelines:
 
 #### Code Formatting
 
+Just use `mise` or `hk`
 ```bash
 # Format all code
+mise run fix
+# or
+hk fix
+
+# if you're really anti-mise/hk, then you can use cargo directly
 cargo fmt
+```
 
 # Check formatting without changing files
-cargo fmt -- --check
+```bash
+mise run check
+# or
+hk check
+
+# or if you're really anti-mise/hk, then you can use cargo directly
+cargo fmt --check
 ```
 
 #### Linting
 
 ```bash
-# Run clippy with strict settings
-cargo clippy -- -D warnings
-
-# Run clippy on all targets
+# the above mise and hk commands also run clippy
+# Again, if you're a purist:
 cargo clippy --all-targets --all-features -- -D warnings
 ```
 
@@ -510,8 +522,8 @@ impl SubmoduleConfig {
 
 Common sense documentation style applies. If a function's purpose is obvious and it's well-typed, a sentence is probably enough. If it has complex logic or side effects, provide a detailed explanation.
 
-````rust
-/// Short one-line description.
+````rust,ignore
+/// Short one-line description.   // <-- stop here for obvious functions
 ///
 /// Longer description explaining the purpose, behavior, and any important
 /// details about the function or type.
@@ -591,7 +603,6 @@ A clear description of what you expected to happen.
 # If you have super secret private repos on it
 # feel free to censor/change them
 ```
-````
 
 **Additional context**
 Add any other context about the problem here.

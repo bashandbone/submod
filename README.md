@@ -296,7 +296,7 @@ This project uses [hk](https://github.com/jdx/hk) for automated git hooks that e
 hk install
 
 # Run pre-commit checks manually
-hk pre-commit
+hk run pre-commit
 
 # Run all linters and checks
 hk check
@@ -305,7 +305,7 @@ hk check
 hk fix
 
 # Run CI checks locally
-hk ci
+hk run ci
 ```
 
 The pre-commit hooks automatically run:
@@ -333,6 +333,7 @@ cargo build
 
 # Run tests
 cargo test
+# or hk run test
 
 # Or use the comprehensive test runner
 ./scripts/run-tests.sh --verbose
@@ -346,8 +347,8 @@ mise run test           # Run all tests
 mise run ci             # Run full CI suite
 
 # Using hk
-hk test                 # Run tests only
-hk ci                   # Run CI checks
+hk run test                 # Run tests only
+hk run ci                   # Run CI checks
 
 # Using cargo directly
 cargo test              # Run all tests
