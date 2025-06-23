@@ -1,8 +1,8 @@
 [package]
 name = "submod"
 version = "0.1.2"
-edition = "2021"
-rust-version = "1.75"
+edition = "2024"
+rust-version = "1.85"
 description = "Git submodule manager with sparse checkout support using gitoxide"
 authors = ["Adam Poulemanos <89049923+bashandbone@users.noreply.github.com>"]
 license = "MIT" # Plain MIT license: plainlicense.org/licenses/permissive/mit/

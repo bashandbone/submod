@@ -1,4 +1,5 @@
 [tools]
+act = "latest"
 bun = "latest"   # We use bun to run mcp tool development servers. Totally optional, but helpful.
 cargo-binstall = "latest"  # For installing binaries from crates.io
 "cargo:cargo-audit" = "latest" # For auditing dependencies for security vulnerabilities.
