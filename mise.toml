@@ -1,7 +1,12 @@
+# SPDX-FileCopyrightText: 2025 Adam Poulemanos <89049923+bashandbone@users.noreply.github.com>
+#
+# SPDX-License-Identifier: MIT
+# Licensed under the [Plain MIT License](LICENSE.md)
+
 [tools]
 act = "latest"
 bun = "latest"   # We use bun to run mcp tool development servers. Totally optional, but helpful.
-cargo-binstall = "latest"  # For installing binaries from crates.io
+cargo-binstall = "latest"
 "cargo:cargo-audit" = "latest" # For auditing dependencies for security vulnerabilities.
 "cargo:cargo-deny" = "latest" # For checking licenses and other policies.
 "cargo:cargo-nextest" = "latest" # For running tests in parallel.
@@ -11,6 +16,7 @@ hk = "latest"   # Handles git hooks, like pre-commit.
 jq = "latest"
 "npm:prettier" = "latest"
 "npm:prettier-plugin-toml" = "latest"
+"pipx:reuse" = "latest"
 pkl = "latest"  # pkl for `hk`, which handles git hooks
 rust = "1.87"   # The minimum Rust version we support; mise just makes sure it's there.
 typos = "latest"

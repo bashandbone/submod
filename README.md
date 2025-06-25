@@ -1,3 +1,11 @@
+<!--
+SPDX-FileCopyrightText: 2025 Adam Poulemanos <89049923+bashandbone@users.noreply.github.com>
+
+SPDX-License-Identifier: MIT
+
+Licensed under the [Plain MIT License](LICENSE.md)
+-->
+
 # `submod`
 
 [![Crates.io](https://img.shields.io/crates/v/submod.svg)](https://crates.io/crates/submod)
@@ -5,6 +13,7 @@
 [![Static Badge](https://img.shields.io/badge/Plain-MIT-15db95?style=flat-square&labelColor=0d19a3&cacheSeconds=86400&link=https%3A%2F%2Fplainlicense.org%2Flicenses%2Fpermissive%2Fmit%2Fmit%2F)](https://plainlicense.org/licenses/permissive/mit/)
 [![Rust](https://img.shields.io/badge/rust-1.87%2B-blue.svg)](https://www.rust-lang.org)
 [![codecov](https://codecov.io/gh/bashandbone/submod/branch/main/graph/badge.svg?token=MOW92KKK0G)](https://codecov.io/gh/bashandbone/submod)
+![Crates.io Downloads (latest version)](https://img.shields.io/crates/dv/submod)
 
 A lightweight, fast CLI tool for managing git submodules with advanced sparse checkout support. Built on top of `gitoxide` and `git2` libraries for maximum performance and reliability.
 

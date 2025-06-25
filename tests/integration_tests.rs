@@ -1,3 +1,8 @@
+// SPDX-FileCopyrightText: 2025 Adam Poulemanos <89049923+bashandbone@users.noreply.github.com>
+//
+// SPDX-License-Identifier: MIT
+// Licensed under the [Plain MIT License][../LICENSE.md]
+
 //! Integration tests for the submod CLI tool
 //!
 //! These tests focus on end-to-end behavior rather than implementation details,

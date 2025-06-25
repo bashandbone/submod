@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2025 Adam Poulemanos <89049923+bashandbone@users.noreply.github.com>
+#
+# SPDX-License-Identifier: MIT
+
 # Set default behavior to automatically normalize line endings
 * text=auto
 

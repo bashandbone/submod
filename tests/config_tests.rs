@@ -1,3 +1,8 @@
+// SPDX-FileCopyrightText: 2025 Adam Poulemanos <89049923+bashandbone@users.noreply.github.com>
+//
+// SPDX-License-Identifier: MIT
+// Licensed under the [Plain MIT License][../LICENSE.md]
+
 //! Integration tests focused on configuration management
 //!
 //! These tests verify TOML configuration parsing, serialization,

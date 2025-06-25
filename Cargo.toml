@@ -1,6 +1,11 @@
+# SPDX-FileCopyrightText: 2025 Adam Poulemanos <89049923+bashandbone@users.noreply.github.com>
+#
+# SPDX-License-Identifier: MIT
+# Licensed under the [Plain MIT License](LICENSE.md)
+
 [package]
 name = "submod"
-version = "0.1.2"
+version = "0.2.0"
 edition = "2024"
 rust-version = "1.85"
 description = "A headache-free submodule management tool, built on top of gitoxide. Manage sparse checkouts, submodule updates, and adding/removing submodules with ease."
@@ -17,13 +22,15 @@ resolver = "3"
 
 [dependencies]
 # Gitoxide ops
-gix = { version = "0.72.1", features = ["max-performance"] }
+gix = { version = "0.72.1", default-features = false, features = [
+    "async-network-client", "attributes", "excludes", "status", "command", "parallel", "serde",
+]}
 gix-config = { version = "0.45.1", features = ["serde"] }
 gix-submodule = "0.19.1"
 bstr = { version = "1.12.0", default-features = false }
 
 # CLI
-clap = { version = "4.5.40", features = ["derive"] }
+clap = { version = "4.5.40", features = ["derive", "cargo", "unicode", "wrap_help"] }
 
 # TOML config
 toml = "0.8.23"
@@ -35,8 +42,11 @@ serde_json = "1.0.140"
 anyhow = "1.0.98"
 thiserror = "2.0.12"
 
-# optional for better low-level ops; falls back to using `git` directly if not available
-git2 = { version = "0.20.2", optional = true }
+# As of submod v0.20, git2 no longer optional
+# gix_submodule just isn't mature enough to realistically provide our functionality without falling back to git2
+git2 = { version = "0.20.2" }
+clap_complete = "4.5.54"
+clap_complete_nushell = "4.5.7"
 
 
 [lib]
@@ -46,10 +56,6 @@ path = "src/lib.rs"
 [[bin]]
 name = "submod"
 path = "src/main.rs"
-
-[features]
-default = ["git2-support"]
-git2-support = ["git2"]
 
 [dev-dependencies]
 tempfile = "3.14.0"

@@ -1,7 +1,11 @@
+// SPDX-FileCopyrightText: 2025 Adam Poulemanos <89049923+bashandbone@users.noreply.github.com>
+//
+// SPDX-License-Identifier: MIT
+// Licensed under the [Plain MIT License][../LICENSE.md]
 #![doc = r"
 # Gitoxide-Based Submodule Manager
 
-Provides core logic for managing git submodules using the [`gitoxide`](https://github.com/Byron/gitoxide) library, with fallbacks to `git2` and the Git CLI when needed. Supports advanced features like sparse checkout and TOML-based configuration.
+Provides core logic for managing git submodules using the [`gitoxide`](https://github.com/Byron/gitoxide) library, with fallbacks to `git2` and the Git CLI when needed. Supports sparse checkout and TOML-based configuration.
 
 ## Overview
 
@@ -37,14 +41,15 @@ All operations return [`SubmoduleError`](src/gitoxide_manager.rs:14) for consist
 
 ## TODOs
 
-- TODO: Implement submodule addition using gitoxide APIs when available ([`add_submodule_with_gix`](src/gitoxide_manager.rs:278)).
+- TODO: Implement submodule addition using gitoxide APIs when available ([`add_submodule_with_gix`](src/gitoxide_manager.rs:278)). Until then, we need to make git2 a required dependency.
 
 ## Usage
 
 Use this module as the backend for CLI commands to manage submodules in a repository. See the project [README](README.md) for usage examples and configuration details.
 "]
 
-use crate::config::{Config, SubmoduleConfig, SubmoduleGitOptions};
+use crate::options::{SerializableBranch, SerializableFetchRecurse, SerializableIgnore, SerializableUpdate};
+use crate::config::{Config, Git2SubmoduleOptions, SubmoduleConfig, SubmoduleGitOptions};
 use gix::Repository;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -60,7 +65,6 @@ pub enum SubmoduleError {
 
     /// Error from git2 library operations (when git2-support feature is enabled)
     #[error("git2 operation failed: {0}")]
-    #[cfg(feature = "git2-support")]
     Git2Error(#[from] git2::Error),
 
     /// Error from Git CLI operations
@@ -110,6 +114,12 @@ pub struct SubmoduleStatus {
     pub is_active: bool,
     /// Sparse checkout status for this submodule
     pub sparse_status: SparseStatus,
+
+    /// Whether the submodule has its own submodules
+    pub has_submodules: bool,
+
+    /// Gitoxide repo instance for this submodule
+    pub repo: Repository,
 }
 
 /// Sparse checkout status
@@ -260,6 +270,10 @@ impl GitoxideSubmoduleManager {
         path: String,
         url: String,
         sparse_paths: Option<Vec<String>>,
+        branch: Option<SerializableBranch>,
+        ignore: Option<SerializableIgnore>,
+        fetch: Option<SerializableFetchRecurse>,
+        update: Option<SerializableUpdate>,
     ) -> Result<(), SubmoduleError> {
         // Clean up any existing submodule state using git commands
         self.cleanup_existing_submodule(&path)?;
@@ -268,15 +282,8 @@ impl GitoxideSubmoduleManager {
         let result = self
             .add_submodule_with_gix(&name, &path, &url)
             .or_else(|_| {
-                #[cfg(feature = "git2-support")]
                 {
                     self.add_submodule_with_git2(&name, &path, &url)
-                }
-                #[cfg(not(feature = "git2-support"))]
-                {
-                    Err(SubmoduleError::GitoxideError(
-                        "git2 not available".to_string(),
-                    ))
                 }
             })
             .or_else(|_| self.add_submodule_with_cli(&name, &path, &url));
@@ -338,7 +345,12 @@ impl GitoxideSubmoduleManager {
         ))
     }
 
-    #[cfg(feature = "git2-support")]
+    /// Convert SubmoduleGitOptions to Git2SubmoduleOptions
+    fn get_git2_submodule_options(&self, options: Option<SubmoduleGitOptions>) -> Git2SubmoduleOptions {
+        let opts = options.unwrap_or_default();
+        opts.try_into().unwrap()
+    }
+
     fn add_submodule_with_git2(
         &self,
         _name: &str,
@@ -349,7 +361,7 @@ impl GitoxideSubmoduleManager {
         let submodule_path = std::path::Path::new(path);
 
         // Let git2 handle all directory creation and management
-        let mut submodule = git2_repo.submodule(url, submodule_path, false)?;
+        let mut submodule = git2_repo.submodule(url, submodule_path, true)?;
 
         // Initialize the submodule configuration
         submodule.init(false)?;

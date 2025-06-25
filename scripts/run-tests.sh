@@ -1,5 +1,10 @@
 #!/bin/bash
 
+# SPDX-FileCopyrightText: 2025 Adam Poulemanos <89049923+bashandbone@users.noreply.github.com>
+#
+# SPDX-License-Identifier: MIT
+# Licensed under the [Plain MIT License](../LICENSE.md)
+
 # Test runner script for submod integration tests
 # This script runs the comprehensive test suite with proper reporting
 
@@ -36,7 +41,7 @@ if [[ ! -f "Cargo.toml" ]] || [[ ! -d "src" ]] || [[ ! -d "tests" ]]; then
 fi
 
 # Check if git is available
-if ! command -v git &> /dev/null; then
+if ! command -v git &>/dev/null; then
     print_error "Git is required for running integration tests"
     exit 1
 fi
@@ -48,32 +53,32 @@ FILTER=""
 
 while [[ $# -gt 0 ]]; do
     case $1 in
-        -v|--verbose)
-            VERBOSE=true
-            shift
-            ;;
-        -p|--performance)
-            PERFORMANCE=true
-            shift
-            ;;
-        -f|--filter)
-            FILTER="$2"
-            shift 2
-            ;;
-        -h|--help)
-            echo "Usage: $0 [OPTIONS]"
-            echo ""
-            echo "Options:"
-            echo "  -v, --verbose      Enable verbose output"
-            echo "  -p, --performance  Run performance tests"
-            echo "  -f, --filter PATTERN  Run only tests matching PATTERN"
-            echo "  -h, --help         Show this help message"
-            exit 0
-            ;;
-        *)
-            print_error "Unknown option: $1"
-            exit 1
-            ;;
+    -v | --verbose)
+        VERBOSE=true
+        shift
+        ;;
+    -p | --performance)
+        PERFORMANCE=true
+        shift
+        ;;
+    -f | --filter)
+        FILTER="$2"
+        shift 2
+        ;;
+    -h | --help)
+        echo "Usage: $0 [OPTIONS]"
+        echo ""
+        echo "Options:"
+        echo "  -v, --verbose      Enable verbose output"
+        echo "  -p, --performance  Run performance tests"
+        echo "  -f, --filter PATTERN  Run only tests matching PATTERN"
+        echo "  -h, --help         Show this help message"
+        exit 0
+        ;;
+    *)
+        print_error "Unknown option: $1"
+        exit 1
+        ;;
     esac
 done
 
@@ -84,7 +89,7 @@ print_status "Building submod binary..."
 if $VERBOSE; then
     cargo build --bin submod
 else
-    cargo build --bin submod > /dev/null 2>&1
+    cargo build --bin submod >/dev/null 2>&1
 fi
 
 # Force Rust tests to run serially to avoid git submodule race conditions

@@ -1,9 +1,13 @@
+// SPDX-FileCopyrightText: 2025 Adam Poulemanos <89049923+bashandbone@users.noreply.github.com>
+//
+// SPDX-License-Identifier: MIT
+// Licensed under the [Plain MIT License][../LICENSE.md]
 #![doc = r"
 Main entry point for the submod CLI tool.
 
 Parses command-line arguments and dispatches submodule management commands using the
 [`GitoxideSubmoduleManager`]. Supports adding, checking, initializing, updating, resetting,
-and syncing submodules with advanced features like sparse checkout.
+and syncing submodules with features like sparse checkout.
 
 # Commands
 
@@ -17,14 +21,18 @@ and syncing submodules with advanced features like sparse checkout.
 Exits with an error if any operation fails.
 "]
 
+mod options;
 mod commands;
 mod config;
 mod gitoxide_manager;
+mod utilities;
 
-use crate::commands::{Cli, Commands};
+use crate::commands::{Cli, Commands, set_path};
+use crate::config::SerializableBranch;
 use crate::gitoxide_manager::GitoxideSubmoduleManager;
 use anyhow::Result;
 use clap::Parser;
+use std::str::FromStr;
 
 fn main() -> Result<()> {
     let cli = Cli::parse();
@@ -34,8 +42,12 @@ fn main() -> Result<()> {
             name,
             path,
             url,
+            branch,
             sparse_paths,
-            settings: _,
+            ignore,
+            update,
+            fetch,
+
         } => {
             let mut manager = GitoxideSubmoduleManager::new(cli.config)
                 .map_err(|e| anyhow::anyhow!("Failed to create manager: {}", e))?;
@@ -66,8 +78,18 @@ fn main() -> Result<()> {
                 None => None,
             };
 
+            // Set the path
+            let set_path_result = set_path(path)
+                .map_err(|e| anyhow::anyhow!("Failed to set path: {}", e))?;
+
+            let set_branch = match branch {
+                Some(ref b) => Some(SerializableBranch::from_str(b)
+                    .map_err(|e| anyhow::anyhow!("Failed to set branch: {:#?}", e))?),
+                None => Some(SerializableBranch::default()),
+            };
+
             manager
-                .add_submodule(name, path, url, sparse_paths_vec)
+                .add_submodule(name, set_path_result, url, sparse_paths_vec, set_branch, ignore, fetch, update)
                 .map_err(|e| anyhow::anyhow!("Failed to add submodule: {}", e))?;
         }
         Commands::Check => {
@@ -158,6 +180,15 @@ fn main() -> Result<()> {
             }
 
             println!("✅ Sync complete");
+        }
+        Commands::FromConfig => {
+            let manager = GitoxideSubmoduleManager::new(cli.config)
+                .map_err(|e| anyhow::anyhow!("Failed to create manager: {}", e))?;
+
+            // Generate submod.toml from existing git configuration
+            manager
+                .generate_from_git_config()
+                .map_err(|e| anyhow::anyhow!("Failed to generate from config: {}", e))?;
         }
     }
 

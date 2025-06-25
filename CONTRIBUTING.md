@@ -1,3 +1,11 @@
+<!--
+SPDX-FileCopyrightText: 2025 Adam Poulemanos <89049923+bashandbone@users.noreply.github.com>
+
+SPDX-License-Identifier: MIT
+
+Licensed under the [Plain MIT License](LICENSE.md)
+-->
+
 # Contributing to `submod`
 
 Thank you for your interest in contributing to `submod`! This document provides guidelines and information for contributors to help make the process smooth and effective.

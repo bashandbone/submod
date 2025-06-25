@@ -1,12 +1,76 @@
-[defaults]
-ignore = "dirty"
+# SPDX-FileCopyrightText: 2025 Adam Poulemanos <89049923+bashandbone@users.noreply.github.com>
+#
+# SPDX-License-Identifier: MIT
+# Licensed under the [Plain MIT License](LICENSE.md)
 
+# =========== Example Submodule Configuration ==========
+
+# --- GLOBAL DEFAULTS ---
+# Set global defaults for all submodules here.
+# These match git's defaults unless overridden.
+# Defaults (without defining them) are:
+# ```toml
+# [defaults]
+# ignore = "none"
+# update = "checkout"
+# fetch = "on-demand"
+# ```
+# You **cannot set a global default path or sparse_paths pattern**.
+# By default, the submodule path is a directory named after the submodule in the repository root.
+#
+# ## Available options:
+# See [docs](https://docs.rs/submod/latest/submod/options/) for details.
+# - `ignore`: "all", "dirty", "untracked", "none" [default]
+# - `update`: "checkout" [default], "rebase", "merge", "none"
+# - `fetch`: "on-demand" [default], "always", "never"
+
+[defaults]
+ignore = "dirty" # Override default ignore setting for all submodules
+
+# --- SUBMODULES ---
+#
+# ## Submodule Name
+#
+# Each submodule uses its name as the section header.
+# If the submodule exists in the repository, use the name from `.gitmodules` or `.git/config`.
+#
+# ## Available options:
+#
+# Submodules support all global options, plus:
+#
+# ## `url`
+# **Required.** The submodule repository URL. Use the same value as in `.gitmodules` or `.git/config`. Accepts remote URLs or local paths (absolute or relative).
+#
+# ## `path`
+# The path where the submodule is checked out. Defaults to the submodule name in the repository root. If not in a repository root, finds the superproject root. Specify a path to override.
+#
+# ## `branch`
+# The submodule branch to check out. Defaults to the submodule's default branch (usually `main` or `master`). You may use `"."` (or aliases: `current`, `current-in-superproject`, `superproject`, `super`) to match the superproject branch. Do not use these as branch names in the submodule repository.
+# TODO: Submit an issue if you encounter a branch name conflict.
+#
+# ## `sparse_paths`
+# A list of relative paths or glob patterns to include in the sparse checkout. If omitted, includes all files.
+# If set, git prepends:
+# ```git
+# /*
+# !/*/
+# ```
+# This includes only files in the root directory, excluding subdirectories.
+# To exclude root files, prefix with `!` (e.g., `!/README.md`).
+# To include subdirectories, add paths like `/src/`.
+#
+# ## `depth`
+# The checkout depth. Matches git's `--depth` option. Omit for a full checkout (depth 0). Use `1` for a shallow checkout (latest commit only).
 
 [vendor-utils]
 path = "vendor/utils"
 url = "https://github.com/example/utils.git"
-sparse_paths = ["src/", "include/", "*.md"]
-ignore = "all" # override default ignore setting
+sparse_paths = [
+    "src/",      # All files in src directory
+    "include/",  # All files in include directory
+    "*.md"       # All markdown files in submodule root
+]
+ignore = "all"   # Override default ignore setting
 
 [my-submodule]
 path = "my-submodule"
