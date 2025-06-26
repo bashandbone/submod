@@ -130,10 +130,10 @@
 <a href="#129" id="129" data-nosnippet="">129</a>    <span class="doccomment">/// Auto-detect (default)
 <a href="#130" id="130" data-nosnippet="">130</a>    ///
 <a href="#131" id="131" data-nosnippet="">131</a>    /// Here libgit2 will bypass the git-aware transport for local paths, but
-<a href="#132" id="132" data-nosnippet="">132</a>    /// use a normal fetch for `file://` URLs.
+<a href="#132" id="132" data-nosnippet="">132</a>    /// use a normal fetch for `` URLs.
 <a href="#133" id="133" data-nosnippet="">133</a>    </span>Auto = raw::GIT_CLONE_LOCAL_AUTO <span class="kw">as </span>isize,
 <a href="#134" id="134" data-nosnippet="">134</a>
-<a href="#135" id="135" data-nosnippet="">135</a>    <span class="doccomment">/// Bypass the git-aware transport even for `file://` URLs.
+<a href="#135" id="135" data-nosnippet="">135</a>    <span class="doccomment">/// Bypass the git-aware transport even for `` URLs.
 <a href="#136" id="136" data-nosnippet="">136</a>    </span>Local = raw::GIT_CLONE_LOCAL <span class="kw">as </span>isize,
 <a href="#137" id="137" data-nosnippet="">137</a>
 <a href="#138" id="138" data-nosnippet="">138</a>    <span class="doccomment">/// Never bypass the git-aware transport
@@ -790,7 +790,7 @@
 <a href="#789" id="789" data-nosnippet="">789</a>        <span class="kw">let </span>td = TempDir::new().unwrap();
 <a href="#790" id="790" data-nosnippet="">790</a>        Repository::init_bare(<span class="kw-2">&amp;</span>td.path().join(<span class="string">"bare"</span>)).unwrap();
 <a href="#791" id="791" data-nosnippet="">791</a>        <span class="kw">let </span>url = <span class="kw">if </span><span class="macro">cfg!</span>(unix) {
-<a href="#792" id="792" data-nosnippet="">792</a>            <span class="macro">format!</span>(<span class="string">"file://{}/bare"</span>, td.path().display())
+<a href="#792" id="792" data-nosnippet="">792</a>            <span class="macro">format!</span>(<span class="string">"{}/bare"</span>, td.path().display())
 <a href="#793" id="793" data-nosnippet="">793</a>        } <span class="kw">else </span>{
 <a href="#794" id="794" data-nosnippet="">794</a>            <span class="macro">format!</span>(
 <a href="#795" id="795" data-nosnippet="">795</a>                <span class="string">"{}/bare"</span>,
