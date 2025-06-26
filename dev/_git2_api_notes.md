@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: 2025 Adam Poulemanos <89049923+bashandbone@users.noreply.github.com>
+
+SPDX-License-Identifier: MIT
+-->
+
 # git2 API notes
 
 ## git2.SubmoduleStatus returns submodule status

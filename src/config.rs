@@ -18,26 +18,27 @@ Features:
 - Load and save configuration from/to TOML files.
 - Serialize/deserialize submodule options for config files.
 - Manage submodule entries and defaults programmatically.
-
-TODO:
-- Add validation for config values when loading from file.
 "]
 
 use std::path::PathBuf;
-use anyhow::{Context, Result};
-use gix::index::extension::sparse;
+use anyhow::Result;
 use serde::{Deserialize, Serialize};
-use std::fs;
 use std::{collections::HashMap, path::Path};
-use toml_edit::{DocumentMut, Item, Table, value};
 use crate::options::{
     SerializableFetchRecurse, SerializableIgnore, SerializableUpdate,
 };
 use crate::options::SerializableBranch;
+// TODO: Implement figment::Profile for modular configs
+use figment::{Figment, Metadata, providers::{Serialized, Toml, Format}, value::{Value, Map, Dict}, Provider, Result as FigmentResult};
 
 /// Returns true. Used as a serde default for boolean fields.
 fn default_true() -> bool {
     true
+}
+
+/// Returns false. Used as a serde default for boolean fields.
+fn default_false() -> bool {
+    false
 }
 
 /// Git options for a submodule
@@ -82,10 +83,6 @@ impl Git2SubmoduleOptions {
     }
 }
 
-// Default implementation for [`SubmoduleGitOptions`]
-impl SubmoduleGitOptions {
-
-}
 
 impl TryFrom<SubmoduleGitOptions> for Git2SubmoduleOptions {
     type Error = String;
@@ -157,6 +154,9 @@ pub struct SubmoduleConfig {
     /// Where to put the submodule in the working directory (relative path)
     pub path: Option<String>,
 
+    /// Optional nickname, used for submod.toml and the cli as an easy reference; otherwise the relative path is used.
+    pub name: Option<String>,
+
     /// Git-specific options for this submodule
     #[serde(flatten)]
     pub git_options: SubmoduleGitOptions,
@@ -165,6 +165,7 @@ pub struct SubmoduleConfig {
     pub active: bool,
     /// Whether to perform a shallow clone (depth == 1). Default is False.
     /// When true, only the last commit will be included in the submodule's history.
+    #[serde(default = "default_false")]
     pub shallow: bool,
 
     /// Sparse checkout paths for this submodule (relative paths)
@@ -173,10 +174,11 @@ pub struct SubmoduleConfig {
 
 impl SubmoduleConfig {
     /// Create a new submodule configuration with defaults
-    pub fn new(url: String, path: Option<String>, git_options: SubmoduleGitOptions, active: Option<bool>, shallow: Option<bool>, sparse_paths: Option<Vec<String>>) -> Self {
+    pub fn new(url: String, path: Option<String>, name: Option<String>, git_options: SubmoduleGitOptions, active: Option<bool>, shallow: Option<bool>, sparse_paths: Option<Vec<String>>) -> Self {
         Self {
             url: url.clone(),
-            path: path.or_else(|| Some(Self::name_from_url(&url))),
+            path: path.clone().or_else(|| Some(Self::name_from_url(&url))),
+            name: name.or_else(|| path.clone().or_else(|| Some(Self::name_from_url(&url)))),
             git_options: SubmoduleGitOptions {
                 ignore: git_options.ignore,
                 fetch_recurse: git_options.fetch_recurse,
@@ -187,11 +189,6 @@ impl SubmoduleConfig {
             sparse_paths: sparse_paths.or_else(|| Some(Vec::new())),
             shallow: shallow.unwrap_or(false), // Default to false if not specified
         }
-    }
-
-    /// Derive the submodule name from the URL (e.g., last path component, stripping .git)
-    pub fn name(&self) -> Option<String> {
-        Some(Self::name_from_url(&self.url))
     }
 
     /// Returns true if the url is a local path (relative or absolute)
@@ -217,13 +214,6 @@ impl SubmoduleConfig {
     pub fn to_git2_options(&self) -> Result<Git2SubmoduleOptions> {
         Git2SubmoduleOptions::try_from(self.git_options.clone()).map_err(|e| anyhow::anyhow!(e))
     }
-    /// Check if our active setting matches what git would report
-    /// `git_active_state` should be the result of calling `gix_submodule::IsActivePlatform`
-    #[allow(dead_code)]
-    #[must_use]
-    pub const fn active_setting_matches_git(&self, git_active_state: bool) -> bool {
-        self.active == git_active_state
-    }
 
     /// convert path to PathBuf for filesystem operations
     pub fn path_as_pathbuf(&self) -> Option<PathBuf> {
@@ -248,146 +238,14 @@ pub struct Config {
 }
 
 impl Config {
-    /// Load configuration from a TOML file
-    pub fn load(path: &Path) -> Result<Self> {
-        if !path.exists() {
-            return Ok(Self {
-                defaults: SubmoduleDefaults::default(),
-                submodules: HashMap::new(),
-            });
+
+    pub fn default() -> Self {
+        Self {
+            defaults: SubmoduleDefaults::default(),
+            submodules: HashMap::new(),
         }
-
-        let content = fs::read_to_string(path)
-            .with_context(|| format!("Failed to read config file: {}", path.display()))?;
-
-        toml::from_str(&content).with_context(|| "Failed to parse TOML config")
     }
 
-    /// Save configuration to a TOML file
-    pub fn save(&self, path: &Path) -> Result<()> {
-        self.save_with_toml_edit(path)
-    }
-
-    /// Save configuration using `toml_edit` for better formatting and comments
-    fn save_with_toml_edit(&self, path: &Path) -> Result<()> {
-        // Load existing document or create new one
-        let mut doc = if path.exists() {
-            let content = fs::read_to_string(path)
-                .with_context(|| format!("Failed to read existing config: {}", path.display()))?;
-            content
-                .parse::<DocumentMut>()
-                .with_context(|| "Failed to parse existing TOML document")?
-        } else {
-            // Create a beautiful new document with header comment
-            let mut doc = DocumentMut::new();
-            doc.insert(
-                "# Submodule configuration for `submod`",
-                Item::None,
-            );
-            doc.insert( "# For configuration options, see [the submod docs](https://docs.rs/submod/latest/submod/options/) or our [example config](https://github.com/bashandbone/submod/blob/main/sample_config/submod.toml)", Item::None);
-            doc.insert("# Each section [name] defines a submodule; the [name] should be the exact name of the repo (without `.git` or its path)", Item::None);
-            doc.insert("", Item::None); // Empty line for spacing
-            doc
-        };
-        let mut defaults_table = Table::default();
-        let non_defaults = self.get_non_defaults();
-        // Handle defaults section
-        if !non_defaults.is_empty() {
-            // Add each default field to the defaults section
-            // if it doesn't match the default value (which we already filtered for)
-            for default in non_defaults {
-                if let Some(ref ignore) = default.ignore {
-                    defaults_table["ignore"] = value(ignore);
-                }
-                if let Some(ref fetch_recurse) = default.fetch_recurse {
-                    defaults_table["fetchRecurse"] = value(fetch_recurse);
-                }
-                if let Some(ref update) = default.update {
-                    defaults_table["update"] = value(update);
-                }
-            }
-        }
-        if doc["defaults"].is_some() {
-            if let Some(existing_defaults) = doc["defaults"].as_table_mut() {
-                // Merge existing defaults with new ones
-                for (key, value) in defaults_table.iter() {
-                    existing_defaults.insert(key.clone(), value.clone());
-                }
-            }
-        }
-        }
-
-        for key in keys_to_remove {
-            doc.remove(&key);
-        }
-
-        // Add each submodule as its own section
-        for (submodule_name, submodule) in &self.submodules {
-            let mut submodule_table = Table::new();
-
-            // Required fields
-            if let Some(ref path) = submodule.path {
-                submodule_table["path"] = value(path);
-            }
-            submodule_table["url"] = value(&submodule.url);
-
-            // Active state
-            submodule_table["active"] = value(submodule.active);
-
-            // Optional sparse_paths
-            if let Some(ref sparse_paths) = submodule.sparse_paths {
-                let mut sparse_array = Array::new();
-                for path in sparse_paths {
-                    sparse_array.push(path);
-                }
-                submodule_table["sparse_paths"] = value(sparse_array);
-            }
-
-            // Git options (flattened)
-            if let Some(ref ignore) = submodule.git_options.ignore {
-                let serialized = serde_json::to_string(ignore).unwrap_or_default();
-                let clean_value = serialized.trim_matches('"');
-                submodule_table["ignore"] = value(clean_value);
-            }
-            if let Some(ref update) = submodule.git_options.update {
-                let serialized = serde_json::to_string(update).unwrap_or_default();
-                let clean_value = serialized.trim_matches('"');
-                submodule_table["update"] = value(clean_value);
-            }
-            if let Some(ref branch) = submodule.git_options.branch {
-                let serialized = serde_json::to_string(branch).unwrap_or_default();
-                let clean_value = serialized.trim_matches('"');
-                submodule_table["branch"] = value(clean_value);
-            }
-            if let Some(ref fetch_recurse) = submodule.git_options.fetch_recurse {
-                let serialized = serde_json::to_string(fetch_recurse).unwrap_or_default();
-                let clean_value = serialized.trim_matches('"');
-                submodule_table["fetchRecurse"] = value(clean_value);
-            }
-
-            doc[submodule_name] = Item::Table(submodule_table);
-        }
-
-        fs::write(path, doc.to_string())
-            .with_context(|| format!("Failed to write config file: {}", path.display()))?;
-
-        Ok(())
-    }
-
-    /// Get provided values for global defaults that are not a default value
-    fn get_non_defaults(&self) -> Vec<Partial<SubmoduleDefaults>> {
-        let default_values = SubmoduleDefaults {
-                ignore: ignore.or_else(|| Some(SerializableIgnore::default())),
-                fetch_recurse: fetch_recurse.or_else(|| Some(SerializableFetchRecurse::default())),
-                update: update.or_else(|| Some(SerializableUpdate::default())),
-            }.get_values();
-        for default in self.defaults.get_values().iter() {
-            if !default_values.contains(default) {
-                return vec![default.clone()];
-            }
-        }
-        vec![]
-    }
 
     /// Add a submodule configuration
     pub fn add_submodule(&mut self, name: String, submodule: SubmoduleConfig) {
@@ -413,22 +271,76 @@ impl Config {
                     .git_options
                     .ignore
                     .as_ref()
-                    .or(self.defaults.0.ignore.as_ref())
+                    .or(self.defaults.ignore.as_ref())
                     .map(|s| format!("{s:?}")) // Convert to string representation
             }
             "update" => submodule
                 .git_options
                 .update
                 .as_ref()
-                .or(self.defaults.0.update.as_ref())
+                .or(self.defaults.update.as_ref())
                 .map(|s| format!("{s:?}")),
             "fetchRecurse" => submodule
                 .git_options
                 .fetch_recurse
                 .as_ref()
-                .or(self.defaults.0.fetch_recurse.as_ref())
+                .or(self.defaults.fetch_recurse.as_ref())
                 .map(|s| format!("{s:?}")),
             _ => None,
         }
     }
+}
+
+// Default figment profile for the repository configuration (i.e. .gitmodules)
+const REPO: figment::Profile = figment::Profile::const_new("repo");
+
+// TODO: Implement figment::Profile for modular configs
+/**
+const USER: figment::Profile = figment::Profile::const_new("user");
+const DEVELOPER: figment::Profile = figment::Profile::const_new("developer");
+*/
+
+impl Provider for Config {
+    /// We now know where the settings came from
+    fn metadata(&self) -> Metadata {
+        Metadata::named("CLI arguments")
+            .source("cli")
+    }
+
+    /// Serialize the configuration to a Figment Value
+    fn data(&self) -> FigmentResult<Map<figment::Profile, Dict>> {
+        let value = Value::serialize(self)?;
+        let profile = self.profile().unwrap_or_default();
+
+        if let Value::Dict(_, dict) = value {
+            let mut map = Map::new();
+            map.insert(profile, dict);
+            Ok(map)
+        } else {
+            Err(figment::Error::from(figment::error::Kind::InvalidType(
+                value.to_actual(),
+                "dictionary".into()
+            )))
+        }
+   }
+
+    /// Return the profile for this configuration
+    ///
+    /// This is used to identify the source of the configuration (e.g., repo, user, developer)
+    /// In this case, we use a constant profile for the repository configuration.
+    // TODO: This will likely need to change to add developer/user profiles
+   fn profile(&self) -> Option<figment::Profile> {
+        Some(REPO)
+    }
+}
+
+/// Returns the resolved configuration from defaults, TOML file, and CLI arguments.
+pub fn get_configuration(cli_config: &Config, path: &Path) -> Result<Config> {
+    let figment = Figment::new()
+        .merge(Toml::file(path).nested())
+        .merge(Serialized::defaults(cli_config));
+
+    // Extract the configuration from the Figment instance
+    let config: Config = figment.extract()?;
+    Ok(config)
 }

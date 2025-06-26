@@ -5,9 +5,9 @@
 
 # =========== Example Submodule Configuration ==========
 
-# --- GLOBAL DEFAULTS ---
-# Set global defaults for all submodules here.
-# These match git's defaults unless overridden.
+# ========================= GLOBAL DEFAULTS =========================
+# Set global (repo-level) defaults for all submodules here.
+# Git does not have global submodule configuration; we resolve the difference and apply the settings to all submodules.
 # Defaults (without defining them) are:
 # ```toml
 # [defaults]
@@ -15,8 +15,7 @@
 # update = "checkout"
 # fetch = "on-demand"
 # ```
-# You **cannot set a global default path or sparse_paths pattern**.
-# By default, the submodule path is a directory named after the submodule in the repository root.
+# Submodule paths can't be set globally, but their default assignment is the submodule name in the repository root.
 #
 # ## Available options:
 # See [docs](https://docs.rs/submod/latest/submod/options/) for details.
@@ -27,16 +26,16 @@
 [defaults]
 ignore = "dirty" # Override default ignore setting for all submodules
 
-# --- SUBMODULES ---
+# =========================== SUBMODULE CONFIGURATION ===========================
 #
 # ## Submodule Name
 #
 # Each submodule uses its name as the section header.
 # If the submodule exists in the repository, use the name from `.gitmodules` or `.git/config`.
 #
-# ## Available options:
+# ## Available Options
 #
-# Submodules support all global options, plus:
+# **Submodules support all global options (ignore, fetch, update)**, which will override the defaults. If you want a submodule to maintain default behavior, but set a different global behavior, you *must* explicitly add the options here. Other submodule options are:
 #
 # ## `url`
 # **Required.** The submodule repository URL. Use the same value as in `.gitmodules` or `.git/config`. Accepts remote URLs or local paths (absolute or relative).
@@ -59,11 +58,17 @@ ignore = "dirty" # Override default ignore setting for all submodules
 # To exclude root files, prefix with `!` (e.g., `!/README.md`).
 # To include subdirectories, add paths like `/src/`.
 #
-# ## `depth`
-# The checkout depth. Matches git's `--depth` option. Omit for a full checkout (depth 0). Use `1` for a shallow checkout (latest commit only).
+# ## `shallow`
+#
+# If `true`, performs a shallow clone of the submodule, which means it only fetchest the most recent commit. Defaults to `false`. This is useful for large repositories where you only need the latest commit.
+#
 
+# NAMES (the part between "[" and "]" below).
+# You can name the submodule "bob" or "vendor-utils" if you want in your `submod.toml`
+# This name is only used for the configuration, and for your reference when using `submod` commands. You can make the names easy to remember for calling `submod` commands.
+# Git expects the submodule name to be the full relative path from the repository root, so that is what we'll use on the back end with `.gitmodules`/`.git/config`.
 [vendor-utils]
-path = "vendor/utils"
+path = "vendor/utils"  # <-- will be the name in `.gitmodules` and `.git/config`
 url = "https://github.com/example/utils.git"
 sparse_paths = [
     "src/",      # All files in src directory

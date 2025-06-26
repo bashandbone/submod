@@ -15,7 +15,7 @@ repository = "https://github.com/bashandbone/submod"
 homepage = "https://github.com/bashandbone/submod"
 documentation = "https://docs.rs/submod"
 readme = "README.md"
-keywords = ["git", "submodule", "gitoxide", "cli", "sparse-checkout"]
+keywords = ["git", "submodule", "gitoxide", "cli", "sparse-checkout", "git2", "gitmodules", "repository", "management", "command-line", "tool", "development", "utilities", "development-tools"]
 categories = ["command-line-utilities", "development-tools"]
 
 resolver = "3"
@@ -31,10 +31,11 @@ bstr = { version = "1.12.0", default-features = false }
 
 # CLI
 clap = { version = "4.5.40", features = ["derive", "cargo", "unicode", "wrap_help"] }
+clap_complete = "4.5.54"
+clap_complete_nushell = "4.5.7"
 
 # TOML config
-toml = "0.8.23"
-toml_edit = "0.22.27"
+figment = { version = "0.10.19", default-features = false, features = [ "toml" ] }
 serde = { version = "1.0.219", features = ["derive"] }
 serde_json = "1.0.140"
 
@@ -45,9 +46,6 @@ thiserror = "2.0.12"
 # As of submod v0.20, git2 no longer optional
 # gix_submodule just isn't mature enough to realistically provide our functionality without falling back to git2
 git2 = { version = "0.20.2" }
-clap_complete = "4.5.54"
-clap_complete_nushell = "4.5.7"
-
 
 [lib]
 name = "submod"
@@ -58,6 +56,7 @@ name = "submod"
 path = "src/main.rs"
 
 [dev-dependencies]
+figment = { version = "0.10.19", default-features = false, features = ["test", "toml"] }
 tempfile = "3.14.0"
 serde_json = "1.0.140"
 

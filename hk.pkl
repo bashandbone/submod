@@ -1,3 +1,10 @@
+/*
+ * SPDX-FileCopyrightText: 2025 Adam Poulemanos <89049923+bashandbone@users.noreply.github.com>
+ *
+ * SPDX-License-Identifier: MIT
+ * Licensed under the [Plain MIT License](LICENSE.md)
+*/
+
 amends "package://github.com/jdx/hk/releases/download/v1.2.0/hk@1.2.0#/Config.pkl"
 import "package://github.com/jdx/hk/releases/download/v1.2.0/hk@1.2.0#/Builtins.pkl"
 
@@ -47,8 +54,6 @@ local ci = (linters) {
         check = "cargo nextest --manifest-path {{ workspace_indicator }} run --all-features --fail-fast -j 1"
     }
 }
-
-
 
 hooks {
     ["pre-commit"] {
