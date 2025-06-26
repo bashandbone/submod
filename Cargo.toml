@@ -43,6 +43,9 @@ serde_json = "1.0.140"
 anyhow = "1.0.98"
 thiserror = "2.0.12"
 
+# bitflags for status flags
+bitflags = "2.6.0"
+
 # As of submod v0.20, git2 no longer optional
 # gix_submodule just isn't mature enough to realistically provide our functionality without falling back to git2
 git2 = { version = "0.20.2" }

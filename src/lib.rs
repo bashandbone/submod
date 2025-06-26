@@ -10,6 +10,7 @@
 //! - [`utilities`]: Common utilities and helper functions.
 //! - [`options`]: Git submodule configuration options and parsing.
 //! - [`config`]: Submodule configuration management.
+//! - [`git_ops`]: Git operations layer with gix-first, git2-fallback strategy.
 //! - [`gitoxide_manager`]: Implementation of submodule operations using gitoxide.
 //!
 //! # Exports
@@ -25,10 +26,13 @@ pub mod utilities;
 /// Configuration management for submodules
 pub mod options;
 pub mod config;
+/// Git operations layer with gix-first, git2-fallback strategy
+pub mod git_ops;
 /// Gitoxide-based submodule management implementation
 pub mod gitoxide_manager;
 
 pub use config::{Config, SubmoduleConfig, SubmoduleDefaults, SubmoduleGitOptions};
+pub use git_ops::{GitOpsManager, GitOperations, SubmoduleAddOptions, SubmoduleUpdateOptions};
 pub use gitoxide_manager::{
     GitoxideSubmoduleManager, SparseStatus, SubmoduleError, SubmoduleStatus,
 };
@@ -38,5 +42,5 @@ pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 /// Re-export commonly used types for convenience
 pub mod prelude {
-    pub use crate::{Config, GitoxideSubmoduleManager, SubmoduleError};
+    pub use crate::{Config, GitOpsManager, GitOperations, GitoxideSubmoduleManager, SubmoduleError};
 }

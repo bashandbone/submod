@@ -715,3 +715,107 @@ fn clean_submodule(&self, path: &str, force: bool, remove_directories: bool) -> 
             let file_path = Path::new(path).join(entry.path().unwrap());
             if file_path.is_file() {
                 if force {
+                    std::fs::remove_file(&file_path)?;
+                }
+            } else if file_path.is_dir() && remove_directories {
+                if force {
+                    std::fs::remove_dir_all(&file_path)?;
+                }
+            }
+        }
+    }
+
+    Ok(())
+}
+```
+
+---
+
+## Phase 1.1 Implementation Notes
+
+### ✅ COMPLETED - Git Operations Layer Implementation
+
+**Date**: 2025-06-26  
+**Status**: Phase 1.1 fully implemented
+
+#### What was implemented:
+
+1. **Core Module Structure** (`src/git_ops.rs`):
+   - `GitOperations` trait defining all git operations
+   - `ConfigLevel` enum for git config operations
+   - `SubmoduleAddOptions` and `SubmoduleUpdateOptions` structs
+   - `GitConfig` and `GitModulesConfig` for configuration state
+   - `SubmoduleEntry` for .gitmodules entries
+   - `DetailedSubmoduleStatus` for comprehensive status info
+   - `SubmoduleStatusFlags` using bitflags (mirrors git2::SubmoduleStatus)
+
+2. **GixOperations Implementation** (`src/git_ops/gix_ops.rs`):
+   - Primary implementation using gix (gitoxide)
+   - Full implementation of read operations (gitmodules, config, status, list)
+   - Fallback errors for unsupported operations (add, init, update, delete, etc.)
+   - Detailed error handling and context using anyhow
+   - Proper conversion between gix types and our serializable types
+
+3. **Git2Operations Implementation** (`src/git_ops/git2_ops.rs`):
+   - Complete fallback implementation using libgit2
+   - Full implementation of all operations including:
+     - Config operations (read/write at different levels)
+     - Submodule operations (add, init, update, delete, deinit, status, list)
+     - Repository operations (fetch, reset, stash)
+     - Sparse checkout operations (enable, set patterns, get patterns)
+   - Comprehensive error handling and context
+   - Manual implementation of operations not directly supported by git2
+
+4. **GitOpsManager** (`src/git_ops.rs`):
+   - Unified interface with automatic fallback from gix to git2
+   - Try-with-fallback pattern for all operations
+   - Graceful error handling and logging
+   - Clean abstraction over both implementations
+
+5. **Integration**:
+   - Updated `src/lib.rs` to expose new git_ops module
+   - Added proper re-exports for public interface
+   - Updated prelude for convenience imports
+   - Added bitflags dependency to Cargo.toml
+
+#### API Capabilities Verified:
+
+**Gix (gitoxide) Capabilities**:
+- ✅ Reading .gitmodules via `repo.submodules()`
+- ✅ Reading local git config via `repo.config_snapshot()`
+- ✅ Getting submodule status via `submodule.status()`
+- ✅ Listing submodules via iterator
+- ❌ Writing .gitmodules (not yet supported)
+- ❌ Writing git config (limited support)
+- ❌ Submodule initialization (not yet supported)
+- ❌ Sparse checkout operations (not yet supported)
+
+**Git2 Capabilities**:
+- ✅ Complete submodule management (add, init, update, delete, deinit)
+- ✅ Full config operations (read/write at different levels)
+- ✅ Comprehensive status reporting with all flags
+- ✅ Repository operations (fetch, reset, stash)
+- ✅ Sparse checkout configuration (enable, set/get patterns)
+- ⚠️ Some operations need manual implementation (clean, sparse apply)
+
+#### Error Handling Strategy:
+- Gix operations return specific errors when unsupported
+- Git2 operations provide full fallback coverage
+- GitOpsManager logs gix failures and gracefully falls back
+- All operations use anyhow::Context for detailed error messages
+
+#### Future Improvements:
+1. **Gix Maturity**: As gix adds more submodule operations, update GixOperations
+2. **Status Mapping**: Improve mapping between gix status and our SubmoduleStatusFlags
+3. **Sparse Checkout**: Implement remaining sparse checkout operations in git2
+4. **Performance**: Add benchmarking to compare gix vs git2 performance
+5. **Configuration**: Add runtime configuration for fallback behavior
+
+#### Testing Recommendations:
+1. Unit tests for each implementation (gix, git2, manager)
+2. Integration tests with real repositories
+3. Fallback behavior tests (gix failure → git2 success)
+4. Performance comparison tests
+5. Error handling and edge case tests
+
+This implementation provides a solid foundation for the git abstraction layer and follows the gix-first, git2-fallback strategy as specified in the project direction.
