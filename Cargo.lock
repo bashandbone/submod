@@ -2020,6 +2020,7 @@ name = "submod"
 version = "0.2.0"
 dependencies = [
  "anyhow",
+ "bitflags",
  "bstr",
  "clap",
  "clap_complete",
