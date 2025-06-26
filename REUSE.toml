@@ -1,0 +1,14 @@
+version = 1
+
+# git2 docs
+[[annotations]]
+path = ["dev/git2/**"]
+
+SPDX-FileCopyrightText = "2014 Alex Crichton"
+SPDX-License-Identifier = "MIT OR Apache-2.0"
+
+# gix docs
+[[annotations]]
+path = ["dev/gix/**"]
+SPDX-FileCopyrightText = "2025 Sebastian Thiel"
+SPDX-License-Identifier = "MIT OR Apache-2.0"
