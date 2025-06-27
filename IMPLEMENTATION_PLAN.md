@@ -513,74 +513,19 @@ impl GitOperations for GitOpsManager {
 
 ### 1.2 Config System Enhancement
 
-Extend the existing figment-based config system to handle global defaults properly:
+Extend the existing figment-based config system to handle syncing with git configuration and ensure submod.toml and .gitmodules stay in sync.
 
 **Updates to [`src/config.rs`](src/config.rs)**:
 
 ```rust
-use crate::git_ops::{GitOperations, GitModulesConfig, SubmoduleEntry};
 
-impl Config {
-    /// Apply global defaults logic as described in Project Direction
-    pub fn apply_global_defaults(&self) -> Result<GitModulesConfig> {
-        let mut git_modules = GitModulesConfig {
-            submodules: std::collections::HashMap::new(),
-        };
-
-        for (name, submodule) in &self.submodules {
-            let mut entry = SubmoduleEntry {
-                path: submodule.path.clone().unwrap_or_else(|| name.clone()),
-                url: submodule.url.clone().unwrap_or_default(),
-                branch: submodule.git_options.branch.as_ref().map(|b| b.to_string()),
-                ignore: None,
-                update: None,
-                fetch_recurse: None,
-                active: submodule.active,
-            };
-
-            // Apply global defaults logic from Project Direction lines 61-67
-            // Only write non-default values to .gitmodules
-
-            // For ignore: write to .gitmodules if different from global default
-            if let Some(submod_ignore) = submodule.git_options.ignore {
-                if Some(submod_ignore) != self.defaults.ignore {
-                    entry.ignore = Some(submod_ignore);
-                }
-            } else if let Some(global_ignore) = self.defaults.ignore {
-                // Apply global default to all other submodules
-                entry.ignore = Some(global_ignore);
-            }
-
-            // Same logic for update and fetch_recurse
-            if let Some(submod_update) = submodule.git_options.update {
-                if Some(submod_update) != self.defaults.update {
-                    entry.update = Some(submod_update);
-                }
-            } else if let Some(global_update) = self.defaults.update {
-                entry.update = Some(global_update);
-            }
-
-            if let Some(submod_fetch) = submodule.git_options.fetch_recurse {
-                if Some(submod_fetch) != self.defaults.fetch_recurse {
-                    entry.fetch_recurse = Some(submod_fetch);
-                }
-            } else if let Some(global_fetch) = self.defaults.fetch_recurse {
-                entry.fetch_recurse = Some(global_fetch);
-            }
-
-            git_modules.submodules.insert(name.clone(), entry);
-        }
-
-        Ok(git_modules)
-    }
-
-    /// Ensure submod.toml and .gitmodules/.git/config stay in sync
+    /// Ensure submod.toml and .gitmodules stay in sync
     pub fn sync_with_git_config(&mut self, git_ops: &dyn GitOperations) -> Result<()> {
         // 1. Read current .gitmodules
         let current_gitmodules = git_ops.read_gitmodules()?;
 
         // 2. Apply our global defaults logic
-        let target_gitmodules = self.apply_global_defaults()?;
+        let target_gitmodules = self.submodules.clone();
 
         // 3. Write updated .gitmodules if different
         if current_gitmodules.submodules != target_gitmodules.submodules {
@@ -607,7 +552,6 @@ impl Config {
         config.sync_with_git_config(git_ops)?;
         Ok(config)
     }
-}
 ```
 
 ## Phase 2: Git Operations Refactor
@@ -741,7 +685,7 @@ fn clean_submodule(&self, path: &str, force: bool, remove_directories: bool) -> 
 
 ### ✅ COMPLETED - Git Operations Layer Implementation
 
-**Date**: 2025-06-26  
+**Date**: 2025-06-26
 **Status**: Phase 1.1 fully implemented
 
 #### What was implemented:

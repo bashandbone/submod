@@ -28,7 +28,7 @@ mod gitoxide_manager;
 mod utilities;
 
 use crate::commands::{Cli, Commands, set_path};
-use crate::config::SerializableBranch;
+use crate::config::SerializableBranch as Branch;
 use crate::gitoxide_manager::GitoxideSubmoduleManager;
 use anyhow::Result;
 use clap::Parser;
@@ -83,9 +83,9 @@ fn main() -> Result<()> {
                 .map_err(|e| anyhow::anyhow!("Failed to set path: {}", e))?;
 
             let set_branch = match branch {
-                Some(ref b) => Some(SerializableBranch::from_str(b)
+                Some(ref b) => Some(Branch::from_str(b)
                     .map_err(|e| anyhow::anyhow!("Failed to set branch: {:#?}", e))?),
-                None => Some(SerializableBranch::default()),
+                None => Some(Branch::default()),
             };
 
             manager

@@ -25,11 +25,12 @@ use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, path::Path};
 use crate::options::{
-    SerializableFetchRecurse, SerializableIgnore, SerializableUpdate,
+    GitmodulesConvert, SerializableFetchRecurse, SerializableIgnore, SerializableUpdate
 };
 use crate::options::SerializableBranch;
+use crate::GitOperations;
 // TODO: Implement figment::Profile for modular configs
-use figment::{Figment, Metadata, providers::{Serialized, Toml, Format}, value::{Value, Map, Dict}, Provider, Result as FigmentResult};
+use figment::{Figment, Metadata, providers::{Toml, Format}, value::{Value, Map, Dict}, Provider, Result as FigmentResult};
 
 /// Returns true. Used as a serde default for boolean fields.
 fn default_true() -> bool {
@@ -97,7 +98,7 @@ impl TryFrom<SubmoduleGitOptions> for Git2SubmoduleOptions {
             None => git2::SubmoduleUpdate::Default,
         };
         let branch = options.branch.map(|b| b.to_string());
-        let fetch_recurse = options.fetch_recurse.map(|fr| fr.to_git_options());
+        let fetch_recurse = options.fetch_recurse.map(|fr| fr.to_gitmodules());
         Ok(Self::new(ignore, update, branch, fetch_recurse))
     }
 }
@@ -114,12 +115,21 @@ pub struct SubmoduleDefaults {
     /// [`Update`][SerializableUpdate] setting for submodules
     pub update: Option<SerializableUpdate>,
 }
-impl SubmoduleDefaults {
 
+impl Iterator for SubmoduleDefaults {
+    type Item = SubmoduleDefaults;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        Some(self.clone())
+    }
+}
+
+
+impl SubmoduleDefaults {
 
     /// Returns a vector of SubmoduleDefaults with the current values (for comparison)
     pub fn get_values(&self) -> Vec<SubmoduleDefaults> {
-        vec![self.clone()]
+        vec![self.clone()].into_iter().flatten().collect()
     }
 
     /// Merge another SubmoduleDefaults into this one. Only updates fields that are set in the other. Returns a new instance with the merged values.
@@ -224,10 +234,88 @@ impl SubmoduleConfig {
     pub fn url_as_string(&self) -> String {
         self.url.clone()
     }
+
+    /// Get the configuration active setting
+    pub fn is_active(&self) -> bool {
+        self.active
+    }
+
+    /// Add a sparse path to the submodule configuration
+    pub fn add_sparse_path(&mut self, path: String) {
+        if let Some(ref mut sparse_paths) = self.sparse_paths {
+            if sparse_paths.contains(&path) {
+                return; // Path already exists, no need to add it again
+            }
+            sparse_paths.push(path);
+        } else {
+            self.sparse_paths = Some(vec![path]);
+        }
+    }
+
+    /// Remove a sparse path from the submodule configuration
+    pub fn remove_sparse_path(&mut self, path: &str) {
+        if let Some(ref mut sparse_paths) = self.sparse_paths {
+            sparse_paths.retain(|p| p != path);
+            if sparse_paths.is_empty() {
+                self.sparse_paths = None; // Remove the field if no paths left
+            }
+        }
+    }
+
+    /// Ensure submod.toml and .gitmodules stay in sync
+    pub fn sync_with_git_config(&mut self, git_ops: &dyn GitOperations) -> Result<()> {
+        // 1. Read current .gitmodules
+        let current_gitmodules = git_ops.read_gitmodules()?;
+
+        // 3. Write updated .gitmodules if different
+        if current_gitmodules.submodules != target_gitmodules.submodules {
+            git_ops.write_gitmodules(&target_gitmodules)?;
+        }
+
+        // 4. Update any git config values that need to be set
+        for (name, entry) in &target_gitmodules.submodules {
+            if let Some(branch) = &entry.branch {
+                git_ops.set_config_value(
+                    &format!("submodule.{}.branch", name),
+                    branch,
+                    crate::git_ops::ConfigLevel::Local,
+                )?;
+            }
+        }
+
+        Ok(())
+    }
+}
+
+impl Provider for SubmoduleConfig {
+    /// We now know where the settings came from
+    fn metadata(&self) -> Metadata {
+        Metadata::named("Submodule Configuration")
+            .source("cli")
+    }
+
+    /// Serialize the configuration to a Figment Value
+    fn data(&self) -> FigmentResult<Map<figment::Profile, Dict>> {
+        let value = Value::serialize(self)?;
+        let profile = self.profile().unwrap_or_default();
+
+        if let Value::Dict(_, dict) = value {
+            let mut map = Map::new();
+            map.insert(profile, dict);
+            Ok(map)
+        } else {
+            Err(figment::Error::from(figment::error::Kind::InvalidType(
+                value.to_actual(),
+                "dictionary".into()
+            )))
+        }
+    }
+
+
 }
 
 /// Main configuration structure for the submod tool
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct Config {
     /// Global default settings that apply to all submodules
     #[serde(default)]
@@ -239,6 +327,7 @@ pub struct Config {
 
 impl Config {
 
+    /// Create a new empty configuration with default values
     pub fn default() -> Self {
         Self {
             defaults: SubmoduleDefaults::default(),
@@ -246,6 +335,44 @@ impl Config {
         }
     }
 
+    fn get_submodule_config(&self, name: &str) -> Option<&SubmoduleConfig> {
+        self.submodules.get(name)
+    }
+    /// Helper to apply a default if the value is None or Unspecified
+    fn apply_option_default<T: Clone + PartialEq>(
+        value: &mut Option<T>,
+        default: &Option<T>,
+        unspecified: T,
+    ) {
+        if value.is_none() || value.as_ref() == Some(&unspecified) {
+            *value = default.clone().or_else(|| Some(unspecified));
+        } else {
+            *value = value.clone().or_else(|| Some(unspecified));
+        }
+    }
+
+    /// Create a new configuration, resolving defaults
+    pub fn apply_defaults(mut self) -> Self {
+        for sub in self.submodules.values_mut() {
+            Self::apply_option_default(
+                &mut sub.git_options.ignore,
+                &self.defaults.ignore,
+                SerializableIgnore::Unspecified,
+            );
+            Self::apply_option_default(
+                &mut sub.git_options.fetch_recurse,
+                &self.defaults.fetch_recurse,
+                SerializableFetchRecurse::Unspecified,
+            );
+            Self::apply_option_default(
+                &mut sub.git_options.update,
+                &self.defaults.update,
+                SerializableUpdate::Unspecified,
+            );
+            // active is just a bool, no default logic needed
+        }
+        self
+    }
 
     /// Add a submodule configuration
     pub fn add_submodule(&mut self, name: String, submodule: SubmoduleConfig) {
@@ -257,41 +384,42 @@ impl Config {
         self.submodules.iter()
     }
 
-    /// Get the effective setting for a submodule, falling back to defaults
-    #[must_use]
-    pub fn get_effective_setting(
-        &self,
-        submodule: &SubmoduleConfig,
-        setting: &str,
-    ) -> Option<String> {
-        // Check submodule-specific setting first, then fall back to defaults
-        match setting {
-            "ignore" => {
-                submodule
-                    .git_options
-                    .ignore
-                    .as_ref()
-                    .or(self.defaults.ignore.as_ref())
-                    .map(|s| format!("{s:?}")) // Convert to string representation
-            }
-            "update" => submodule
-                .git_options
-                .update
-                .as_ref()
-                .or(self.defaults.update.as_ref())
-                .map(|s| format!("{s:?}")),
-            "fetchRecurse" => submodule
-                .git_options
-                .fetch_recurse
-                .as_ref()
-                .or(self.defaults.fetch_recurse.as_ref())
-                .map(|s| format!("{s:?}")),
-            _ => None,
-        }
+    /// Get a submodule configuration by name
+    /// Returns None if the submodule does not exist
+    pub fn get_submodule(&self, name: &str) -> Option<&SubmoduleConfig> {
+        self.submodules.get(name)
     }
+
+    /// Ensure submod.toml and .gitmodules stay in sync
+    pub fn sync_with_git_config(&mut self, git_ops: &dyn GitOperations) -> Result<()> {
+        // 1. Read current .gitmodules
+        let current_gitmodules = git_ops.read_gitmodules()?;
+
+        // 2. Apply our global defaults logic
+        let target_gitmodules = self.submodules.clone();
+
+        // 3. Write updated .gitmodules if different
+        if current_gitmodules.submodules != target_gitmodules.submodules {
+            git_ops.write_gitmodules(&target_gitmodules)?;
+        }
+
+        // 4. Update any git config values that need to be set
+        for (name, entry) in &target_gitmodules.submodules {
+            if let Some(branch) = &entry.branch {
+                git_ops.set_config_value(
+                    &format!("submodule.{}.branch", name),
+                    branch,
+                    crate::git_ops::ConfigLevel::Local,
+                )?;
+            }
+        }
+
+        Ok(())
+    }
+
+
 }
 
-// Default figment profile for the repository configuration (i.e. .gitmodules)
 const REPO: figment::Profile = figment::Profile::const_new("repo");
 
 // TODO: Implement figment::Profile for modular configs
@@ -335,12 +463,15 @@ impl Provider for Config {
 }
 
 /// Returns the resolved configuration from defaults, TOML file, and CLI arguments.
-pub fn get_configuration(cli_config: &Config, path: &Path) -> Result<Config> {
-    let figment = Figment::new()
-        .merge(Toml::file(path).nested())
-        .merge(Serialized::defaults(cli_config));
+fn load_config<P: AsRef<Path>>(
+    path: P,
+    cli_options: Config,       // <-- your CLI-parsed Config, a Provider
+) -> anyhow::Result<Config> {
+    let fig = Figment::from(Config::default()) // 1) start from Rust-side defaults
+        .merge(Toml::file(path).nested())  // 2) file-based overrides
+        .merge(cli_options);      // 3) CLI overrides file
 
-    // Extract the configuration from the Figment instance
-    let config: Config = figment.extract()?;
-    Ok(config)
+    // 4) extract into Config, then post-process submodules
+    let cfg: Config = fig.extract()?;
+    Ok(cfg.apply_defaults())
 }

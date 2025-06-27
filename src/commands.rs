@@ -51,7 +51,7 @@ See the [README.md](../README.md) for full usage and configuration details.
 
 use clap::{Parser, Subcommand};
 use std::{ffi::OsString, path::PathBuf};
-use crate::options::{SerializableBranch, SerializableFetchRecurse, SerializableUpdate, SerializableIgnore};
+use crate::options::{SerializableBranch as Branch, SerializableFetchRecurse as FetchRecurse, SerializableUpdate as Update, SerializableIgnore as Ignore};
 use clap_complete::aot::{generate, Generator, Shell};
 use clap_complete_nushell::Nushell;
 
@@ -85,20 +85,20 @@ pub enum Commands {
         #[arg(short = "p", long = "path", value_parser = clap::value_parser!(OsString), value_hint = clap::ValueHint::DirPath, about = "Local path where you want to put the submodule.")]
         path: Option<OsString>,
 
-        #[arg(short = "b", long = "branch", value_parser(SerializableBranch::from_str), about = "Branch to use for the submodule. If not provided, defaults to the submodule's default branch.")]
+        #[arg(short = "b", long = "branch", value_parser(Branch::from_str), about = "Branch to use for the submodule. If not provided, defaults to the submodule's default branch.")]
         branch: Option<String>,
 
-        #[arg(short = "i", long = "ignore", value_parser = clap::value_parser!(SerializableIgnore), default_value(SerializableIgnore::default().to_string()), about = "What changes in the submodule git should ignore.")]
-        ignore: SerializableIgnore,
+        #[arg(short = "i", long = "ignore", value_parser = clap::value_parser!(Ignore), default_value(Ignore::Unspecified.to_string()), about = "What changes in the submodule git should ignore.")]
+        ignore: Ignore,
 
         #[arg(short = "x", long = "sparse-paths", value_delimiter = ',', about = "Sparse checkout paths (comma-separated). Can be globs or paths")]
         sparse_paths: Option<Vec<String>>,
 
-        #[arg(short = "f", long = "fetch", value_parser = clap::value_parser!(SerializableFetchRecurse), default_value(SerializableFetchRecurse::default().to_string()), about = "Sets the recursive fetch behavior for the submodule (like, if we should fetch its submodules).")]
-        fetch: SerializableFetchRecurse,
+        #[arg(short = "f", long = "fetch", value_parser = clap::value_parser!(FetchRecurse), default_value(FetchRecurse::Unspecified.to_string()), about = "Sets the recursive fetch behavior for the submodule (like, if we should fetch its submodules).")]
+        fetch: FetchRecurse,
 
-        #[arg(short = "u", long = "update", value_parser = clap::value_parser!(SerializableUpdate), default_value(SerializableUpdate::default().to_string()), about = "How git should update the submodule when you run `git submodule update`.")]
-        update: SerializableUpdate,
+        #[arg(short = "u", long = "update", value_parser = clap::value_parser!(Update), default_value(Update::Unspecified.to_string()), about = "How git should update the submodule when you run `git submodule update`.")]
+        update: Update,
 
         // TODO: Implement this arg
         #[arg(short = "s", long = "shallow", default_value = "false", action = clap::ArgAction::SetTrue, default_missing_value = "true", value_hint = clap::ValueHint::CommandName, about = "If given, sets the submodule as a shallow clone. It will only fetch the last commit of the branch, not the full history.")]
@@ -117,7 +117,7 @@ pub enum Commands {
         #[arg(short = "p", long = "path", value_parser = clap::value_parser!(OsString), value_hint = clap::ValueHint::DirPath, about = "New local path for the submodule. Implies `nuke-it-from-orbit` (no-kill) if the path changes.")]
         path: Option<OsString>,
 
-        #[arg(short = "b", long = "branch", value_parser(SerializableBranch::from_str), about = "Change the submodule's branch.")]
+        #[arg(short = "b", long = "branch", value_parser(Branch::from_str), about = "Change the submodule's branch.")]
         branch: Option<String>,
 
         #[arg(short = "x", long = "sparse-paths", value_delimiter = ',', value_parser = clap::value_parser!(OsString), about = "Replace the sparse checkout paths (comma-separated), or add if not set. Use `--append` to append to existing sparse paths.", default_missing_value = "none")]
@@ -126,14 +126,14 @@ pub enum Commands {
         #[arg(requires("sparse_paths"), short = "a", long = "append", value_parser = clap::value_parser!(bool), default_value = "false", default_missing_value = "true", about = "If given, appends the new sparse paths to the existing ones.")]
         append: bool,
 
-        #[arg(short = "i", long = "ignore", value_parser = clap::value_parser!(SerializableIgnore), about = "Change the ignore settings for the submodule.")]
-        ignore: Option<SerializableIgnore>,
+        #[arg(short = "i", long = "ignore", value_parser = clap::value_parser!(Ignore), about = "Change the ignore settings for the submodule.")]
+        ignore: Option<Ignore>,
 
-        #[arg(short = "f", long = "fetch", value_parser = clap::value_parser!(SerializableFetchRecurse), about = "Change the fetch settings for the submodule.")]
-        fetch: Option<SerializableFetchRecurse>,
+        #[arg(short = "f", long = "fetch", value_parser = clap::value_parser!(FetchRecurse), about = "Change the fetch settings for the submodule.")]
+        fetch: Option<FetchRecurse>,
 
-        #[arg(short = "u", long = "update", value_parser = clap::value_parser!(SerializableUpdate), about = "Change the update settings for the submodule.")]
-        update: Option<SerializableUpdate>,
+        #[arg(short = "u", long = "update", value_parser = clap::value_parser!(Update), about = "Change the update settings for the submodule.")]
+        update: Option<Update>,
 
         #[arg(short = "s", long = "shallow", default_value = "false", default_missing_value = "true", about = "If true, sets the submodule as a shallow clone. Set false to disable shallow cloning.")]
         shallow: bool,
@@ -147,14 +147,14 @@ pub enum Commands {
     #[subcommand(name = "change-global", visible_aliases = ["cg", "chgl", "global"], help_heading = "Change Global Settings", about = "Add or change the global settings for submodules, affecting all submodules in the current repository. Any individual submodule settings will override these global settings.")]
     ChangeGlobal {
 
-        #[arg(short = "i", long = "ignore", value_parser = clap::value_parser!(SerializableIgnore), about = "Sets the default ignore behavior for all submodules in this repository. This will override any individual submodule settings.")]
+        #[arg(short = "i", long = "ignore", value_parser = clap::value_parser!(Ignore), about = "Sets the default ignore behavior for all submodules in this repository. This will override any individual submodule settings.")]
 
-        ignore: Option<SerializableIgnore>,
-        #[arg(short = "f", long = "fetch", value_parser = clap::value_parser!(SerializableFetchRecurse), about = "Sets the default fetch behavior for all submodules in this repository. This will override any individual submodule settings.")]
+        ignore: Option<Ignore>,
+        #[arg(short = "f", long = "fetch", value_parser = clap::value_parser!(FetchRecurse), about = "Sets the default fetch behavior for all submodules in this repository. This will override any individual submodule settings.")]
 
-        fetch: Option<SerializableFetchRecurse>,
-        #[arg(short = "u", long = "update", value_parser = clap::value_parser!(SerializableUpdate), about = "Sets the default update behavior for all submodules in this repository. This will override any individual submodule settings.")]
-        update: Option<SerializableUpdate>,
+        fetch: Option<FetchRecurse>,
+        #[arg(short = "u", long = "update", value_parser = clap::value_parser!(Update), about = "Sets the default update behavior for all submodules in this repository. This will override any individual submodule settings.")]
+        update: Option<Update>,
     },
 
     #[subcommand(name = "check", visible_alias = "c", help_heading = "Check Submodules", about = "Checks the status of submodules, ensuring they are initialized and up-to-date.")]
@@ -228,4 +228,3 @@ pub enum Commands {
     #[subcommand(name = "completions", visible_aliases = ["comp", "complete"], help_heading = "Generate Shell Completions", about = "Generates shell completions for the specified shell.", action= clap::ArgAction::Set, value_parser = clap::value_parser!(Shell))]
     Completions,
 }
-

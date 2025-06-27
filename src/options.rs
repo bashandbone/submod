@@ -19,6 +19,59 @@ use gix_submodule::config::{Branch, FetchRecurse, Ignore, Update};
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 
+pub trait  GitmodulesConvert {
+    /// Get the git key for a submodule by the submodule's name (in git config)
+    fn gitmodules_key_path(&self, name: &str) -> String;
+
+    /// Get the git key for the enum setting
+    fn gitmodules_key(&self) -> &str;
+
+    /// Convert to gitmodules string (what you would get from the .gitmodules or .git/config)
+    fn to_gitmodules(&self) -> String;
+
+    /// Convert from gitmodules string (what you would get from the .gitmodules or .git/config)
+    fn from_gitmodules(options: &str) -> Result<Self, ()>
+    where
+        Self: Sized;
+
+    /// Convert from gitmodules bytes (what you would get from the .gitmodules or .git/config)
+    fn from_gitmodules_bytes(options: &[u8]) -> Result<Self, ()>
+    where
+        Self: Sized;
+
+}
+
+pub trait OptionsChecks {
+    /// Check if the enum is unspecified
+    fn is_unspecified(&self) -> bool;
+
+    /// Check if the enum is the default value
+    fn is_default(&self) -> bool;
+
+}
+
+pub trait IsUnspecified {
+    /// Check if the enum is unspecified
+    fn is_unspecified(&self) -> bool;
+}
+
+pub trait IsDefault {
+    /// Check if the enum is the default value
+    fn is_default(&self) -> bool;
+}
+
+pub trait GixGit2Convert {
+    /// Convert from a `git2` type to a `gix_submodule` type
+    fn from_git2(git2: Git2SubmoduleIgnore) -> Result<Self, ()>
+    where
+        Self: Sized;
+
+    /// Convert from a `gix_submodule` type to a `submod` type
+    fn from_gix(gix: gix_submodule::config::Ignore) -> Result<Self, ()>
+    where
+        Self: Sized;
+}
+
 /// Serializable enum for [`Ignore`] config
 #[derive(
     Debug,
@@ -45,6 +98,62 @@ pub enum SerializableIgnore {
     /// No modifications to the submodule are ignored, showing untracked files and modified files in the worktree. This is the default. It treats the submodule like the rest of the repository.
     #[default]
     None,
+    /// Used as a sentinel value internally; do not use in a submod.toml or submod CLI command.
+    #[serde(skip)]
+    Unspecified,
+}
+
+impl GitmodulesConvert for SerializableIgnore {
+    /// Get the git key for a submodule by the submodule's name (in git config)
+    fn gitmodules_key_path(&self, name: &str) -> String {
+        format!("submodule.{name}.{}", self.gitmodules_key())
+    }
+
+    /// Get the git key for the ignore submodule setting
+    fn gitmodules_key(&self) -> &str {
+        "ignore"
+    }
+
+    /// Convert to gitmodules string (what you would get from the .gitmodules or .git/config)
+    fn to_gitmodules(&self) -> String {
+        match self {
+            SerializableIgnore::All => "all".to_string(),
+            SerializableIgnore::Dirty => "dirty".to_string(),
+            SerializableIgnore::Untracked => "untracked".to_string(),
+            SerializableIgnore::None => "none".to_string(),
+            SerializableIgnore::Unspecified => "".to_string(), // Unspecified is treated as an empty string
+        }
+    }
+
+    /// Convert from gitmodules string (what you would get from the .gitmodules or .git/config)
+    fn from_gitmodules(options: &str) -> Result<Self, ()> {
+        match options {
+            "all" => Ok(SerializableIgnore::All),
+            "dirty" => Ok(SerializableIgnore::Dirty),
+            "untracked" => Ok(SerializableIgnore::Untracked),
+            "none" => Ok(SerializableIgnore::None), // Default is None
+            "" => Ok(SerializableIgnore::Unspecified), // Empty string is treated as unspecified
+            _ => Err(()), // Handle unsupported options
+        }
+    }
+
+    /// Convert from gitmodules bytes (what you would get from the .gitmodules or .git/config)
+    fn from_gitmodules_bytes(options: &[u8]) -> Result<Self, ()> {
+        let options_str = std::str::from_utf8(options).map_err(|_| ())?;
+        Self::from_gitmodules(options_str)
+    }
+}
+
+impl OptionsChecks for SerializableIgnore {
+    /// Check if the enum is unspecified
+    fn is_unspecified(&self) -> bool {
+        matches!(self, SerializableIgnore::Unspecified)
+    }
+
+    /// Check if the enum is the default value
+    fn is_default(&self) -> bool {
+        matches!(self, SerializableIgnore::None)
+    }
 }
 
 impl TryFrom<SerializableIgnore> for Git2SubmoduleIgnore {
@@ -56,6 +165,7 @@ impl TryFrom<SerializableIgnore> for Git2SubmoduleIgnore {
             SerializableIgnore::Dirty => Git2SubmoduleIgnore::Dirty,
             SerializableIgnore::Untracked => Git2SubmoduleIgnore::Untracked,
             SerializableIgnore::None => Git2SubmoduleIgnore::None,
+            SerializableIgnore::Unspecified => Git2SubmoduleIgnore::Unspecified,
             _ => return Err(()), // Handle unsupported variants
         })
     }
@@ -69,9 +179,8 @@ impl TryFrom<Git2SubmoduleIgnore> for SerializableIgnore {
             Git2SubmoduleIgnore::All => SerializableIgnore::All,
             Git2SubmoduleIgnore::Dirty => SerializableIgnore::Dirty,
             Git2SubmoduleIgnore::Untracked => SerializableIgnore::Untracked,
-            Git2SubmoduleIgnore::None | Git2SubmoduleIgnore::Unspecified => {
-                SerializableIgnore::None
-            }
+            Git2SubmoduleIgnore::None => SerializableIgnore::None,
+            Git2SubmoduleIgnore::Unspecified => SerializableIgnore::Unspecified,
             _ => return Err(()), // Handle unsupported variants
         })
     }
@@ -98,7 +207,7 @@ impl TryFrom<SerializableIgnore> for Ignore {
             SerializableIgnore::All => Ignore::All,
             SerializableIgnore::Dirty => Ignore::Dirty,
             SerializableIgnore::Untracked => Ignore::Untracked,
-            SerializableIgnore::None => Ignore::None,
+            SerializableIgnore::None | SerializableIgnore::Unspecified => Ignore::None,
             _ => return Err(()),
         })
     }
@@ -128,42 +237,59 @@ pub enum SerializableFetchRecurse {
     Always,
     /// Submodules are never fetched. This is useful if you want to manage submodules manually or if you don't want to fetch them at all.
     Never,
+    /// Used as a sentinel value internally; do not use in a submod.toml or submod CLI command.
+    #[serde(skip)]
+    Unspecified,
 }
 
-impl SerializableFetchRecurse {
+impl GitmodulesConvert for SerializableFetchRecurse {
     /// Get the git key for a submodule by the submodule's name (in git config)
-    pub fn get_git_key(&self, name: &str) -> String {
-        format!("submodule.{name}.{}", self.git_key())
+    fn gitmodules_key_path(&self, name: &str) -> String {
+        format!("submodule.{name}.{}", self.gitmodules_key())
     }
 
     /// Get the git key for the fetch recurse submodule setting
-    pub fn git_key(&self) -> &str {
+    fn gitmodules_key(&self) -> &str {
         "fetchRecurseSubmodules"
     }
 
-    /// Convert to git options string (what you would get from the .gitmodules or .git/config)
-    pub fn to_git_options(&self) -> String {
+    /// Convert to gitmodules string (what you would get from the .gitmodules or .git/config)
+    fn to_gitmodules(&self) -> String {
         match self {
-            SerializableFetchRecurse::OnDemand => "on-demand".to_string(),
+            SerializableFetchRecurse::OnDemand | SerializableFetchRecurse::Unspecified => "on-demand".to_string(),
             SerializableFetchRecurse::Always => "true".to_string(),
             SerializableFetchRecurse::Never => "false".to_string(),
+
         }
     }
 
-    /// Convert from git options string (what you would get from the .gitmodules or .git/config)
-    pub fn from_git_options(options: &str) -> Result<Self, ()> {
+    /// Convert from gitmodules string (what you would get from the .gitmodules or .git/config)
+    fn from_gitmodules(options: &str) -> Result<Self, ()> {
         match options {
-            "" | "none" | "None" | "on-demand" => Ok(SerializableFetchRecurse::OnDemand), // Default is OnDemand
-            "true" | "always" => Ok(SerializableFetchRecurse::Always),
-            "false" | "never" => Ok(SerializableFetchRecurse::Never),
+            "on-demand" => Ok(SerializableFetchRecurse::OnDemand), // Default is OnDemand
+            "true" => Ok(SerializableFetchRecurse::Always),
+            "false" => Ok(SerializableFetchRecurse::Never),
+            "" => Ok(SerializableFetchRecurse::Unspecified), // Empty string is treated as unspecified
             _ => Err(()), // Handle unsupported options
         }
     }
 
-    /// Convert from git options bytes (what you would get from the .gitmodules or .git/config)
-    pub fn from_git_options_bytes(options: &[u8]) -> Result<Self, ()> {
+    /// Convert from gitmodules bytes (what you would get from the .gitmodules or .git/config)
+    fn from_gitmodules_bytes(options: &[u8]) -> Result<Self, ()> {
         let options_str = std::str::from_utf8(options).map_err(|_| ())?;
-        Self::from_git_options(options_str)
+        Self::from_gitmodules(options_str)
+    }
+}
+
+impl OptionsChecks for SerializableFetchRecurse {
+    /// Check if the enum is unspecified
+    fn is_unspecified(&self) -> bool {
+        matches!(self, SerializableFetchRecurse::Unspecified)
+    }
+
+    /// Check if the enum is the default value
+    fn is_default(&self) -> bool {
+        matches!(self, SerializableFetchRecurse::OnDemand)
     }
 }
 
@@ -185,7 +311,7 @@ impl TryFrom<SerializableFetchRecurse> for FetchRecurse {
 
     fn try_from(value: SerializableFetchRecurse) -> Result<Self, Self::Error> {
         Ok(match value {
-            SerializableFetchRecurse::OnDemand => FetchRecurse::OnDemand,
+            SerializableFetchRecurse::OnDemand | SerializableFetchRecurse::Unspecified => FetchRecurse::OnDemand,
             SerializableFetchRecurse::Always => FetchRecurse::Always,
             SerializableFetchRecurse::Never => FetchRecurse::Never,
             _ => return Err(()), // Handle unsupported variants
@@ -271,6 +397,62 @@ pub enum SerializableUpdate {
     Merge,
     /// Do not update the submodule at all. This is useful if you want to manage submodules manually or if you don't want to update them at all.
     None,
+    /// Used as a sentinel value internally; do not use in a submod.toml or submod CLI command.
+    #[serde(skip)]
+    Unspecified
+}
+
+impl OptionsChecks for SerializableUpdate {
+    /// Check if the enum is unspecified
+    fn is_unspecified(&self) -> bool {
+        matches!(self, SerializableUpdate::Unspecified)
+    }
+
+    /// Check if the enum is the default value
+    fn is_default(&self) -> bool {
+        matches!(self, SerializableUpdate::Checkout)
+    }
+}
+
+impl GitmodulesConvert for SerializableUpdate {
+    /// Get the git key for a submodule by the submodule's name (in git config)
+    fn gitmodules_key_path(&self, name: &str) -> String {
+        format!("submodule.{name}.{}", self.gitmodules_key())
+    }
+
+    /// Get the git key for the update submodule setting
+    fn gitmodules_key(&self) -> &str {
+        "update"
+    }
+
+    /// Convert to gitmodules string (what you would get from the .gitmodules or .git/config)
+    fn to_gitmodules(&self) -> String {
+        match self {
+            SerializableUpdate::Checkout => "checkout".to_string(),
+            SerializableUpdate::Rebase => "rebase".to_string(),
+            SerializableUpdate::Merge => "merge".to_string(),
+            SerializableUpdate::None => "none".to_string(),
+            SerializableUpdate::Unspecified => "".to_string(), // Unspecified is treated as an empty string
+        }
+    }
+
+    /// Convert from gitmodules string (what you would get from the .gitmodules or .git/config)
+    fn from_gitmodules(options: &str) -> Result<Self, ()> {
+        match options {
+            "checkout" => Ok(SerializableUpdate::Checkout),
+            "rebase" => Ok(SerializableUpdate::Rebase),
+            "merge" => Ok(SerializableUpdate::Merge),
+            "none" => Ok(SerializableUpdate::None), // Default is None
+            "" => Ok(SerializableUpdate::Unspecified), // Empty string is treated as unspecified
+            _ => Err(()), // Handle unsupported options
+        }
+    }
+
+    /// Convert from gitmodules bytes (what you would get from the .gitmodules or .git/config)
+    fn from_gitmodules_bytes(options: &[u8]) -> Result<Self, ()> {
+        let options_str = std::str::from_utf8(options).map_err(|_| ())?;
+        Self::from_gitmodules(options_str)
+    }
 }
 
 impl TryFrom<Git2SubmoduleUpdate> for SerializableUpdate {
@@ -281,7 +463,7 @@ impl TryFrom<Git2SubmoduleUpdate> for SerializableUpdate {
             Git2SubmoduleUpdate::Rebase => SerializableUpdate::Rebase,
             Git2SubmoduleUpdate::Merge => SerializableUpdate::Merge,
             Git2SubmoduleUpdate::None => SerializableUpdate::None,
-            Git2SubmoduleUpdate::Default => SerializableUpdate::Checkout, // Default is Checkout
+            Git2SubmoduleUpdate::Default => SerializableUpdate::Unspecified,
             _ => return Err(()),
         })
     }
@@ -295,6 +477,7 @@ impl TryFrom<SerializableUpdate> for Git2SubmoduleUpdate {
             SerializableUpdate::Rebase => Git2SubmoduleUpdate::Rebase,
             SerializableUpdate::Merge => Git2SubmoduleUpdate::Merge,
             SerializableUpdate::None => Git2SubmoduleUpdate::None,
+            SerializableUpdate::Unspecified => Git2SubmoduleUpdate::Default,
             _ => return Err(()), // Handle unsupported variants
         })
     }
@@ -308,7 +491,8 @@ impl TryFrom<Update> for SerializableUpdate {
             Update::Rebase => SerializableUpdate::Rebase,
             Update::Merge => SerializableUpdate::Merge,
             Update::None => SerializableUpdate::None,
-            Update::Command(_cmd) => SerializableUpdate::None, // Commands are not directly serializable, so we use None
+            // Commands are not directly serializable, and can't be defined in .gitmodules, so we use unspecified. `gix` has it as a variant because it can be provided by library call.
+            Update::Command(_cmd) => SerializableUpdate::Unspecified,
             _ => return Err(()),
         })
     }
@@ -317,10 +501,11 @@ impl TryFrom<SerializableUpdate> for Update {
     type Error = ();
     fn try_from(value: SerializableUpdate) -> Result<Self, Self::Error> {
         Ok(match value {
-            SerializableUpdate::Checkout => Update::Checkout,
+            SerializableUpdate::Checkout | SerializableUpdate::Unspecified => Update::Checkout,
             SerializableUpdate::Rebase => Update::Rebase,
             SerializableUpdate::Merge => Update::Merge,
             SerializableUpdate::None => Update::None,
+
             _ => return Err(()), // Handle unsupported variants
         })
     }
