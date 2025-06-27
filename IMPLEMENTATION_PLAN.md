@@ -681,14 +681,14 @@ fn clean_submodule(&self, path: &str, force: bool, remove_directories: bool) -> 
 
 ---
 
-## Phase 1.1 Implementation Notes
+## Phase 1 Implementation Notes
 
 ### ✅ COMPLETED - Git Operations Layer Implementation
 
 **Date**: 2025-06-26
 **Status**: Phase 1.1 fully implemented
 
-#### What was implemented:
+#### What was implemented
 
 1. **Core Module Structure** (`src/git_ops.rs`):
    - `GitOperations` trait defining all git operations
@@ -728,9 +728,10 @@ fn clean_submodule(&self, path: &str, force: bool, remove_directories: bool) -> 
    - Updated prelude for convenience imports
    - Added bitflags dependency to Cargo.toml
 
-#### API Capabilities Verified:
+#### API Capabilities Verified
 
 **Gix (gitoxide) Capabilities**:
+
 - ✅ Reading .gitmodules via `repo.submodules()`
 - ✅ Reading local git config via `repo.config_snapshot()`
 - ✅ Getting submodule status via `submodule.status()`
@@ -741,27 +742,31 @@ fn clean_submodule(&self, path: &str, force: bool, remove_directories: bool) -> 
 - ❌ Sparse checkout operations (not yet supported)
 
 **Git2 Capabilities**:
+
 - ✅ Complete submodule management (add, init, update, delete, deinit)
 - ✅ Full config operations (read/write at different levels)
 - ✅ Comprehensive status reporting with all flags
 - ✅ Repository operations (fetch, reset, stash)
 - ✅ Sparse checkout configuration (enable, set/get patterns)
-- ⚠️ Some operations need manual implementation (clean, sparse apply)
+- ⚠️ Some operations need manual implementation using gix_command (clean, sparse apply)
 
-#### Error Handling Strategy:
+#### Error Handling Strategy
+
 - Gix operations return specific errors when unsupported
 - Git2 operations provide full fallback coverage
 - GitOpsManager logs gix failures and gracefully falls back
 - All operations use anyhow::Context for detailed error messages
 
-#### Future Improvements:
+#### Future Improvements
+
 1. **Gix Maturity**: As gix adds more submodule operations, update GixOperations
 2. **Status Mapping**: Improve mapping between gix status and our SubmoduleStatusFlags
 3. **Sparse Checkout**: Implement remaining sparse checkout operations in git2
 4. **Performance**: Add benchmarking to compare gix vs git2 performance
 5. **Configuration**: Add runtime configuration for fallback behavior
 
-#### Testing Recommendations:
+#### Testing Recommendations
+
 1. Unit tests for each implementation (gix, git2, manager)
 2. Integration tests with real repositories
 3. Fallback behavior tests (gix failure → git2 success)

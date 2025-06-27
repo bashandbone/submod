@@ -19,10 +19,13 @@
 use anyhow::{Context, Result};
 use bitflags::bitflags;
 use std::collections::HashMap;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use crate::options::{
     SerializableBranch, SerializableFetchRecurse, SerializableIgnore, SerializableUpdate,
+};
+use crate::config::{
+    SubmoduleEntries, SubmoduleAddOptions, SubmoduleUpdateOptions,
 };
 
 /// Configuration levels for git config operations
@@ -38,72 +41,13 @@ pub enum ConfigLevel {
     Worktree,
 }
 
-/// Options for adding a submodule
-#[derive(Debug, Clone)]
-pub struct SubmoduleAddOptions {
-    /// Name of the submodule
-    pub name: String,
-    /// Local path where the submodule will be checked out
-    pub path: PathBuf,
-    /// URL of the submodule repository
-    pub url: String,
-    /// Branch to track (optional)
-    pub branch: Option<SerializableBranch>,
-    /// Ignore rule for the submodule (optional)
-    pub ignore: Option<SerializableIgnore>,
-    /// Update strategy for the submodule (optional)
-    pub update: Option<SerializableUpdate>,
-    /// Fetch recurse setting (optional)
-    pub fetch_recurse: Option<SerializableFetchRecurse>,
-    /// Whether to create a shallow clone
-    pub shallow: bool,
-    /// Whether to skip initialization after adding
-    pub no_init: bool,
-}
-
-/// Options for updating a submodule
-#[derive(Debug, Clone)]
-pub struct SubmoduleUpdateOptions {
-    /// Update strategy to use
-    pub strategy: SerializableUpdate,
-    /// Whether to update recursively
-    pub recursive: bool,
-    /// Whether to force the update
-    pub force: bool,
-}
-
 /// Represents git configuration state
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct GitConfig {
     /// Configuration entries as key-value pairs
     pub entries: HashMap<String, String>,
 }
 
-/// Represents .gitmodules configuration
-#[derive(Debug, Clone)]
-pub struct GitModulesConfig {
-    /// Map of submodule name to submodule entry
-    pub submodules: HashMap<String, SubmoduleEntry>,
-}
-
-/// A single submodule entry in .gitmodules
-#[derive(Debug, Clone)]
-pub struct SubmoduleEntry {
-    /// Path where the submodule is checked out
-    pub path: String,
-    /// URL of the submodule repository
-    pub url: String,
-    /// Branch to track (optional)
-    pub branch: Option<String>,
-    /// Ignore rule (optional)
-    pub ignore: Option<SerializableIgnore>,
-    /// Update strategy (optional)
-    pub update: Option<SerializableUpdate>,
-    /// Fetch recurse setting (optional)
-    pub fetch_recurse: Option<SerializableFetchRecurse>,
-    /// Whether the submodule is active
-    pub active: bool,
-}
 
 bitflags! {
     /// Submodule status flags (mirrors git2::SubmoduleStatus)
@@ -164,7 +108,7 @@ pub struct DetailedSubmoduleStatus {
     /// Fetch recurse rule for the submodule
     pub fetch_recurse_rule: SerializableFetchRecurse,
     /// Branch being tracked (if any)
-    pub branch: Option<String>,
+    pub branch: Option<SerializableBranch>,
     /// Whether the submodule is initialized
     pub is_initialized: bool,
     /// Whether the submodule is active
@@ -181,9 +125,9 @@ pub struct DetailedSubmoduleStatus {
 pub trait GitOperations {
     // Config operations
     /// Read .gitmodules configuration
-    fn read_gitmodules(&self) -> Result<GitModulesConfig>;
+    fn read_gitmodules(&self) -> Result<SubmoduleEntries>;
     /// Write .gitmodules configuration
-    fn write_gitmodules(&self, config: &GitModulesConfig) -> Result<()>;
+    fn write_gitmodules(&self, config: &SubmoduleEntries) -> Result<()>;
     /// Read git configuration at specified level
     fn read_git_config(&self, level: ConfigLevel) -> Result<GitConfig>;
     /// Write git configuration at specified level
@@ -272,14 +216,14 @@ impl GitOpsManager {
 }
 
 impl GitOperations for GitOpsManager {
-    fn read_gitmodules(&self) -> Result<GitModulesConfig> {
+    fn read_gitmodules(&self) -> Result<SubmoduleEntries> {
         self.try_with_fallback(
             |gix| gix.read_gitmodules(),
             |git2| git2.read_gitmodules(),
         )
     }
 
-    fn write_gitmodules(&self, config: &GitModulesConfig) -> Result<()> {
+    fn write_gitmodules(&self, config: &SubmoduleEntries) -> Result<()> {
         self.try_with_fallback(
             |gix| gix.write_gitmodules(config),
             |git2| git2.write_gitmodules(config),
