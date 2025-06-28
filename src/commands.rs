@@ -49,7 +49,7 @@ Use the `--config` option to specify a custom config file location.
 See the [README.md](../README.md) for full usage and configuration details.
 "#]
 
-use clap::{Parser, command};
+use clap::{Parser, Subcommand, command, arg};
 use std::{ffi::OsString, path::PathBuf};
 use crate::options::{SerializableBranch as Branch, SerializableFetchRecurse as FetchRecurse, SerializableUpdate as Update, SerializableIgnore as Ignore};
 use clap_complete::aot::{generate, Generator, Shell};
@@ -63,168 +63,168 @@ use clap_complete_nushell::Nushell;
 #[command(name = clap::crate_name!(), version = clap::crate_version!(), propagate_version = true, author = clap::crate_authors!(), about = clap::crate_description!(), infer_subcommands = true)]
 pub struct Cli {
     /// command to execute.
-    #[derive(subcommand)]
+    #[command(subcommand)]
     pub command: Commands,
 
     /// Path to the configuration file (default: submod.toml).
-    #[arg(long = "config", global = true, default_value = "submod.toml", value_parser = clap::value_parser!(PathBuf), value_hint = clap::ValueHint::FilePath, about = "Optionally provide a different configuration file path. Defaults to submod.toml in the current directory.")]
+    #[arg(long = "config", global = true, default_value = "submod.toml", value_parser = clap::value_parser!(PathBuf), value_hint = clap::ValueHint::FilePath, help = "Optionally provide a different configuration file path. Defaults to submod.toml in the current directory.")]
     pub config: PathBuf,
 }
 
 /// Supported commands for the `submod` tool.
 #[derive(Subcommand, Debug)]
 pub enum Commands {
-    #[command(name = "add", visible_alias = "a", help_heading = "Add a Submodule", about = "Add and initialize a new submodule.")]
+    #[command(name = "add", visible_alias = "a", next_help_heading = "Add a Submodule", about = "Add and initialize a new submodule.")]
     Add {
-        #[arg(required = true, action = clap::ArgAction::Set, value_parser = clap::value_parser!(String), about = "The URL or local path of the submodule's git repository.")]
+        #[arg(required = true, action = clap::ArgAction::Set, value_parser = clap::value_parser!(String), help = "The URL or local path of the submodule's git repository.")]
         url: String,
 
-        #[arg(short = "n", long = "name", value_parser = clap::value_parser!(String), about = "Optional *nickname* for the submodule to use in your config and `submod` commands. Otherwise we'll use the relative path, which is what git uses.")]
+        #[arg(short = 'n', long = "name", value_parser = clap::value_parser!(String), help = "Optional *nickname* for the submodule to use in your config and `submod` commands. Otherwise we'll use the relative path, which is what git uses.")]
         name: Option<String>,
 
-        #[arg(short = "p", long = "path", value_parser = clap::value_parser!(OsString), value_hint = clap::ValueHint::DirPath, about = "Local path where you want to put the submodule.")]
+        #[arg(short = 'p', long = "path", value_parser = clap::value_parser!(OsString), value_hint = clap::ValueHint::DirPath, help = "Local path where you want to put the submodule.")]
         path: Option<OsString>,
 
-        #[arg(short = 'b', long = "branch", value_parser = clap::value_parser!(Branch), help = "Branch to use for the submodule. If not provided, defaults to the submodule's default branch.")]
+        #[arg(short = 'b', long = "branch", help = "Branch to use for the submodule. If not provided, defaults to the submodule's default branch.")]
         branch: Option<String>,
 
-        #[arg(short = "i", long = "ignore", value_parser = clap::value_parser!(Ignore), default_value(Ignore::Unspecified.to_string()), about = "What changes in the submodule git should ignore.")]
+        #[arg(short = 'i', long = "ignore", default_value_t = Ignore::Unspecified, help = "What changes in the submodule git should ignore.")]
         ignore: Ignore,
 
-        #[arg(short = "x", long = "sparse-paths", value_delimiter = ",", about = "Sparse checkout paths (comma-separated). Can be globs or paths")]
+        #[arg(short = 'x', long = "sparse-paths", value_delimiter = ',', help = "Sparse checkout paths (comma-separated). Can be globs or paths")]
         sparse_paths: Option<Vec<String>>,
 
-        #[arg(short = "f", long = "fetch", value_parser = clap::value_parser!(FetchRecurse), default_value(FetchRecurse::Unspecified.to_string()), about = "Sets the recursive fetch behavior for the submodule (like, if we should fetch its submodules).")]
+        #[arg(short = 'f', long = "fetch", default_value_t = FetchRecurse::Unspecified, help = "Sets the recursive fetch behavior for the submodule (like, if we should fetch its submodules).")]
         fetch: FetchRecurse,
 
-        #[arg(short = "u", long = "update", value_parser = clap::value_parser!(Update), default_value(Update::Unspecified.to_string()), about = "How git should update the submodule when you run `git submodule update`.")]
+        #[arg(short = 'u', long = "update", default_value_t = Update::Unspecified, help = "How git should update the submodule when you run `git submodule update`.")]
         update: Update,
 
         // TODO: Implement this arg
-        #[arg(short = "s", long = "shallow", default_value = "false", action = clap::ArgAction::SetTrue, default_missing_value = "true", value_hint = clap::ValueHint::CommandName, about = "If given, sets the submodule as a shallow clone. It will only fetch the last commit of the branch, not the full history.")]
+        #[arg(short = 's', long = "shallow", default_value = "false", action = clap::ArgAction::SetTrue, default_missing_value = "true", value_hint = clap::ValueHint::CommandName, help = "If given, sets the submodule as a shallow clone. It will only fetch the last commit of the branch, not the full history.")]
         shallow: bool,
 
         // TODO: Implement this arg
-        #[arg(long = "no-init", default_value = "false", action = clap::ArgAction::SetTrue, default_missing_value = "true", value_hint = clap::ValueHint::CommandName, about = "If given, we'll add the submodule to your submod.toml but not initialize it.")]
+        #[arg(long = "no-init", default_value = "false", action = clap::ArgAction::SetTrue, default_missing_value = "true", value_hint = clap::ValueHint::CommandName, help = "If given, we'll add the submodule to your submod.toml but not initialize it.")]
         no_init: bool,
     },
     // TODO: Implement this command
-    #[command(name = "change", help_heading = "Change a Submodule's Settings", about = "Change the configuration of an existing submodule. Any field you provide will overwrite an existing value (unless both are defaults). If you change the path, it will nuke the submodule from orbit (delete it and re-clone it).")]
+    #[command(name = "change", next_help_heading = "Change a Submodule's Settings", about = "Change the configuration of an existing submodule. Any field you provide will overwrite an existing value (unless both are defaults). If you change the path, it will nuke the submodule from orbit (delete it and re-clone it).")]
     Change {
-        #[arg(required = true, value_parser = clap::value_parser!(String), value_hint = clap::ValueHint::CommandName, about = "The name of the submodule to change. Must match an existing submodule.", long_about = "The name of the submodule to change. Must match an existing submodule in your submod.toml. Because we use this value to lookup your config, you cannot change the name from the CLI. You must manually change it in your submod.toml. All other options can be changed here.")]
+        #[arg(required = true, value_parser = clap::value_parser!(String), value_hint = clap::ValueHint::CommandName, help = "The name of the submodule to change. Must match an existing submodule.", long_help = "The name of the submodule to change. Must match an existing submodule in your submod.toml. Because we use this value to lookup your config, you cannot change the name from the CLI. You must manually change it in your submod.toml. All other options can be changed here.")]
         name: String,
 
-        #[arg(short = "p", long = "path", value_parser = clap::value_parser!(OsString), value_hint = clap::ValueHint::DirPath, about = "New local path for the submodule. Implies `nuke-it-from-orbit` (no-kill) if the path changes.")]
+        #[arg(short = 'p', long = "path", value_parser = clap::value_parser!(OsString), value_hint = clap::ValueHint::DirPath, help = "New local path for the submodule. Implies `nuke-it-from-orbit` (no-kill) if the path changes.")]
         path: Option<OsString>,
 
-        #[arg(short = 'b', long = "branch", value_parser = clap::value_parser!(Branch), help = "Branch to use for the submodule. If not provided, defaults to the submodule's default branch.")]
+        #[arg(short = 'b', long = "branch", help = "Branch to use for the submodule. If not provided, defaults to the submodule's default branch.")]
         branch: Option<String>,
 
-        #[arg(short = "x", long = "sparse-paths", value_delimiter = ",", value_parser = clap::value_parser!(OsString), about = "Replace the sparse checkout paths (comma-separated), or add if not set. Use `--append` to append to existing sparse paths.", default_missing_value = "none")]
+        #[arg(short = 'x', long = "sparse-paths", value_delimiter = ',', value_parser = clap::value_parser!(OsString), help = "Replace the sparse checkout paths (comma-separated), or add if not set. Use `--append` to append to existing sparse paths.", default_missing_value = "none")]
         sparse_paths: Option<Vec<OsString>>,
 
-        #[arg(requires("sparse_paths"), short = "a", long = "append", value_parser = clap::value_parser!(bool), default_value = "false", default_missing_value = "true", about = "If given, appends the new sparse paths to the existing ones.")]
+        #[arg(requires("sparse_paths"), short = 'a', long = "append", value_parser = clap::value_parser!(bool), default_value = "false", default_missing_value = "true", help = "If given, appends the new sparse paths to the existing ones.")]
         append: bool,
 
-        #[arg(short = "i", long = "ignore", value_parser = clap::value_parser!(Ignore), about = "Change the ignore settings for the submodule.")]
+        #[arg(short = 'i', long = "ignore", help = "Change the ignore settings for the submodule.")]
         ignore: Option<Ignore>,
 
-        #[arg(short = "f", long = "fetch", value_parser = clap::value_parser!(FetchRecurse), about = "Change the fetch settings for the submodule.")]
+        #[arg(short = 'f', long = "fetch", help = "Change the fetch settings for the submodule.")]
         fetch: Option<FetchRecurse>,
 
-        #[arg(short = "u", long = "update", value_parser = clap::value_parser!(Update), about = "Change the update settings for the submodule.")]
+        #[arg(short = 'u', long = "update", help = "Change the update settings for the submodule.")]
         update: Option<Update>,
 
-        #[arg(short = "s", long = "shallow", default_value = "false", default_missing_value = "true", about = "If true, sets the submodule as a shallow clone. Set false to disable shallow cloning.")]
+        #[arg(short = 's', long = "shallow", default_value = "false", default_missing_value = "true", help = "If true, sets the submodule as a shallow clone. Set false to disable shallow cloning.")]
         shallow: bool,
-        #[arg(short = "u", long = "url", value_parser = clap::value_parser!(String), about = "Change the URL of the submodule. The submodule name from the url must match an existing submodule.")]
+        #[arg(short = 'u', long = "url", value_parser = clap::value_parser!(String), help = "Change the URL of the submodule. The submodule name from the url must match an existing submodule.")]
         url: Option<String>,
 
-        #[arg(long = "active", default_value = "true", value_parser = clap::value_parser!(bool), default_missing_value = "true", about = "If true, the submodule will be considered active and included in operations. If false, will disable the submodule. For a shorter version of this command, use `submod disable <name>` instead.")]
+        #[arg(long = "active", default_value = "true", value_parser = clap::value_parser!(bool), default_missing_value = "true", help = "If true, the submodule will be considered active and included in operations. If false, will disable the submodule. For a shorter version of this command, use `submod disable <name>` instead.")]
         active: bool,
     },
     // TODO: Implement this command
-    #[command(name = "change-global", visible_aliases = ["cg", "chgl", "global"], help_heading = "Change Global Settings", about = "Add or change the global settings for submodules, affecting all submodules in the current repository. Any individual submodule settings will override these global settings.")]
+    #[command(name = "change-global", visible_aliases = ["cg", "chgl", "global"], next_help_heading = "Change Global Settings", about = "Add or change the global settings for submodules, affecting all submodules in the current repository. Any individual submodule settings will override these global settings.")]
     ChangeGlobal {
 
-        #[arg(short = "i", long = "ignore", value_parser = clap::value_parser!(Ignore), about = "Sets the default ignore behavior for all submodules in this repository. This will override any individual submodule settings.")]
+        #[arg(short = 'i', long = "ignore", help = "Sets the default ignore behavior for all submodules in this repository. This will override any individual submodule settings.")]
 
         ignore: Option<Ignore>,
-        #[arg(short = "f", long = "fetch", value_parser = clap::value_parser!(FetchRecurse), about = "Sets the default fetch behavior for all submodules in this repository. This will override any individual submodule settings.")]
+        #[arg(short = 'f', long = "fetch", help = "Sets the default fetch behavior for all submodules in this repository. This will override any individual submodule settings.")]
 
         fetch: Option<FetchRecurse>,
-        #[arg(short = "u", long = "update", value_parser = clap::value_parser!(Update), about = "Sets the default update behavior for all submodules in this repository. This will override any individual submodule settings.")]
+        #[arg(short = 'u', long = "update", help = "Sets the default update behavior for all submodules in this repository. This will override any individual submodule settings.")]
         update: Option<Update>,
     },
 
-    #[command(name = "check", visible_alias = "c", help_heading = "Check Submodules", about = "Checks the status of submodules, ensuring they are initialized and up-to-date.")]
+    #[command(name = "check", visible_alias = "c", next_help_heading = "Check Submodules", about = "Checks the status of submodules, ensuring they are initialized and up-to-date.")]
     Check,
 
     // TODO: Implement this command
-    #[command(name = "list", visible_aliases = ["ls", "l"], help_heading = "List Submodules", about = "Lists all submodules, optionally recursively.")]
+    #[command(name = "list", visible_aliases = ["ls", "l"], next_help_heading = "List Submodules", about = "Lists all submodules, optionally recursively.")]
     List {
         /// Recursively list all submodules for the current repository.
-        #[arg(short = "r", long = "recursive", default_value = "false", action = clap::ArgAction::SetTrue, default_missing_value = "true", value_hint = clap::ValueHint::CommandName, about = "If given, lists all submodules recursively (like, the submodules of the submodules).")]
+        #[arg(short = 'r', long = "recursive", default_value = "false", action = clap::ArgAction::SetTrue, default_missing_value = "true", value_hint = clap::ValueHint::CommandName, help = "If given, lists all submodules recursively (like, the submodules of the submodules).")]
         recursive: bool,
     },
 
-    #[command(name = "init", visible_alias = "i", help_heading = "Initialize Submodules", about = "Initializes missing submodules based on the configuration file.")]
+    #[command(name = "init", visible_alias = "i", next_help_heading = "Initialize Submodules", about = "Initializes missing submodules based on the configuration file.")]
     Init,
 
     // TODO: Implement this command (use git2 + fs to delete files)
-    #[command(name = "delete", visible_alias = "del", help_heading = "Delete a Submodule", about = "Deletes a submodule by name; removes it from the configuration and the filesystem.")]
+    #[command(name = "delete", visible_alias = "del", next_help_heading = "Delete a Submodule", about = "Deletes a submodule by name; removes it from the configuration and the filesystem.")]
     Delete,
 
     // TODO: Implement this command (use git2). Functionally this changes a module to `active = false` in our config and `.gitmodules`, but does not delete the submodule from the filesystem.
-    #[command(name = "disable", visible_alias = "d", help_heading = "Disable a Submodule", about = "Disables a submodule by name; sets its active status to false. Does not remove settings or files.")]
+    #[command(name = "disable", visible_alias = "d", next_help_heading = "Disable a Submodule", about = "Disables a submodule by name; sets its active status to false. Does not remove settings or files.")]
     Disable,
 
-    #[command(name = "update", visible_alias = "u", help_heading = "Update Submodules", about = "Updates all submodules to their configured state.")]
+    #[command(name = "update", visible_alias = "u", next_help_heading = "Update Submodules", about = "Updates all submodules to their configured state.")]
     Update,
 
-    #[command(name = "reset", visible_alias = "r", help_heading = "Reset Submodules", about = "Hard resets submodules, stashing changes, resetting to the configured state, and cleaning untracked files.")]
+    #[command(name = "reset", visible_alias = "r", next_help_heading = "Reset Submodules", about = "Hard resets submodules, stashing changes, resetting to the configured state, and cleaning untracked files.")]
     Reset {
 
-        #[arg(short = "a", long = "all", default_value = "false", action = clap::ArgAction::SetTrue, default_missing_value = "true", value_hint = clap::ValueHint::CommandName, about = "If given, resets all submodules. If not given, you must specify specific submodules to reset.")]
+        #[arg(short = 'a', long = "all", default_value = "false", action = clap::ArgAction::SetTrue, default_missing_value = "true", value_hint = clap::ValueHint::CommandName, help = "If given, resets all submodules. If not given, you must specify specific submodules to reset.")]
         all: bool,
 
-        #[arg(required_unless_present = "all", value_delimiter = ",", about = "Names of specific submodules to reset. If `--all` is not given, you must specify at least one submodule name.")]
+        #[arg(required_unless_present = "all", value_delimiter = ',', help = "Names of specific submodules to reset. If `--all` is not given, you must specify at least one submodule name.")]
         names: Vec<String>,
     },
 
-    #[command(name = "sync", visible_alias = "s", help_heading = "Sync Submodules", about = "Runs a full sync: check, init, update. Ensures all submodules are in sync with the configuration.")]
+    #[command(name = "sync", visible_alias = "s", next_help_heading = "Sync Submodules", about = "Runs a full sync: check, init, update. Ensures all submodules are in sync with the configuration.")]
     Sync,
 
     // TODO: Implement this command
-    #[command(name = "generate-config", visible_aliases = ["gc", "genconf"], help_heading = "Generate a Config File", about = "Generates a new configuration file.")]
+    #[command(name = "generate-config", visible_aliases = ["gc", "genconf"], next_help_heading = "Generate a Config File", about = "Generates a new configuration file.")]
     GenerateConfig {
         /// Path to the new configuration file to generate.
-        #[arg(short = "o", long = "output", value_parser = clap::value_parser!(PathBuf), value_hint = clap::ValueHint::FilePath, default_value = "submod.toml", help = "Path to the output configuration file. Defaults to submod.toml in the current directory.")]
+        #[arg(short = 'o', long = "output", value_parser = clap::value_parser!(PathBuf), value_hint = clap::ValueHint::FilePath, default_value = "submod.toml", help = "Path to the output configuration file. Defaults to submod.toml in the current directory.")]
         output: PathBuf,
 
-        #[arg(short = "s", long = "from-setup", about = "Generates the config from your current repository's submodule settings.")]
+        #[arg(short = 's', long = "from-setup", help = "Generates the config from your current repository's submodule settings.")]
         from_setup: String,
 
-        #[arg(short = "f", long = "force", default_value = "false", action = clap::ArgAction::SetTrue, default_missing_value = "true", value_hint = clap::ValueHint::CommandName, about = "If given, overwrites the existing configuration file without prompting.")]
+        #[arg(short = 'f', long = "force", default_value = "false", action = clap::ArgAction::SetTrue, default_missing_value = "true", value_hint = clap::ValueHint::CommandName, help = "If given, overwrites the existing configuration file without prompting.")]
         force: bool,
 
-        #[arg(short = "t", long = "template", about = "Generates a template configuration file with default values.", default_value = "false", action = clap::ArgAction::SetTrue, default_missing_value = "true", value_hint = clap::ValueHint::CommandName)]
+        #[arg(short = 't', long = "template", help = "Generates a template configuration file with default values.", default_value = "false", action = clap::ArgAction::SetTrue, default_missing_value = "true", value_hint = clap::ValueHint::CommandName)]
         template: bool,
     },
 
     // TODO: Implement this command (use git2) (not we can leverage this logic for `delete` because the `kill` option is the same.)
-    #[command(name = "nuke-it-from-orbit", visible_aliases = ["nuke-em", "nuke-it", "nuke-them"], help_heading = "Nuke It From Orbit", about = "Deletes all submodules or specific ones, removing them from the configuration and the filesystem. Optionally leaves them dead. 🚀💥👾💥💀.")]
+    #[command(name = "nuke-it-from-orbit", visible_aliases = ["nuke-em", "nuke-it", "nuke-them"], next_help_heading = "Nuke It From Orbit", about = "Deletes all submodules or specific ones, removing them from the configuration and the filesystem. Optionally leaves them dead. 🚀💥👾💥💀.")]
     NukeItFromOrbit {
-        #[arg(long = "all", default_value = "false", action = clap::ArgAction::SetTrue, default_missing_value = "true", value_hint = clap::ValueHint::CommandName, about = "Nuke 'em all? 🤓")]
+        #[arg(long = "all", default_value = "false", action = clap::ArgAction::SetTrue, default_missing_value = "true", value_hint = clap::ValueHint::CommandName, help = "Nuke 'em all? 🤓")]
         all: bool,
-        #[arg(required_unless_present = "all", value_delimiter = ",", about = "... or only specific ones? 😔 (comma-separated list of names")]
+        #[arg(required_unless_present = "all", value_delimiter = ',', help = "... or only specific ones? 😔 (comma-separated list of names")]
         names: Option<Vec<String>>,
 
-        #[arg(short = "k", long = "kill", default_value = "false", action = clap::ArgAction::SetTrue, default_missing_value = "true", value_hint = clap::ValueHint::CommandName, about = "If given, DOES NOT reinitialize the submodules and DOES NOT add them back to the config. They will be truly dead. 💀")]
+        #[arg(short = 'k', long = "kill", default_value = "false", action = clap::ArgAction::SetTrue, default_missing_value = "true", value_hint = clap::ValueHint::CommandName, help = "If given, DOES NOT reinitialize the submodules and DOES NOT add them back to the config. They will be truly dead. 💀")]
         kill: bool,
     },
 
     // TODO: Implement this command (super simple with clap_complete/clap_complete_nushell. The latter is just another enum variant that implements the `Generator` trait like all of the other clap_complete shells.)
-    #[command(name = "completions", visible_aliases = ["comp", "complete"], help_heading = "Generate Shell Completions", about = "Generates shell completions for the specified shell.", action= clap::ArgAction::Set, value_parser = clap::value_parser!(Shell))]
+    #[command(name = "completions", visible_aliases = ["comp", "complete"], next_help_heading = "Generate Shell Completions", about = "Generates shell completions for the specified shell.", action= clap::ArgAction::Set, value_parser = clap::value_parser!(Shell))]
     Completions,
 }

@@ -48,18 +48,17 @@ fn main() -> Result<()> {
             ignore,
             update,
             fetch,
-
+            shallow,
+            no_init,
         } => {
             let mut manager = GitoxideSubmoduleManager::new(cli.config)
                 .map_err(|e| anyhow::anyhow!("Failed to create manager: {}", e))?;
 
             let sparse_paths_vec = sparse_paths.map(|paths| {
                 paths
-                    .split(',')
+                    .into_iter()
                     .map(|s| s.trim().to_string())
                     .filter(|s| !s.is_empty())
-                    .collect::<Vec<String>>()
-                    .into_iter()
                     .map(|s| {
                         if s.contains('\0') {
                             return Err(anyhow::anyhow!(
@@ -79,9 +78,18 @@ fn main() -> Result<()> {
                 None => None,
             };
 
-            // Set the path
-            let set_path_result = set_path(path)
-                .map_err(|e| anyhow::anyhow!("Failed to set path: {}", e))?;
+            // Set the path - if not provided, derive from URL
+            let set_path_result = match path {
+                Some(p) => set_path(p)
+                    .map_err(|e| anyhow::anyhow!("Failed to set path: {}", e))?,
+                None => {
+                    // Derive path from URL - take the last component without .git
+                    let path_from_url = url.split('/').last()
+                        .unwrap_or("submodule")
+                        .trim_end_matches(".git");
+                    path_from_url.to_string()
+                },
+            };
 
             let set_branch = match branch {
                 Some(ref b) => Some(Branch::from_str(b)
@@ -89,8 +97,20 @@ fn main() -> Result<()> {
                 None => Some(Branch::default()),
             };
 
+            // Set the name - if not provided, use the path
+            let set_name = name.unwrap_or_else(|| set_path_result.clone());
+
+            // Convert CLI types to serializable types
+            use crate::options::{SerializableIgnore, SerializableFetchRecurse, SerializableUpdate};
+            let set_ignore = Some(SerializableIgnore::try_from(ignore)
+                .map_err(|_| anyhow::anyhow!("Failed to convert ignore option"))?);
+            let set_fetch = Some(SerializableFetchRecurse::try_from(fetch)
+                .map_err(|_| anyhow::anyhow!("Failed to convert fetch option"))?);
+            let set_update = Some(SerializableUpdate::try_from(update)
+                .map_err(|_| anyhow::anyhow!("Failed to convert update option"))?);
+
             manager
-                .add_submodule(name, set_path_result, url, sparse_paths_vec, set_branch, ignore, fetch, update)
+                .add_submodule(set_name, set_path_result, url, sparse_paths_vec, set_branch, set_ignore, set_fetch, set_update)
                 .map_err(|e| anyhow::anyhow!("Failed to add submodule: {}", e))?;
         }
         Commands::Check => {
@@ -101,7 +121,7 @@ fn main() -> Result<()> {
                 .map_err(|e| anyhow::anyhow!("Failed to check submodules: {}", e))?;
         }
         Commands::Init => {
-            let mut manager = GitoxideSubmoduleManager::new(cli.config)
+            let manager = GitoxideSubmoduleManager::new(cli.config)
                 .map_err(|e| anyhow::anyhow!("Failed to create manager: {}", e))?;
 
             // Initialize all submodules from config
@@ -112,7 +132,7 @@ fn main() -> Result<()> {
             }
         }
         Commands::Update => {
-            let mut manager = GitoxideSubmoduleManager::new(cli.config)
+            let manager = GitoxideSubmoduleManager::new(cli.config)
                 .map_err(|e| anyhow::anyhow!("Failed to create manager: {}", e))?;
 
             // Update all submodules from config
@@ -158,7 +178,7 @@ fn main() -> Result<()> {
             }
         }
         Commands::Sync => {
-            let mut manager = GitoxideSubmoduleManager::new(cli.config)
+            let manager = GitoxideSubmoduleManager::new(cli.config)
                 .map_err(|e| anyhow::anyhow!("Failed to create manager: {}", e))?;
 
             // Run check, init, and update in sequence
@@ -182,15 +202,40 @@ fn main() -> Result<()> {
 
             println!("✅ Sync complete");
         }
-        Commands::FromConfig => {
-            let manager = GitoxideSubmoduleManager::new(cli.config)
-                .map_err(|e| anyhow::anyhow!("Failed to create manager: {}", e))?;
-
-            // Generate submod.toml from existing git configuration
-            manager
-                .generate_from_git_config()
-                .map_err(|e| anyhow::anyhow!("Failed to generate from config: {}", e))?;
+        Commands::Change { .. } => {
+            return Err(anyhow::anyhow!("Change command is not yet implemented"));
         }
+        Commands::ChangeGlobal { .. } => {
+            return Err(anyhow::anyhow!("ChangeGlobal command is not yet implemented"));
+        }
+        Commands::List { .. } => {
+            return Err(anyhow::anyhow!("List command is not yet implemented"));
+        }
+        Commands::Delete => {
+            return Err(anyhow::anyhow!("Delete command is not yet implemented"));
+        }
+        Commands::Disable => {
+            return Err(anyhow::anyhow!("Disable command is not yet implemented"));
+        }
+        Commands::GenerateConfig { .. } => {
+            return Err(anyhow::anyhow!("GenerateConfig command is not yet implemented"));
+        }
+        Commands::NukeItFromOrbit { .. } => {
+            return Err(anyhow::anyhow!("NukeItFromOrbit command is not yet implemented"));
+        }
+        Commands::Completions => {
+            return Err(anyhow::anyhow!("Completions command is not yet implemented"));
+        }
+        // TODO: Implement FromConfig command
+        // Commands::FromConfig => {
+        //     let manager = GitoxideSubmoduleManager::new(cli.config)
+        //         .map_err(|e| anyhow::anyhow!("Failed to create manager: {}", e))?;
+        //
+        //     // Generate submod.toml from existing git configuration
+        //     manager
+        //         .generate_from_git_config()
+        //         .map_err(|e| anyhow::anyhow!("Failed to generate from config: {}", e))?;
+        // }
     }
 
     Ok(())
