@@ -23,7 +23,7 @@ resolver = "3"
 [dependencies]
 # Gitoxide ops
 gix = { version = "0.72.1", default-features = false, features = [
-    "async-network-client", "attributes", "excludes", "status", "command", "parallel", "serde",
+    "async-network-client", "attributes", "excludes", "status", "command", "parallel", "serde", "status"
 ]}
 gix-config = { version = "0.45.1", features = ["serde"] }
 gix-submodule = "0.19.1"
