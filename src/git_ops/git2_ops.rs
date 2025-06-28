@@ -196,38 +196,38 @@ impl GitOperations for Git2Operations {
                 None, // sparse_checkouts will be populated separately if needed
             ))
     }
-    fn write_gitmodules(&self, config: &SubmoduleEntries) -> Result<()> {
+    fn write_gitmodules(&mut self, config: &SubmoduleEntries) -> Result<()> {
         // git2 doesn't have direct .gitmodules writing, but we can manipulate submodules
         // For now, we'll update individual submodule configurations
         if let Some(submodules) = config.submodules().as_ref() {
             for (name, entry) in submodules.iter() {
-                // Find or create the submodule
-                match self.repo.find_submodule(&entry.path.and_then(|p| Some(p.to_string())).unwrap_or(name.clone())) {
-                    Ok(mut submodule) => {
-                        // Update existing submodule configuration
-                        if let Some(ignore) = &entry.ignore {
-                            let git2_ignore: git2::SubmoduleIgnore = (*ignore).try_into()
-                                .map_err(|_| anyhow::anyhow!("Failed to convert ignore setting"))?;
-                            submodule.set_ignore(git2_ignore);
-                        }
-                        if let Some(update) = &entry.update {
-                            let git2_update: git2::SubmoduleUpdate = (*update).try_into()
-                                .map_err(|_| anyhow::anyhow!("Failed to convert update setting"))?;
-                            submodule.set_update(git2_update);
-                        }
-                        // Set URL if different
-                        if submodule.url() != entry.url.as_deref() {
-                            submodule.set_url(&entry.url)?;
-                        }
-                        // Sync changes
+                let submodule_path = entry.path.as_ref().map(|p| p.as_str()).unwrap_or(&name);
+                
+                // Check if submodule exists first
+                if self.repo.find_submodule(submodule_path).is_ok() {
+                    // Update existing submodule configuration
+                    if let Some(ignore) = &entry.ignore {
+                        let git2_ignore: git2::SubmoduleIgnore = ignore.clone().try_into()
+                            .map_err(|_| anyhow::anyhow!("Failed to convert ignore setting"))?;
+                        self.repo.submodule_set_ignore(&name, git2_ignore)?;
+                    }
+                    if let Some(update) = &entry.update {
+                        let git2_update: git2::SubmoduleUpdate = update.clone().try_into()
+                            .map_err(|_| anyhow::anyhow!("Failed to convert update setting"))?;
+                        self.repo.submodule_set_update(&name, git2_update)?;
+                    }
+                    // TODO: Set URL if different - git2 doesn't have set_url method
+                    // if submodule.url() != entry.url.as_deref() {
+                    //     // Need to use git config or other method to set URL
+                    // }
+                    
+                    // Sync changes - need to get the submodule again for sync
+                    if let Ok(mut submodule) = self.repo.find_submodule(submodule_path) {
                         submodule.sync()?;
                     }
-                    Err(_) => {
-                        // Submodule doesn't exist, we'd need to add it
-                        // This is handled by add_submodule method
-                        continue;
-                    }
                 }
+                // If submodule doesn't exist, we'd need to add it
+                // This is handled by add_submodule method
             }
         }
         Ok(())
@@ -274,7 +274,7 @@ impl GitOperations for Git2Operations {
         if let Some(update) = &opts.update {
             let git2_update: git2::SubmoduleUpdate = update.clone().try_into()
                 .map_err(|_| anyhow::anyhow!("Failed to convert update setting"))?;
-            self.repo.submodule_set_update(&opts.path.to_string_lossy().unwrap(), git2_update)?;
+            self.repo.submodule_set_update(&opts.path.to_string_lossy(), git2_update)?;
         }
         // Set branch if specified
         if let Some(branch) = &opts.branch {
@@ -519,7 +519,7 @@ impl GitOperations for Git2Operations {
         let submodule = self.repo.find_submodule(path)
             .with_context(|| format!("Submodule not found: {}", path))?;
         // Open the submodule repository
-        let sub_repo = submodule.open()
+        let mut sub_repo = submodule.open()
             .with_context(|| format!("Failed to open submodule repository: {}", path))?;
         // Create stash
         let signature = sub_repo.signature()
@@ -585,7 +585,7 @@ impl GitOperations for Git2Operations {
             .collect();
         Ok(patterns)
     }
-    fn apply_sparse_checkout(&self, path: &str) -> Result<()> {
+    fn apply_sparse_checkout(&self, _path: &str) -> Result<()> {
         // git2 doesn't have direct sparse checkout application
         // We need to use gix_command or implement it manually
         // For now, return an error to indicate this needs manual implementation

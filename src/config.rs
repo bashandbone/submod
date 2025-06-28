@@ -762,7 +762,7 @@ impl Config {
     }
 
     /// Ensure submod.toml and .gitmodules stay in sync
-    pub fn sync_with_git_config(&mut self, git_ops: &dyn GitOperations) -> Result<()> {
+    pub fn sync_with_git_config(&mut self, git_ops: &mut dyn GitOperations) -> Result<()> {
         // 1. Read current .gitmodules
         let current_gitmodules = git_ops.read_gitmodules()?;
 
@@ -811,7 +811,7 @@ impl Config {
     }
 
 
-    pub fn load_with_git_sync(&self, path: impl AsRef<Path>, git_ops: &dyn GitOperations, cli_options: Config) -> anyhow::Result<Self> {
+    pub fn load_with_git_sync(&self, path: impl AsRef<Path>, git_ops: &mut dyn GitOperations, cli_options: Config) -> anyhow::Result<Self> {
         let mut cfg = self.load(path, cli_options)?;
         // Sync with git config
         cfg.sync_with_git_config(git_ops)?;

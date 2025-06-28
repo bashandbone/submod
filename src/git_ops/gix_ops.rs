@@ -17,7 +17,7 @@ use crate::options::{
     ConfigLevel, SerializableBranch, SerializableFetchRecurse, SerializableIgnore, SerializableUpdate,
 };
 use crate::config::{SubmoduleAddOptions, SubmoduleEntry, SubmoduleEntries, SubmoduleUpdateOptions};
-use crate::Config;
+
 
 /// Primary implementation using gix (gitoxide)
 pub struct GixOperations {
@@ -46,39 +46,41 @@ impl GixOperations {
         &self,
         submodule: &gix::Submodule,
     ) -> Result<SubmoduleEntry> {
-        let name = submodule.name().to_string();
+        let _name = submodule.name().to_string();
         let path = submodule.path()?.to_string();
         let url = submodule.url()?.to_string();
 
-        // Get configuration for this submodule
-        let config = submodule.config()?;
-
-        let branch = config.as_ref().ok().and_then(|c| {
-            c.branch().map(|b| {
-                if b == "." {
-                    SerializableBranch::CurrentInSuperproject
-                } else {
-                    SerializableBranch::Name(b.to_string())
+        // Get configuration for this submodule using individual methods
+        let branch = submodule.branch().ok().flatten().map(|b| {
+            match b {
+                gix::submodule::config::Branch::Name(name) => {
+                    if name == "." {
+                        SerializableBranch::CurrentInSuperproject
+                    } else {
+                        SerializableBranch::Name(name.to_string())
+                    }
                 }
-            })
+                gix::submodule::config::Branch::CurrentInSuperproject => {
+                    SerializableBranch::CurrentInSuperproject
+                }
+            }
         });
-        let ignore = config.ignore()
+        let ignore = submodule.ignore().ok().flatten()
             .and_then(|i| SerializableIgnore::try_from(i).ok());
-        let update = config.update()
+        let update = submodule.update().ok().flatten()
             .and_then(|u| SerializableUpdate::try_from(u).ok());
-        let fetch_recurse = config.fetch_recurse()
+        let fetch_recurse = submodule.fetch_recurse().ok().flatten()
             .and_then(|f| SerializableFetchRecurse::try_from(f).ok());
-        let active = config.is_active();
+        let active = Some(true); // TODO: Need to determine how to check if submodule is active in gix
         Ok(SubmoduleEntry {
-            name,
-            path,
-            url,
+            path: Some(path),
+            url: Some(url),
             branch,
             ignore,
             update,
             fetch_recurse,
             active,
-            shallow: false, // gix doesn't expose shallow info directly
+            shallow: Some(false), // gix doesn't expose shallow info directly
         })
     }
     /// Convert gix submodule status to our status flags
@@ -98,9 +100,11 @@ impl GitOperations for GixOperations {
         self.try_gix_operation(|repo| {
             let mut submodules = HashMap::new();
             // Use gix::Repository::submodules() to get iterator over submodules
-            for submodule in repo.submodules()? {
-                let entry = self.convert_gix_submodule_to_entry(&submodule)?;
-                submodules.insert(entry.name.clone(), entry);
+            if let Some(submodule_iter) = repo.submodules()? {
+                for submodule in submodule_iter {
+                    let entry = self.convert_gix_submodule_to_entry(&submodule)?;
+                    submodules.insert(submodule.name().to_string(), entry);
+                }
             }
             Ok(SubmoduleEntries {
                 submodules: if submodules.is_empty() { None } else { Some(submodules) },
@@ -108,7 +112,7 @@ impl GitOperations for GixOperations {
             })
         })
     }
-    fn write_gitmodules(&self, _config: &SubmoduleEntries) -> Result<()> {
+    fn write_gitmodules(&mut self, _config: &SubmoduleEntries) -> Result<()> {
         // gix doesn't have direct .gitmodules writing yet
         Err(anyhow::anyhow!(
             "gix .gitmodules writing not yet supported, falling back to git2"
@@ -162,72 +166,21 @@ impl GitOperations for GixOperations {
             "gix submodule deinitialization not yet supported, falling back to git2"
         ))
     }
-    fn get_submodule_status(&self, path: &str) -> Result<DetailedSubmoduleStatus> {
-        self.try_gix_operation(|repo| {
-            // Find the submodule by path
-            let submodule = repo
-                .submodules()?
-                .and_then(|mut iter| iter.find(|sm| sm.path().map(|p| *p == path).unwrap_or(false)))
-                .ok_or_else(|| anyhow::anyhow!("Submodule not found: {}", path))?;
-            let name = submodule.name().to_string();
-            let config = (&Config::default)().load(&path, Config::default());
-            let ignore_value = config
-                .map(|c| c.defaults.ignore)
-                .and_then(|ignore| {
-                    ignore
-                        .map(|i| gix::submodule::config::Ignore::try_from(i)
-                            .map_err(|_| anyhow::anyhow!("Failed to convert ignore value for submodule: {}", path)))
-                })
-                .transpose()?
-                .unwrap_or_default();
-            let status = submodule.status(ignore_value, true);
-            let url = config.as_ref().ok().and_then(|c| c.url().map(|u| u.to_string()));
-            let branch = config.branch().map(|b| {
-                if b == "." {
-                    SerializableBranch::CurrentInSuperproject
-                } else {
-                    SerializableBranch::Name(b.to_string())
-                }
-            });
-            let ignore_rule = config.ignore()
-                .and_then(|i| SerializableIgnore::try_from(i).ok())
-                .unwrap_or_default();
-            let update_rule = config.update()
-                .and_then(|u| SerializableUpdate::try_from(u).ok())
-                .unwrap_or_default();
-            let fetch_recurse_rule = config.fetch_recurse()
-                .and_then(|f| SerializableFetchRecurse::try_from(f).ok())
-                .unwrap_or_default();
-            let status_flags = self.convert_gix_status_to_flags(&status);
-            let is_initialized = status.is_initialized();
-            let is_active = config.is_active();
-            let has_modifications = status.is_dirty();
-            Ok(DetailedSubmoduleStatus {
-                path: path.to_string(),
-                name,
-                url,
-                head_oid: None,    // Would need additional gix calls to get OIDs
-                index_oid: None,   // Would need additional gix calls to get OIDs
-                workdir_oid: None, // Would need additional gix calls to get OIDs
-                status_flags,
-                ignore_rule,
-                update_rule,
-                fetch_recurse_rule,
-                branch,
-                is_initialized,
-                is_active,
-                has_modifications,
-                sparse_checkout_enabled: false, // Would need additional checks
-                sparse_patterns: Vec::new(),    // Would need additional checks
-            })
-        })
+    fn get_submodule_status(&self, _path: &str) -> Result<DetailedSubmoduleStatus> {
+        // gix submodule status checking is complex and not yet fully implemented
+        // TODO: Implement proper gix submodule status checking
+        Err(anyhow::anyhow!(
+            "gix submodule status checking not yet fully supported, falling back to git2"
+        ))
     }
     fn list_submodules(&self) -> Result<Vec<String>> {
         self.try_gix_operation(|repo| {
             let mut submodule_paths = Vec::new();
-            for submodule in repo.submodules()? {
-                let path = submodule.path()?.to_string();
-                submodule_paths.push(path);
+            if let Some(submodule_iter) = repo.submodules()? {
+                for submodule in submodule_iter {
+                    let path = submodule.path()?.to_string();
+                    submodule_paths.push(path);
+                }
             }
             Ok(submodule_paths)
         })

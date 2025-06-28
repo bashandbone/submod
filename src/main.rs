@@ -101,7 +101,7 @@ fn main() -> Result<()> {
                 .map_err(|e| anyhow::anyhow!("Failed to check submodules: {}", e))?;
         }
         Commands::Init => {
-            let manager = GitoxideSubmoduleManager::new(cli.config)
+            let mut manager = GitoxideSubmoduleManager::new(cli.config)
                 .map_err(|e| anyhow::anyhow!("Failed to create manager: {}", e))?;
 
             // Initialize all submodules from config
@@ -112,7 +112,7 @@ fn main() -> Result<()> {
             }
         }
         Commands::Update => {
-            let manager = GitoxideSubmoduleManager::new(cli.config)
+            let mut manager = GitoxideSubmoduleManager::new(cli.config)
                 .map_err(|e| anyhow::anyhow!("Failed to create manager: {}", e))?;
 
             // Update all submodules from config
@@ -158,7 +158,7 @@ fn main() -> Result<()> {
             }
         }
         Commands::Sync => {
-            let manager = GitoxideSubmoduleManager::new(cli.config)
+            let mut manager = GitoxideSubmoduleManager::new(cli.config)
                 .map_err(|e| anyhow::anyhow!("Failed to create manager: {}", e))?;
 
             // Run check, init, and update in sequence

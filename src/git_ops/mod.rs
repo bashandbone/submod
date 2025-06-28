@@ -119,7 +119,7 @@ pub trait GitOperations {
     /// Read .gitmodules configuration
     fn read_gitmodules(&self) -> Result<SubmoduleEntries>;
     /// Write .gitmodules configuration
-    fn write_gitmodules(&self, config: &SubmoduleEntries) -> Result<()>;
+    fn write_gitmodules(&mut self, config: &SubmoduleEntries) -> Result<()>;
     /// Read git configuration at specified level
     fn read_git_config(&self, level: ConfigLevel) -> Result<GitConfig>;
     /// Write git configuration at specified level
@@ -224,8 +224,8 @@ impl GitOperations for GitOpsManager {
         )
     }
 
-    fn write_gitmodules(&self, config: &SubmoduleEntries) -> Result<()> {
-        self.try_with_fallback(
+    fn write_gitmodules(&mut self, config: &SubmoduleEntries) -> Result<()> {
+        self.try_with_fallback_mut(
             |gix| gix.write_gitmodules(config),
             |git2| git2.write_gitmodules(config),
         )
