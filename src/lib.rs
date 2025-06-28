@@ -1,27 +1,7 @@
 // SPDX-FileCopyrightText: 2025 Adam Poulemanos <89049923+bashandbone@users.noreply.github.com>
 //
-// SPDX-License-Identifier: MIT
-// Licensed under the [Plain MIT License][../LICENSE.md]
-//! Library entry point for submod, a Git submodule manager with sparse checkout support.
-//!
-//! This crate is primarily intended for CLI use. The library API is not stable and may change.
-//!
-//! # Modules
-//! - [`utilities`]: Common utilities and helper functions.
-//! - [`options`]: Git submodule configuration options and parsing.
-//! - [`config`]: Submodule configuration management.
-//! - [`git_ops`]: Git operations layer with gix-first, git2-fallback strategy.
-//! - [`gitoxide_manager`]: Implementation of submodule operations using gitoxide.
-//!
-//! # Exports
-//! - Common types and managers for use in tests or advanced integrations.
-//!
-//! # Version
-//! - Exposes the current crate version as [`VERSION`].
-//!
-//! # Note
-//! The API is not guaranteed to be stable. Use at your own risk.
-
+// SPDX-License-Identifier: LicenseRef-PlainMIT OR MIT
+//
 pub mod utilities;
 /// Configuration management for submodules
 pub mod options;

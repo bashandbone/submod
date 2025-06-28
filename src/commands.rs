@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2025 Adam Poulemanos <89049923+bashandbone@users.noreply.github.com>
 //
-// SPDX-License-Identifier: MIT
-// Licensed under the [Plain MIT License][../LICENSE.md]
+// SPDX-License-Identifier: LicenseRef-PlainMIT OR MIT
+//
 #![doc = r#"
 Command-line argument definitions for the `submod` tool.
 
@@ -51,9 +51,7 @@ See the [README.md](../README.md) for full usage and configuration details.
 
 use clap::{Parser, Subcommand, command, arg};
 use std::{ffi::OsString, path::PathBuf};
-use crate::options::{SerializableBranch as Branch, SerializableFetchRecurse as FetchRecurse, SerializableUpdate as Update, SerializableIgnore as Ignore};
-use clap_complete::aot::{generate, Generator, Shell};
-use clap_complete_nushell::Nushell;
+use crate::options::{SerializableFetchRecurse as FetchRecurse, SerializableUpdate as Update, SerializableIgnore as Ignore};
 
 
 /// Top-level CLI parser for the `submod` tool.

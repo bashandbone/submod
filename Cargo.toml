@@ -1,7 +1,6 @@
 # SPDX-FileCopyrightText: 2025 Adam Poulemanos <89049923+bashandbone@users.noreply.github.com>
 #
-# SPDX-License-Identifier: MIT
-# Licensed under the [Plain MIT License](LICENSE.md)
+# SPDX-License-Identifier: LicenseRef-PlainMIT OR MIT
 
 [package]
 name = "submod"
@@ -10,12 +9,27 @@ edition = "2024"
 rust-version = "1.85"
 description = "A headache-free submodule management tool, built on top of gitoxide. Manage sparse checkouts, submodule updates, and adding/removing submodules with ease."
 authors = ["Adam Poulemanos <89049923+bashandbone@users.noreply.github.com>"]
-license = "MIT" # Plain MIT license: plainlicense.org/licenses/permissive/mit/
+license = "LICENSE.md" # Plain MIT license: plainlicense.org/licenses/permissive/mit/
 repository = "https://github.com/bashandbone/submod"
 homepage = "https://github.com/bashandbone/submod"
 documentation = "https://docs.rs/submod"
 readme = "README.md"
-keywords = ["git", "submodule", "gitoxide", "cli", "sparse-checkout", "git2", "gitmodules", "repository", "management", "command-line", "tool", "development", "utilities", "development-tools"]
+keywords = [
+  "git",
+  "submodule",
+  "gitoxide",
+  "cli",
+  "sparse-checkout",
+  "git2",
+  "gitmodules",
+  "repository",
+  "management",
+  "command-line",
+  "tool",
+  "development",
+  "utilities",
+  "development-tools",
+]
 categories = ["command-line-utilities", "development-tools"]
 
 resolver = "3"
@@ -23,19 +37,31 @@ resolver = "3"
 [dependencies]
 # Gitoxide ops
 gix = { version = "0.72.1", default-features = false, features = [
-    "async-network-client", "attributes", "excludes", "status", "command", "parallel", "serde", "status"
-]}
+  "async-network-client",
+  "attributes",
+  "excludes",
+  "status",
+  "command",
+  "parallel",
+  "serde",
+  "status",
+] }
 gix-config = { version = "0.45.1", features = ["serde"] }
 gix-submodule = "0.19.1"
 bstr = { version = "1.12.0", default-features = false }
 
 # CLI
-clap = { version = "4.5.40", features = ["derive", "cargo", "unicode", "wrap_help"] }
+clap = { version = "4.5.40", features = [
+  "derive",
+  "cargo",
+  "unicode",
+  "wrap_help",
+] }
 clap_complete = "4.5.54"
 clap_complete_nushell = "4.5.7"
 
 # TOML config
-figment = { version = "0.10.19", default-features = false, features = [ "toml" ] }
+figment = { version = "0.10.19", default-features = false, features = ["toml"] }
 serde = { version = "1.0.219", features = ["derive"] }
 serde_json = "1.0.140"
 
@@ -59,7 +85,10 @@ name = "submod"
 path = "src/main.rs"
 
 [dev-dependencies]
-figment = { version = "0.10.19", default-features = false, features = ["test", "toml"] }
+figment = { version = "0.10.19", default-features = false, features = [
+  "test",
+  "toml",
+] }
 tempfile = "3.14.0"
 serde_json = "1.0.140"
 

@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: 2025 Adam Poulemanos <89049923+bashandbone@users.noreply.github.com>
+
+SPDX-License-Identifier: LicenseRef-PlainMIT OR MIT
+-->
+
 # CLI Migration Mapping
 
 This document maps all git CLI calls in `gitoxide_manager.rs` to their equivalent `GitOperations` trait methods.

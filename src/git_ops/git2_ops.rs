@@ -1,11 +1,7 @@
 // SPDX-FileCopyrightText: 2025 Adam Poulemanos <89049923+bashandbone@users.noreply.github.com>
 //
-// SPDX-License-Identifier: MIT
-// Licensed under the [Plain MIT License][../LICENSE.md]
-//! Git2 implementation of git operations.
-//!
-//! This module provides the fallback implementation using git2 (libgit2).
-//! It should provide complete coverage of all operations needed by the submod tool.
+// SPDX-License-Identifier: LicenseRef-PlainMIT OR MIT
+//
 use anyhow::{Context, Result};
 use std::collections::HashMap;
 use std::path::Path;

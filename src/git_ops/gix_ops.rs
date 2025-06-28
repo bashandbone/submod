@@ -1,12 +1,7 @@
 // SPDX-FileCopyrightText: 2025 Adam Poulemanos <89049923+bashandbone@users.noreply.github.com>
 //
-// SPDX-License-Identifier: MIT
-// Licensed under the [Plain MIT License][../LICENSE.md]
-//! Gix (gitoxide) implementation of git operations.
-//!
-//! This module provides the primary implementation using gix (gitoxide) library.
-//! Operations that are not yet supported by gix will return appropriate errors
-//! to trigger fallback to git2.
+// SPDX-License-Identifier: LicenseRef-PlainMIT OR MIT
+//
 use anyhow::{Context, Result};
 use std::collections::HashMap;
 use std::path::Path;

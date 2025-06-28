@@ -1,0 +1,514 @@
+SPDXVersion: SPDX-2.1
+DataLicense: CC0-1.0
+SPDXID: SPDXRef-DOCUMENT
+DocumentName: submod
+DocumentNamespace: http://spdx.org/spdxdocs/spdx-v2.1-185367f6-c895-4a13-8337-c72cb32bd9eb
+Creator: Person: Adam Poulemanos ()
+Creator: Organization: Anonymous ()
+Creator: Tool: reuse-5.0.2
+Created: 2025-06-28T19:43:16Z
+CreatorComment: <text>This document was created automatically using available reuse information consistent with REUSE.</text>
+Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-ba67ecb5d0a3a1c22a71b02bb19635bf
+Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-2b9d19ddb774b441c24dd033190e4881
+Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-7587ad15a7b426a87c8722fc6000f919
+Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-9f3fb4a21359ccc5e4c5c768903a01e8
+Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-be5518c0fe9359819e490146d9161cd1
+Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-81b578a8b24428e9e2bb71aa6e961ca8
+Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-b08f980ec326f0602c3bba442d26d381
+Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-d877a567c22e21441319e65665134e15
+Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-aef806ff8a6291b1b53840bc42388310
+Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-93f7b2f69c7a45790773321ac2aba865
+Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-dddf6f8a28f6db923ed2c9419af20bf2
+Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-2a07c074a94b21344582086e01b81087
+Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-0ad18cff9136f68cd9a48770ca9a22e0
+Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-b005911361c43c8657a01a9817226dee
+Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-5ce90b80b2b2e86834f8f069d1c0e742
+Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-18806903860241c11dc653b3587fff0a
+Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-c14062f0c7889ee6bf6d5b6267209a25
+Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-bc1950edd0479000aa512d1d452ea282
+Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-45016fa196ccc8163c5ab90f2538ec7b
+Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-4a970fcafd2ad468b2e357443ed73f80
+Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-c3d97984e4b3fe3df89df8225a553d53
+Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-3f255a700766d8c737d467548caa3beb
+Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-709f7e42d0ee9a549058ee8d63028560
+Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-e988a8c8f61680c67dec700a3b0f082f
+Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-b9cb4472875604cf4461172921291c53
+Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-edf2c9a41af714d85aa1e77b4e93ca0c
+Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-34b4809e1d01cfec85c9bdcd9b53b828
+Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-12e9c4d90528094578ed81eab4d82bdb
+Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-691deb9953bf0b2eb7c697c1336d5a76
+Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-a6200b953696ecbd53d759f728e9e2d1
+Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-defc7209a4972747366ecf9773bd7654
+Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-adcf5945af860a46ee2fcfc88c521ebf
+Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-958596f7fbaee9850d8c8a840d2877f9
+Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-b7df73a594787f9530813f44da0b581b
+Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-5ae5b950f3dbe7a8fca553ddadf132d5
+Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-e505b9c1ca89af92f4cdbd8f7548e041
+Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-0439ae6097cc8778e7a8803b00788c0c
+Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-d4f5056dd4c32bf707d21d2924540fa1
+Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-ab53fbe3018953b93268c269b013aa36
+Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-020984ce78fbdba5aa8e85c5c82f6da4
+Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-d1dd4a6ccf7d518709f826fea86eff08
+Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-46192eae3049faadfea4a71cdf620367
+Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-c8cc79e18053b71bb7271741299da912
+Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-5c18668723b1c05506d294b9abd1695d
+Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-974bb4e174c495d7f68a01202781b627
+Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-82723470ecdbfdcfc4e511d8285e9eb5
+Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-81fc0a4a24ecb131268ebab6a8969157
+Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-d6794c7c061e300975e3036f16474232
+Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-848a2609bdaa4b39a523eeeb720ea541
+Relationship: SPDXRef-DOCUMENT DESCRIBES SPDXRef-04c75679a94ce672f09ad26b3f3d9d50
+
+FileName: ./.claude/settings.local.json
+SPDXID: SPDXRef-ba67ecb5d0a3a1c22a71b02bb19635bf
+FileChecksum: SHA1: 49055f607f08cee1bbe168e189b168a802291631
+LicenseConcluded: LicenseRef-PlainMIT OR MIT
+LicenseInfoInFile: LicenseRef-PlainMIT
+LicenseInfoInFile: MIT
+FileCopyrightText: <text>SPDX-FileCopyrightText: 2025 Adam Poulemanos <89049923+bashandbone@users.noreply.github.com></text>
+
+FileName: ./.gitattributes
+SPDXID: SPDXRef-2b9d19ddb774b441c24dd033190e4881
+FileChecksum: SHA1: e85e1c643b9017f8a76abbe189f3579c6c74f549
+LicenseConcluded: LicenseRef-PlainMIT OR MIT
+LicenseInfoInFile: LicenseRef-PlainMIT
+LicenseInfoInFile: MIT
+FileCopyrightText: <text>SPDX-FileCopyrightText: 2025 Adam Poulemanos <89049923+bashandbone@users.noreply.github.com></text>
+
+FileName: ./.github/workflows/ci.yml
+SPDXID: SPDXRef-7587ad15a7b426a87c8722fc6000f919
+FileChecksum: SHA1: 499b0ca436832a9dfc7a011131471495cc7519c6
+LicenseConcluded: LicenseRef-PlainMIT OR MIT
+LicenseInfoInFile: LicenseRef-PlainMIT
+LicenseInfoInFile: MIT
+FileCopyrightText: <text>SPDX-FileCopyrightText: 2025 Adam Poulemanos <89049923+bashandbone@users.noreply.github.com></text>
+
+FileName: ./.github/workflows/docs.yml
+SPDXID: SPDXRef-9f3fb4a21359ccc5e4c5c768903a01e8
+FileChecksum: SHA1: 2686645e265b26ea7d6e1cf8548f704c09d1da2c
+LicenseConcluded: LicenseRef-PlainMIT OR MIT
+LicenseInfoInFile: LicenseRef-PlainMIT
+LicenseInfoInFile: MIT
+FileCopyrightText: <text>SPDX-FileCopyrightText: 2025 Adam Poulemanos <89049923+bashandbone@users.noreply.github.com></text>
+
+FileName: ./.github/workflows/release.yml
+SPDXID: SPDXRef-be5518c0fe9359819e490146d9161cd1
+FileChecksum: SHA1: 52e830f7cdfd6bcbe60f1dad15b2788f406a0363
+LicenseConcluded: LicenseRef-PlainMIT OR MIT
+LicenseInfoInFile: LicenseRef-PlainMIT
+LicenseInfoInFile: MIT
+FileCopyrightText: <text>SPDX-FileCopyrightText: 2025 Adam Poulemanos <89049923+bashandbone@users.noreply.github.com></text>
+
+FileName: ./.gitignore
+SPDXID: SPDXRef-81b578a8b24428e9e2bb71aa6e961ca8
+FileChecksum: SHA1: 9daa8e830eb5b1d0afeec0e2cf17a36c25d272e8
+LicenseConcluded: LicenseRef-PlainMIT OR MIT
+LicenseInfoInFile: LicenseRef-PlainMIT
+LicenseInfoInFile: MIT
+FileCopyrightText: <text>SPDX-FileCopyrightText: 2025 Adam Poulemanos <89049923+bashandbone@users.noreply.github.com></text>
+
+FileName: ./.prettierignore
+SPDXID: SPDXRef-b08f980ec326f0602c3bba442d26d381
+FileChecksum: SHA1: 9bb1688157104702faedf2993e8ba204f4a6fe59
+LicenseConcluded: LicenseRef-PlainMIT OR MIT
+LicenseInfoInFile: LicenseRef-PlainMIT
+LicenseInfoInFile: MIT
+FileCopyrightText: <text>SPDX-FileCopyrightText: 2025 Adam Poulemanos <89049923+bashandbone@users.noreply.github.com></text>
+
+FileName: ./.prettierrc.toml
+SPDXID: SPDXRef-d877a567c22e21441319e65665134e15
+FileChecksum: SHA1: d402a4fd68c98434f9d61361830dbd908ba77e6a
+LicenseConcluded: LicenseRef-PlainMIT OR MIT
+LicenseInfoInFile: LicenseRef-PlainMIT
+LicenseInfoInFile: MIT
+FileCopyrightText: <text>SPDX-FileCopyrightText: 2025 Adam Poulemanos <89049923+bashandbone@users.noreply.github.com></text>
+
+FileName: ./.roo/mcp.json
+SPDXID: SPDXRef-aef806ff8a6291b1b53840bc42388310
+FileChecksum: SHA1: 63aee3278332626e17c09dbcdcb32785948bf76b
+LicenseConcluded: LicenseRef-PlainMIT OR MIT
+LicenseInfoInFile: LicenseRef-PlainMIT
+LicenseInfoInFile: MIT
+FileCopyrightText: <text>SPDX-FileCopyrightText: 2025 Adam Poulemanos <89049923+bashandbone@users.noreply.github.com></text>
+
+FileName: ./.roomodes
+SPDXID: SPDXRef-93f7b2f69c7a45790773321ac2aba865
+FileChecksum: SHA1: 8ffef0d425643abf3382284e82a19ea2a7d2139e
+LicenseConcluded: LicenseRef-PlainMIT OR MIT
+LicenseInfoInFile: LicenseRef-PlainMIT
+LicenseInfoInFile: MIT
+FileCopyrightText: <text>SPDX-FileCopyrightText: 2025 Adam Poulemanos <89049923+bashandbone@users.noreply.github.com></text>
+
+FileName: ./.vscode/launch.json
+SPDXID: SPDXRef-dddf6f8a28f6db923ed2c9419af20bf2
+FileChecksum: SHA1: abf130e877bdeca678d138f15561e9368c88359a
+LicenseConcluded: LicenseRef-PlainMIT OR MIT
+LicenseInfoInFile: LicenseRef-PlainMIT
+LicenseInfoInFile: MIT
+FileCopyrightText: <text>SPDX-FileCopyrightText: 2025 Adam Poulemanos <89049923+bashandbone@users.noreply.github.com></text>
+
+FileName: ./.vscode/mcp.json
+SPDXID: SPDXRef-2a07c074a94b21344582086e01b81087
+FileChecksum: SHA1: d4239527466fd4d67f054431aed8887eba5793ec
+LicenseConcluded: LicenseRef-PlainMIT OR MIT
+LicenseInfoInFile: LicenseRef-PlainMIT
+LicenseInfoInFile: MIT
+FileCopyrightText: <text>SPDX-FileCopyrightText: 2025 Adam Poulemanos <89049923+bashandbone@users.noreply.github.com></text>
+
+FileName: ./CHANGELOG.md
+SPDXID: SPDXRef-0ad18cff9136f68cd9a48770ca9a22e0
+FileChecksum: SHA1: b18f59e0ef62b398f4c74703377b611c8147f9d4
+LicenseConcluded: LicenseRef-PlainMIT OR MIT
+LicenseInfoInFile: LicenseRef-PlainMIT
+LicenseInfoInFile: MIT
+FileCopyrightText: <text>SPDX-FileCopyrightText: 2025 Adam Poulemanos <89049923+bashandbone@users.noreply.github.com></text>
+
+FileName: ./CLAUDE.md
+SPDXID: SPDXRef-b005911361c43c8657a01a9817226dee
+FileChecksum: SHA1: 99c45c4a4d8401d7d4f089cf17977da69cc4e0d0
+LicenseConcluded: LicenseRef-PlainMIT OR MIT
+LicenseInfoInFile: LicenseRef-PlainMIT
+LicenseInfoInFile: MIT
+FileCopyrightText: <text>SPDX-FileCopyrightText: 2025 Adam Poulemanos <89049923+bashandbone@users.noreply.github.com></text>
+
+FileName: ./CLI_MIGRATION_MAPPING.md
+SPDXID: SPDXRef-5ce90b80b2b2e86834f8f069d1c0e742
+FileChecksum: SHA1: 5adee844f973d3149c131f59b87bc7a67fb53bc8
+LicenseConcluded: LicenseRef-PlainMIT OR MIT
+LicenseInfoInFile: LicenseRef-PlainMIT
+LicenseInfoInFile: MIT
+FileCopyrightText: <text>SPDX-FileCopyrightText: 2025 Adam Poulemanos <89049923+bashandbone@users.noreply.github.com></text>
+
+FileName: ./CONTRIBUTING.md
+SPDXID: SPDXRef-18806903860241c11dc653b3587fff0a
+FileChecksum: SHA1: c8a36469fd4349b600a71485223b2c22ec4bf859
+LicenseConcluded: LicenseRef-PlainMIT OR MIT
+LicenseInfoInFile: LicenseRef-PlainMIT
+LicenseInfoInFile: MIT
+FileCopyrightText: <text>SPDX-FileCopyrightText: 2025 Adam Poulemanos <89049923+bashandbone@users.noreply.github.com></text>
+
+FileName: ./Cargo.lock
+SPDXID: SPDXRef-c14062f0c7889ee6bf6d5b6267209a25
+FileChecksum: SHA1: afb55e08bf55805511960f33ce42b980928d7e5b
+LicenseConcluded: LicenseRef-PlainMIT OR MIT
+LicenseInfoInFile: LicenseRef-PlainMIT
+LicenseInfoInFile: MIT
+FileCopyrightText: <text>SPDX-FileCopyrightText: 2025 Adam Poulemanos <89049923+bashandbone@users.noreply.github.com></text>
+
+FileName: ./Cargo.toml
+SPDXID: SPDXRef-bc1950edd0479000aa512d1d452ea282
+FileChecksum: SHA1: 322010f5691e4d6316f8f54090a55b4908469d80
+LicenseConcluded: LicenseRef-PlainMIT OR MIT
+LicenseInfoInFile: LicenseRef-PlainMIT
+LicenseInfoInFile: MIT
+FileCopyrightText: <text>SPDX-FileCopyrightText: 2025 Adam Poulemanos <89049923+bashandbone@users.noreply.github.com></text>
+
+FileName: ./IMPLEMENTATION_PLAN.md
+SPDXID: SPDXRef-45016fa196ccc8163c5ab90f2538ec7b
+FileChecksum: SHA1: 2ced77e46a558672ec0f8d7a9fe5e793833d7edc
+LicenseConcluded: LicenseRef-PlainMIT OR MIT
+LicenseInfoInFile: LicenseRef-PlainMIT
+LicenseInfoInFile: MIT
+FileCopyrightText: <text>SPDX-FileCopyrightText: 2025 Adam Poulemanos <89049923+bashandbone@users.noreply.github.com></text>
+
+FileName: ./Project Direction.md
+SPDXID: SPDXRef-4a970fcafd2ad468b2e357443ed73f80
+FileChecksum: SHA1: 06acb59254da1cbcd0cc0be1013825142100bb20
+LicenseConcluded: LicenseRef-PlainMIT OR MIT
+LicenseInfoInFile: LicenseRef-PlainMIT
+LicenseInfoInFile: MIT
+FileCopyrightText: <text>SPDX-FileCopyrightText: 2025 Adam Poulemanos <89049923+bashandbone@users.noreply.github.com></text>
+
+FileName: ./README.md
+SPDXID: SPDXRef-c3d97984e4b3fe3df89df8225a553d53
+FileChecksum: SHA1: 1de57600113624e3770f7d821b7bb1d793a60943
+LicenseConcluded: LicenseRef-PlainMIT OR MIT
+LicenseInfoInFile: LicenseRef-PlainMIT
+LicenseInfoInFile: MIT
+FileCopyrightText: <text>SPDX-FileCopyrightText: 2025 Adam Poulemanos <89049923+bashandbone@users.noreply.github.com></text>
+
+FileName: ./_typos.toml
+SPDXID: SPDXRef-3f255a700766d8c737d467548caa3beb
+FileChecksum: SHA1: e3baf0cf79a9fba41d756921cf942dffa83a8892
+LicenseConcluded: LicenseRef-PlainMIT OR MIT
+LicenseInfoInFile: LicenseRef-PlainMIT
+LicenseInfoInFile: MIT
+FileCopyrightText: <text>SPDX-FileCopyrightText: 2025 Adam Poulemanos <89049923+bashandbone@users.noreply.github.com></text>
+
+FileName: ./deny.toml
+SPDXID: SPDXRef-709f7e42d0ee9a549058ee8d63028560
+FileChecksum: SHA1: 9e9285282a4a4a30bff8b9aab1ba0f339cceffbf
+LicenseConcluded: LicenseRef-PlainMIT OR MIT
+LicenseInfoInFile: LicenseRef-PlainMIT
+LicenseInfoInFile: MIT
+FileCopyrightText: <text>SPDX-FileCopyrightText: 2025 Adam Poulemanos <89049923+bashandbone@users.noreply.github.com></text>
+
+FileName: ./dev/_git2_api_notes.md
+SPDXID: SPDXRef-e988a8c8f61680c67dec700a3b0f082f
+FileChecksum: SHA1: 8633b3cc4a74a34e67c1c584fb532a1ad6552f65
+LicenseConcluded: LicenseRef-PlainMIT OR MIT
+LicenseInfoInFile: LicenseRef-PlainMIT
+LicenseInfoInFile: MIT
+FileCopyrightText: <text>SPDX-FileCopyrightText: 2025 Adam Poulemanos <89049923+bashandbone@users.noreply.github.com></text>
+
+FileName: ./dev/gix/config_crate.html
+SPDXID: SPDXRef-b9cb4472875604cf4461172921291c53
+FileChecksum: SHA1: b340a4fbb1ddd2e3f0fc671de611c74284a66f72
+LicenseConcluded: Apache-2.0 OR MIT
+LicenseInfoInFile: Apache-2.0
+LicenseInfoInFile: MIT
+FileCopyrightText: <text>2025 Sebastian Thiel</text>
+
+FileName: ./dev/gix/repository.html
+SPDXID: SPDXRef-edf2c9a41af714d85aa1e77b4e93ca0c
+FileChecksum: SHA1: 34b55660968ff9a3b96298e7668d369d57a54d72
+LicenseConcluded: Apache-2.0 OR MIT
+LicenseInfoInFile: Apache-2.0
+LicenseInfoInFile: MIT
+FileCopyrightText: <text>2025 Sebastian Thiel</text>
+
+FileName: ./dev/gix/repository.md
+SPDXID: SPDXRef-34b4809e1d01cfec85c9bdcd9b53b828
+FileChecksum: SHA1: 130e5448612b90c39ce47937eb82263e2da63c66
+LicenseConcluded: Apache-2.0 OR MIT
+LicenseInfoInFile: Apache-2.0
+LicenseInfoInFile: MIT
+FileCopyrightText: <text>2025 Sebastian Thiel</text>
+
+FileName: ./dev/gix/state.html
+SPDXID: SPDXRef-12e9c4d90528094578ed81eab4d82bdb
+FileChecksum: SHA1: 5037951ffabfaba3d4cddd996572d9c9a499a476
+LicenseConcluded: Apache-2.0 OR MIT
+LicenseInfoInFile: Apache-2.0
+LicenseInfoInFile: MIT
+FileCopyrightText: <text>2025 Sebastian Thiel</text>
+
+FileName: ./dev/gix/status.html
+SPDXID: SPDXRef-691deb9953bf0b2eb7c697c1336d5a76
+FileChecksum: SHA1: d17fe251beccea71731df3c467bd7ba0fe0cc57e
+LicenseConcluded: Apache-2.0 OR MIT
+LicenseInfoInFile: Apache-2.0
+LicenseInfoInFile: MIT
+FileCopyrightText: <text>2025 Sebastian Thiel</text>
+
+FileName: ./dev/gix/submodule.html
+SPDXID: SPDXRef-a6200b953696ecbd53d759f728e9e2d1
+FileChecksum: SHA1: f0d57e55424963bf6f074d3d6e70359ba269bb79
+LicenseConcluded: Apache-2.0 OR MIT
+LicenseInfoInFile: Apache-2.0
+LicenseInfoInFile: MIT
+FileCopyrightText: <text>2025 Sebastian Thiel</text>
+
+FileName: ./hk.pkl
+SPDXID: SPDXRef-defc7209a4972747366ecf9773bd7654
+FileChecksum: SHA1: fdc10b1de19cb591350f348afadc93593cda70e2
+LicenseConcluded: LicenseRef-PlainMIT OR MIT
+LicenseInfoInFile: LicenseRef-PlainMIT
+LicenseInfoInFile: MIT
+FileCopyrightText: <text>SPDX-FileCopyrightText: 2025 Adam Poulemanos <89049923+bashandbone@users.noreply.github.com></text>
+
+FileName: ./mise.toml
+SPDXID: SPDXRef-adcf5945af860a46ee2fcfc88c521ebf
+FileChecksum: SHA1: cde14f1274b5ae56711e851c695088102df5897e
+LicenseConcluded: LicenseRef-PlainMIT OR MIT
+LicenseInfoInFile: LicenseRef-PlainMIT
+LicenseInfoInFile: MIT
+FileCopyrightText: <text>SPDX-FileCopyrightText: 2025 Adam Poulemanos <89049923+bashandbone@users.noreply.github.com></text>
+
+FileName: ./sample_config/submod.toml
+SPDXID: SPDXRef-958596f7fbaee9850d8c8a840d2877f9
+FileChecksum: SHA1: 69edc44b16936e31338523c7f71a1bbf9a108843
+LicenseConcluded: LicenseRef-PlainMIT OR MIT
+LicenseInfoInFile: LicenseRef-PlainMIT
+LicenseInfoInFile: MIT
+FileCopyrightText: <text>SPDX-FileCopyrightText: 2025 Adam Poulemanos <89049923+bashandbone@users.noreply.github.com></text>
+
+FileName: ./scripts/run-tests.sh
+SPDXID: SPDXRef-b7df73a594787f9530813f44da0b581b
+FileChecksum: SHA1: 06e605eff09fa3d75af345dc474f9da4fed63339
+LicenseConcluded: LicenseRef-PlainMIT OR MIT
+LicenseInfoInFile: LicenseRef-PlainMIT
+LicenseInfoInFile: MIT
+FileCopyrightText: <text>SPDX-FileCopyrightText: 2025 Adam Poulemanos <89049923+bashandbone@users.noreply.github.com></text>
+
+FileName: ./src/commands.rs
+SPDXID: SPDXRef-5ae5b950f3dbe7a8fca553ddadf132d5
+FileChecksum: SHA1: dc5bca2956e7b02e0e44d40a9c7c1968f255f45a
+LicenseConcluded: LicenseRef-PlainMIT OR MIT
+LicenseInfoInFile: LicenseRef-PlainMIT
+LicenseInfoInFile: MIT
+FileCopyrightText: <text>SPDX-FileCopyrightText: 2025 Adam Poulemanos <89049923+bashandbone@users.noreply.github.com></text>
+
+FileName: ./src/config.rs
+SPDXID: SPDXRef-e505b9c1ca89af92f4cdbd8f7548e041
+FileChecksum: SHA1: e77fc0bfeba3e550926d28bbbf0a4dfceb16fb91
+LicenseConcluded: LicenseRef-PlainMIT OR MIT
+LicenseInfoInFile: LicenseRef-PlainMIT
+LicenseInfoInFile: MIT
+FileCopyrightText: <text>SPDX-FileCopyrightText: 2025 Adam Poulemanos <89049923+bashandbone@users.noreply.github.com></text>
+
+FileName: ./src/git_ops/git2_ops.rs
+SPDXID: SPDXRef-0439ae6097cc8778e7a8803b00788c0c
+FileChecksum: SHA1: 448b01f25bd9daa5f084d43374a42378787d694a
+LicenseConcluded: LicenseRef-PlainMIT OR MIT
+LicenseInfoInFile: LicenseRef-PlainMIT
+LicenseInfoInFile: MIT
+FileCopyrightText: <text>SPDX-FileCopyrightText: 2025 Adam Poulemanos <89049923+bashandbone@users.noreply.github.com></text>
+
+FileName: ./src/git_ops/gix_ops.rs
+SPDXID: SPDXRef-d4f5056dd4c32bf707d21d2924540fa1
+FileChecksum: SHA1: 21fa43393f6b000e6c5af99fc2a86dcc82f5605e
+LicenseConcluded: LicenseRef-PlainMIT OR MIT
+LicenseInfoInFile: LicenseRef-PlainMIT
+LicenseInfoInFile: MIT
+FileCopyrightText: <text>SPDX-FileCopyrightText: 2025 Adam Poulemanos <89049923+bashandbone@users.noreply.github.com></text>
+
+FileName: ./src/git_ops/mod.rs
+SPDXID: SPDXRef-ab53fbe3018953b93268c269b013aa36
+FileChecksum: SHA1: 1ee6914b6dde0bfb36d87c5c23c08fd7c8f60be1
+LicenseConcluded: LicenseRef-PlainMIT OR MIT
+LicenseInfoInFile: LicenseRef-PlainMIT
+LicenseInfoInFile: MIT
+FileCopyrightText: <text>SPDX-FileCopyrightText: 2025 Adam Poulemanos <89049923+bashandbone@users.noreply.github.com></text>
+
+FileName: ./src/gitoxide_manager.rs
+SPDXID: SPDXRef-020984ce78fbdba5aa8e85c5c82f6da4
+FileChecksum: SHA1: 8824bec4d5a6fd3e82edd03048ba154c3db82061
+LicenseConcluded: LicenseRef-PlainMIT OR MIT
+LicenseInfoInFile: LicenseRef-PlainMIT
+LicenseInfoInFile: MIT
+FileCopyrightText: <text>SPDX-FileCopyrightText: 2025 Adam Poulemanos <89049923+bashandbone@users.noreply.github.com></text>
+
+FileName: ./src/lib.rs
+SPDXID: SPDXRef-d1dd4a6ccf7d518709f826fea86eff08
+FileChecksum: SHA1: 812cc0e7e8ac4983100d6e6e89f5ecbda77531e8
+LicenseConcluded: LicenseRef-PlainMIT OR MIT
+LicenseInfoInFile: LicenseRef-PlainMIT
+LicenseInfoInFile: MIT
+FileCopyrightText: <text>SPDX-FileCopyrightText: 2025 Adam Poulemanos <89049923+bashandbone@users.noreply.github.com></text>
+
+FileName: ./src/main.rs
+SPDXID: SPDXRef-46192eae3049faadfea4a71cdf620367
+FileChecksum: SHA1: 6964370cce1982c74bccac217b8946e18d67c436
+LicenseConcluded: LicenseRef-PlainMIT OR MIT
+LicenseInfoInFile: LicenseRef-PlainMIT
+LicenseInfoInFile: MIT
+FileCopyrightText: <text>SPDX-FileCopyrightText: 2025 Adam Poulemanos <89049923+bashandbone@users.noreply.github.com></text>
+
+FileName: ./src/options.rs
+SPDXID: SPDXRef-c8cc79e18053b71bb7271741299da912
+FileChecksum: SHA1: e443682f2af48e778e11157c9c25b64ed19f4f73
+LicenseConcluded: LicenseRef-PlainMIT OR MIT
+LicenseInfoInFile: LicenseRef-PlainMIT
+LicenseInfoInFile: MIT
+FileCopyrightText: <text>SPDX-FileCopyrightText: 2025 Adam Poulemanos <89049923+bashandbone@users.noreply.github.com></text>
+
+FileName: ./src/utilities.rs
+SPDXID: SPDXRef-5c18668723b1c05506d294b9abd1695d
+FileChecksum: SHA1: 9f3fd68bc418ac378872ff88b709eea12e4c31cf
+LicenseConcluded: LicenseRef-PlainMIT OR MIT
+LicenseInfoInFile: LicenseRef-PlainMIT
+LicenseInfoInFile: MIT
+FileCopyrightText: <text>SPDX-FileCopyrightText: 2025 Adam Poulemanos <89049923+bashandbone@users.noreply.github.com></text>
+
+FileName: ./tests/common/mod.rs
+SPDXID: SPDXRef-974bb4e174c495d7f68a01202781b627
+FileChecksum: SHA1: 0e56c18d4c2ddc78b6a25b0b61c1cfef5d8cf19a
+LicenseConcluded: LicenseRef-PlainMIT OR MIT
+LicenseInfoInFile: LicenseRef-PlainMIT
+LicenseInfoInFile: MIT
+FileCopyrightText: <text>SPDX-FileCopyrightText: 2025 Adam Poulemanos <89049923+bashandbone@users.noreply.github.com></text>
+
+FileName: ./tests/config_tests.rs
+SPDXID: SPDXRef-82723470ecdbfdcfc4e511d8285e9eb5
+FileChecksum: SHA1: 68320274b4dd7278146b992a8fe0381bbe54e31b
+LicenseConcluded: LicenseRef-PlainMIT OR MIT
+LicenseInfoInFile: LicenseRef-PlainMIT
+LicenseInfoInFile: MIT
+FileCopyrightText: <text>SPDX-FileCopyrightText: 2025 Adam Poulemanos <89049923+bashandbone@users.noreply.github.com></text>
+
+FileName: ./tests/error_handling_tests.rs
+SPDXID: SPDXRef-81fc0a4a24ecb131268ebab6a8969157
+FileChecksum: SHA1: 73a06644765dcb05de5ab222da665f9debd5df6f
+LicenseConcluded: LicenseRef-PlainMIT OR MIT
+LicenseInfoInFile: LicenseRef-PlainMIT
+LicenseInfoInFile: MIT
+FileCopyrightText: <text>SPDX-FileCopyrightText: 2025 Adam Poulemanos <89049923+bashandbone@users.noreply.github.com></text>
+
+FileName: ./tests/integration_tests.rs
+SPDXID: SPDXRef-d6794c7c061e300975e3036f16474232
+FileChecksum: SHA1: 73cab1ab2c813480b27f935a7e08c6da81fcde2f
+LicenseConcluded: LicenseRef-PlainMIT OR MIT
+LicenseInfoInFile: LicenseRef-PlainMIT
+LicenseInfoInFile: MIT
+FileCopyrightText: <text>SPDX-FileCopyrightText: 2025 Adam Poulemanos <89049923+bashandbone@users.noreply.github.com></text>
+
+FileName: ./tests/performance_tests.rs
+SPDXID: SPDXRef-848a2609bdaa4b39a523eeeb720ea541
+FileChecksum: SHA1: 31f6eca822c16fc08fdd19374d993c6e71412d29
+LicenseConcluded: LicenseRef-PlainMIT OR MIT
+LicenseInfoInFile: LicenseRef-PlainMIT
+LicenseInfoInFile: MIT
+FileCopyrightText: <text>SPDX-FileCopyrightText: 2025 Adam Poulemanos <89049923+bashandbone@users.noreply.github.com></text>
+
+FileName: ./tests/sparse_checkout_tests.rs
+SPDXID: SPDXRef-04c75679a94ce672f09ad26b3f3d9d50
+FileChecksum: SHA1: 18437543c385047a6d6e13165d0e97fdbf5e50d6
+LicenseConcluded: LicenseRef-PlainMIT OR MIT
+LicenseInfoInFile: LicenseRef-PlainMIT
+LicenseInfoInFile: MIT
+FileCopyrightText: <text>SPDX-FileCopyrightText: 2025 Adam Poulemanos <89049923+bashandbone@users.noreply.github.com></text>
+
+LicenseID: LicenseRef-PlainMIT
+LicenseName: NOASSERTION
+ExtractedText: <text><!--
+SPDX-FileCopyrightText: 2025 Adam Poulemanos <89049923+bashandbone@users.noreply.github.com>
+
+SPDX-License-Identifier: LicenseRef-PlainMIT OR MIT
+-->
+
+# The Plain MIT License
+
+> v0.1.2
+> Copyright Notice: (c) 2025 `Adam Poulemanos`
+
+## You Can Do Anything with The Work
+
+  We give you permission to:
+
+- **Use** it
+- **Copy** it
+- **Change** it
+- **Share** it
+- **Sell** it
+- **Mix** or put it together with other works
+
+You can do all of these things **for free**. You can do them for any reason.
+Everyone else can do these things too, as long as they follow these rules.
+
+## **If** You Give Us Credit **and Keep This Notice**
+
+You can do any of these things with the work, **if you follow these two rules**:
+
+1. **You must keep our copyright notice**.[^1]
+2. **You must *also* keep this notice with all versions of the work**. You can give this notice a few ways:
+   1. Include this complete notice in the work (the Plain MIT License).
+   2. Include this notice in materials that come with the work.
+   3. [Link to this notice][selflink] from the work.
+   4. Use an accepted standard for linking to licenses, like the [SPDX Identifier][spdx-guide]: `SPDX-LICENSE-IDENTIFIER: MIT`.
+
+## We Give No Promises or Guarantees
+
+We give the work to you **as it is**, without any promises or guarantees. This means:
+
+- **"As is"**: You get the work exactly how it is, including anything broken.
+- **No Guarantees**: We are not promising it will work well for any specific tasks, or that it will not break any rules. It may not work at all.
+
+We are not responsible for any problems or damages that happen because of the work. You use it at your own risk.
+
+[^1]: This tells people who created the work.
+
+[selflink]: <https://plainlicense.org/licenses/permissive/mit/> "The Plain MIT License"
+[spdx-guide]: <https://spdx.dev/learn/handling-license-info/> "SPDX User Guide"
+</text>
+

@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: 2025 Adam Poulemanos <89049923+bashandbone@users.noreply.github.com>
+
+SPDX-License-Identifier: LicenseRef-PlainMIT OR MIT
+-->
+
 # The Plain MIT License
 
 > v0.1.2

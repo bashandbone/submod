@@ -1,9 +1,7 @@
 <!--
 SPDX-FileCopyrightText: 2025 Adam Poulemanos <89049923+bashandbone@users.noreply.github.com>
 
-SPDX-License-Identifier: MIT
-
-Licensed under the [Plain MIT License](LICENSE.md)
+SPDX-License-Identifier: LicenseRef-PlainMIT OR MIT
 -->
 
 # Changelog
