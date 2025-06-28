@@ -13,7 +13,7 @@ use super::{
     DetailedSubmoduleStatus, GitConfig, GitOperations, SubmoduleStatusFlags,
 };
 use crate::options::{
-    ConfigLevel, SerializableBranch, SerializableFetchRecurse, SerializableUpdate,
+    ConfigLevel, SerializableBranch, SerializableFetchRecurse, SerializableIgnore, SerializableUpdate,
 };
 use crate::config::{SubmoduleAddOptions, SubmoduleEntries, SubmoduleEntry, SubmoduleUpdateOptions};
 /// Git2 implementation providing complete fallback coverage
@@ -202,12 +202,36 @@ impl GitOperations for Git2Operations {
         if let Some(submodules) = config.submodules().as_ref() {
             for (name, entry) in submodules.iter() {
                 // Find or create the submodule
-                match self.repo.find_submodule(&entry.path.clone().and_then(|p| Some(p.to_string())).unwrap_or(name.clone())) {
+                match self.repo.find_submodule(&entry.path.as_ref().map(|p| p.to_string()).unwrap_or(name.clone())) {
                     Ok(mut submodule) => {
-                        // Update existing submodule configuration
-                        // Note: git2 doesn't provide direct methods to set ignore/update/url
-                        // These would need to be set via git config operations
-                        // TODO: Implement config-based setting of submodule properties
+                        // Update existing submodule configuration through git config
+                        let mut config = self.repo.config()?;
+                        if let Some(ignore) = &entry.ignore {
+                            let ignore_str = match ignore {
+                                SerializableIgnore::All => "all",
+                                SerializableIgnore::Dirty => "dirty", 
+                                SerializableIgnore::Untracked => "untracked",
+                                SerializableIgnore::None => "none",
+                                SerializableIgnore::Unspecified => continue, // Skip unspecified
+                            };
+                            config.set_str(&format!("submodule.{}.ignore", name), ignore_str)?;
+                        }
+                        if let Some(update) = &entry.update {
+                            let update_str = match update {
+                                SerializableUpdate::Checkout => "checkout",
+                                SerializableUpdate::Rebase => "rebase",
+                                SerializableUpdate::Merge => "merge", 
+                                SerializableUpdate::None => "none",
+                                SerializableUpdate::Unspecified => continue, // Skip unspecified
+                            };
+                            config.set_str(&format!("submodule.{}.update", name), update_str)?;
+                        }
+                        // Set URL if different
+                        if let Some(url) = &entry.url {
+                            if submodule.url() != Some(url.as_str()) {
+                                config.set_str(&format!("submodule.{}.url", name), url)?;
+                            }
+                        }
                         // Sync changes
                         submodule.sync()?;
                     }

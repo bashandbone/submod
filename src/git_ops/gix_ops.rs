@@ -44,31 +44,28 @@ impl GixOperations {
     fn convert_gix_submodule_to_entry(
         &self,
         submodule: &gix::Submodule,
-    ) -> Result<(String, SubmoduleEntry)> {
-        let name = submodule.name().to_string();
+    ) -> Result<SubmoduleEntry> {
+        let _name = submodule.name().to_string();
         let path = submodule.path()?.to_string();
         let url = submodule.url()?.to_string();
 
-        // Note: gix::Submodule doesn't have a config() method
-        // We'll need to read config manually or use fallback values
-        let branch = None; // TODO: Read from config when gix supports it
-        let ignore = None; // TODO: Read from config when gix supports it  
-        let update = None; // TODO: Read from config when gix supports it
-        let fetch_recurse = None; // TODO: Read from config when gix supports it
-        let active = Some(true); // Default to active for now
-
-        let entry = SubmoduleEntry {
+        // TODO: gix doesn't expose submodule config directly yet
+        // For now, use default values - this will fall back to git2
+        let branch = None;
+        let ignore = None;
+        let update = None;
+        let fetch_recurse = None;
+        let active = true; // Default to active
+        Ok(SubmoduleEntry {
             path: Some(path),
             url: Some(url),
             branch,
             ignore,
             update,
             fetch_recurse,
-            active,
+            active: Some(active),
             shallow: Some(false), // gix doesn't expose shallow info directly
-        };
-        
-        Ok((name, entry))
+        })
     }
     /// Convert gix submodule status to our status flags
     fn convert_gix_status_to_flags(&self, status: &gix::submodule::Status) -> SubmoduleStatusFlags {
@@ -89,14 +86,15 @@ impl GitOperations for GixOperations {
             // Use gix::Repository::submodules() to get iterator over submodules
             if let Some(submodule_iter) = repo.submodules()? {
                 for submodule in submodule_iter {
-                    let (name, entry) = self.convert_gix_submodule_to_entry(&submodule)?;
+                    let name = submodule.name().to_string();
+                    let entry = self.convert_gix_submodule_to_entry(&submodule)?;
                     submodules.insert(name, entry);
                 }
             }
-            Ok(SubmoduleEntries::new(
-                if submodules.is_empty() { None } else { Some(submodules) },
-                None, // Will be populated separately if needed
-            ))
+            Ok(SubmoduleEntries {
+                submodules: if submodules.is_empty() { None } else { Some(submodules) },
+                sparse_checkouts: None, // Will be populated separately if needed
+            })
         })
     }
     fn write_gitmodules(&self, _config: &SubmoduleEntries) -> Result<()> {
@@ -154,10 +152,9 @@ impl GitOperations for GixOperations {
         ))
     }
     fn get_submodule_status(&self, _path: &str) -> Result<DetailedSubmoduleStatus> {
-        // gix submodule status operations are not fully supported yet
-        Err(anyhow::anyhow!(
-            "gix submodule status not yet fully supported, falling back to git2"
-        ))
+        // gix submodule status is complex and not fully implemented yet
+        // Return an error to trigger git2 fallback
+        Err(anyhow::anyhow!("gix submodule status not yet fully supported"))
     }
     fn list_submodules(&self) -> Result<Vec<String>> {
         self.try_gix_operation(|repo| {
