@@ -16,30 +16,22 @@
 //! - [`Git2Operations`] - Implementation using git2 as fallback
 //! - [`GitOpsManager`] - Unified manager with automatic fallback
 
+pub mod gix_ops;
+pub mod git2_ops;
+pub use gix_ops::GixOperations;
+pub use git2_ops::Git2Operations;
+
 use anyhow::{Context, Result};
 use bitflags::bitflags;
 use std::collections::HashMap;
 use std::path::Path;
 
-use crate::options::{
+use crate::options::{ ConfigLevel,
     SerializableBranch, SerializableFetchRecurse, SerializableIgnore, SerializableUpdate,
 };
 use crate::config::{
     SubmoduleEntries, SubmoduleAddOptions, SubmoduleUpdateOptions,
 };
-
-/// Configuration levels for git config operations
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ConfigLevel {
-    /// System-wide configuration
-    System,
-    /// Global user configuration
-    Global,
-    /// Local repository configuration
-    Local,
-    /// Worktree-specific configuration
-    Worktree,
-}
 
 /// Represents git configuration state
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -137,11 +129,11 @@ pub trait GitOperations {
 
     // Submodule operations
     /// Add a new submodule
-    fn add_submodule(&self, opts: &SubmoduleAddOptions) -> Result<()>;
+    fn add_submodule(&mut self, opts: &SubmoduleAddOptions) -> Result<()>;
     /// Initialize a submodule
-    fn init_submodule(&self, path: &str) -> Result<()>;
+    fn init_submodule(&mut self, path: &str) -> Result<()>;
     /// Update a submodule
-    fn update_submodule(&self, path: &str, opts: &SubmoduleUpdateOptions) -> Result<()>;
+    fn update_submodule(&mut self, path: &str, opts: &SubmoduleUpdateOptions) -> Result<()>;
     /// Delete a submodule completely
     fn delete_submodule(&self, path: &str) -> Result<()>;
     /// Deinitialize a submodule
@@ -171,14 +163,6 @@ pub trait GitOperations {
     /// Apply sparse checkout configuration
     fn apply_sparse_checkout(&self, path: &str) -> Result<()>;
 }
-
-// Module declarations
-pub mod gix_ops;
-pub mod git2_ops;
-
-// Re-export the implementations
-pub use gix_ops::GixOperations;
-pub use git2_ops::Git2Operations;
 
 /// Unified git operations manager with automatic fallback
 pub struct GitOpsManager {
@@ -212,6 +196,23 @@ impl GitOpsManager {
         }
 
         git2_op(&self.git2_ops)
+    }
+
+    /// Try gix first, fall back to git2 (mutable version)
+    fn try_with_fallback_mut<T, F1, F2>(&mut self, gix_op: F1, git2_op: F2) -> Result<T>
+    where
+        F1: FnOnce(&mut GixOperations) -> Result<T>,
+        F2: FnOnce(&mut Git2Operations) -> Result<T>,
+    {
+        if let Some(ref mut gix) = self.gix_ops {
+            match gix_op(gix) {
+                Ok(result) => return Ok(result),
+                Err(e) => {
+                    eprintln!("gix operation failed, falling back to git2: {}", e);
+                }
+            }
+        }
+        git2_op(&mut self.git2_ops)
     }
 }
 
@@ -251,22 +252,22 @@ impl GitOperations for GitOpsManager {
         )
     }
 
-    fn add_submodule(&self, opts: &SubmoduleAddOptions) -> Result<()> {
-        self.try_with_fallback(
+    fn add_submodule(&mut self, opts: &SubmoduleAddOptions) -> Result<()> {
+        self.try_with_fallback_mut(
             |gix| gix.add_submodule(opts),
             |git2| git2.add_submodule(opts),
         )
     }
 
-    fn init_submodule(&self, path: &str) -> Result<()> {
-        self.try_with_fallback(
+    fn init_submodule(&mut self, path: &str) -> Result<()> {
+        self.try_with_fallback_mut(
             |gix| gix.init_submodule(path),
             |git2| git2.init_submodule(path),
         )
     }
 
-    fn update_submodule(&self, path: &str, opts: &SubmoduleUpdateOptions) -> Result<()> {
-        self.try_with_fallback(
+    fn update_submodule(&mut self, path: &str, opts: &SubmoduleUpdateOptions) -> Result<()> {
+        self.try_with_fallback_mut(
             |gix| gix.update_submodule(path, opts),
             |git2| git2.update_submodule(path, opts),
         )

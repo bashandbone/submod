@@ -1,0 +1,283 @@
+// SPDX-FileCopyrightText: 2025 Adam Poulemanos <89049923+bashandbone@users.noreply.github.com>
+//
+// SPDX-License-Identifier: MIT
+// Licensed under the [Plain MIT License][../LICENSE.md]
+//! Gix (gitoxide) implementation of git operations.
+//!
+//! This module provides the primary implementation using gix (gitoxide) library.
+//! Operations that are not yet supported by gix will return appropriate errors
+//! to trigger fallback to git2.
+use anyhow::{Context, Result};
+use std::collections::HashMap;
+use std::path::Path;
+use super::{
+    DetailedSubmoduleStatus, GitConfig, GitOperations, SubmoduleStatusFlags,
+};
+use crate::options::{
+    ConfigLevel, SerializableBranch, SerializableFetchRecurse, SerializableIgnore, SerializableUpdate,
+};
+use crate::config::{SubmoduleAddOptions, SubmoduleEntry, SubmoduleEntries, SubmoduleUpdateOptions};
+use crate::Config;
+
+/// Primary implementation using gix (gitoxide)
+pub struct GixOperations {
+    repo: gix::Repository,
+}
+impl GixOperations {
+    /// Create a new GixOperations instance
+    pub fn new(repo_path: Option<&Path>) -> Result<Self> {
+        let repo = match repo_path {
+            Some(path) => gix::open(path)
+                .with_context(|| format!("Failed to open repository at {}", path.display()))?,
+            None => gix::discover(".")
+                .with_context(|| "Failed to discover repository in current directory")?,
+        };
+        Ok(Self { repo })
+    }
+    /// Try to perform operation with gix, return error if not supported
+    fn try_gix_operation<T, F>(&self, operation: F) -> Result<T>
+    where
+        F: FnOnce(&gix::Repository) -> Result<T>,
+    {
+        operation(&self.repo)
+    }
+    /// Convert gix submodule to our SubmoduleEntry format
+    fn convert_gix_submodule_to_entry(
+        &self,
+        submodule: &gix::Submodule,
+    ) -> Result<SubmoduleEntry> {
+        let name = submodule.name().to_string();
+        let path = submodule.path()?.to_string();
+        let url = submodule.url()?.to_string();
+
+        // Get configuration for this submodule
+        let config = submodule.config()?;
+
+        let branch = config.as_ref().ok().and_then(|c| {
+            c.branch().map(|b| {
+                if b == "." {
+                    SerializableBranch::CurrentInSuperproject
+                } else {
+                    SerializableBranch::Name(b.to_string())
+                }
+            })
+        });
+        let ignore = config.ignore()
+            .and_then(|i| SerializableIgnore::try_from(i).ok());
+        let update = config.update()
+            .and_then(|u| SerializableUpdate::try_from(u).ok());
+        let fetch_recurse = config.fetch_recurse()
+            .and_then(|f| SerializableFetchRecurse::try_from(f).ok());
+        let active = config.is_active();
+        Ok(SubmoduleEntry {
+            name,
+            path,
+            url,
+            branch,
+            ignore,
+            update,
+            fetch_recurse,
+            active,
+            shallow: false, // gix doesn't expose shallow info directly
+        })
+    }
+    /// Convert gix submodule status to our status flags
+    fn convert_gix_status_to_flags(&self, status: &gix::submodule::Status) -> SubmoduleStatusFlags {
+        let mut flags = SubmoduleStatusFlags::empty();
+        // Map gix status to our flags
+        // Note: This is a simplified mapping as gix status structure may differ
+        if status.is_dirty() == Some(true) {
+            flags |= SubmoduleStatusFlags::WD_WD_MODIFIED;
+        }
+        // Add more mappings as needed based on gix::submodule::Status structure
+        flags
+    }
+}
+impl GitOperations for GixOperations {
+    fn read_gitmodules(&self) -> Result<SubmoduleEntries> {
+        self.try_gix_operation(|repo| {
+            let mut submodules = HashMap::new();
+            // Use gix::Repository::submodules() to get iterator over submodules
+            for submodule in repo.submodules()? {
+                let entry = self.convert_gix_submodule_to_entry(&submodule)?;
+                submodules.insert(entry.name.clone(), entry);
+            }
+            Ok(SubmoduleEntries {
+                submodules: if submodules.is_empty() { None } else { Some(submodules) },
+                sparse_checkouts: None, // Will be populated separately if needed
+            })
+        })
+    }
+    fn write_gitmodules(&self, _config: &SubmoduleEntries) -> Result<()> {
+        // gix doesn't have direct .gitmodules writing yet
+        Err(anyhow::anyhow!(
+            "gix .gitmodules writing not yet supported, falling back to git2"
+        ))
+    }
+    fn read_git_config(&self, _level: ConfigLevel) -> Result<GitConfig> {
+        // gix config reading is complex and not fully implemented yet
+        Err(anyhow::anyhow!(
+            "gix config reading not yet fully supported, falling back to git2"
+        ))
+    }
+    fn write_git_config(&self, _config: &GitConfig, _level: ConfigLevel) -> Result<()> {
+        // gix config writing is limited, fall back to git2
+        Err(anyhow::anyhow!(
+            "gix config writing not yet fully supported, falling back to git2"
+        ))
+    }
+    fn set_config_value(&self, _key: &str, _value: &str, _level: ConfigLevel) -> Result<()> {
+        // gix config writing is limited, fall back to git2
+        Err(anyhow::anyhow!(
+            "gix config value setting not yet fully supported, falling back to git2"
+        ))
+    }
+    fn add_submodule(&mut self, _opts: &SubmoduleAddOptions) -> Result<()> {
+        // gix doesn't support submodule addition yet
+        Err(anyhow::anyhow!(
+            "gix submodule addition not yet supported, falling back to git2"
+        ))
+    }
+    fn init_submodule(&mut self, _path: &str) -> Result<()> {
+        // gix doesn't support submodule initialization yet
+        Err(anyhow::anyhow!(
+            "gix submodule initialization not yet supported, falling back to git2"
+        ))
+    }
+    fn update_submodule(&mut self, _path: &str, _opts: &SubmoduleUpdateOptions) -> Result<()> {
+        // gix doesn't support submodule updates yet
+        Err(anyhow::anyhow!(
+            "gix submodule updates not yet supported, falling back to git2"
+        ))
+    }
+    fn delete_submodule(&self, _path: &str) -> Result<()> {
+        // gix doesn't support submodule deletion yet
+        Err(anyhow::anyhow!(
+            "gix submodule deletion not yet supported, falling back to git2"
+        ))
+    }
+    fn deinit_submodule(&self, _path: &str, _force: bool) -> Result<()> {
+        // gix doesn't support submodule deinitialization yet
+        Err(anyhow::anyhow!(
+            "gix submodule deinitialization not yet supported, falling back to git2"
+        ))
+    }
+    fn get_submodule_status(&self, path: &str) -> Result<DetailedSubmoduleStatus> {
+        self.try_gix_operation(|repo| {
+            // Find the submodule by path
+            let submodule = repo
+                .submodules()?
+                .and_then(|mut iter| iter.find(|sm| sm.path().map(|p| *p == path).unwrap_or(false)))
+                .ok_or_else(|| anyhow::anyhow!("Submodule not found: {}", path))?;
+            let name = submodule.name().to_string();
+            let config = (&Config::default)().load(&path, Config::default());
+            let ignore_value = config
+                .map(|c| c.defaults.ignore)
+                .and_then(|ignore| {
+                    ignore
+                        .map(|i| gix::submodule::config::Ignore::try_from(i)
+                            .map_err(|_| anyhow::anyhow!("Failed to convert ignore value for submodule: {}", path)))
+                })
+                .transpose()?
+                .unwrap_or_default();
+            let status = submodule.status(ignore_value, true);
+            let url = config.as_ref().ok().and_then(|c| c.url().map(|u| u.to_string()));
+            let branch = config.branch().map(|b| {
+                if b == "." {
+                    SerializableBranch::CurrentInSuperproject
+                } else {
+                    SerializableBranch::Name(b.to_string())
+                }
+            });
+            let ignore_rule = config.ignore()
+                .and_then(|i| SerializableIgnore::try_from(i).ok())
+                .unwrap_or_default();
+            let update_rule = config.update()
+                .and_then(|u| SerializableUpdate::try_from(u).ok())
+                .unwrap_or_default();
+            let fetch_recurse_rule = config.fetch_recurse()
+                .and_then(|f| SerializableFetchRecurse::try_from(f).ok())
+                .unwrap_or_default();
+            let status_flags = self.convert_gix_status_to_flags(&status);
+            let is_initialized = status.is_initialized();
+            let is_active = config.is_active();
+            let has_modifications = status.is_dirty();
+            Ok(DetailedSubmoduleStatus {
+                path: path.to_string(),
+                name,
+                url,
+                head_oid: None,    // Would need additional gix calls to get OIDs
+                index_oid: None,   // Would need additional gix calls to get OIDs
+                workdir_oid: None, // Would need additional gix calls to get OIDs
+                status_flags,
+                ignore_rule,
+                update_rule,
+                fetch_recurse_rule,
+                branch,
+                is_initialized,
+                is_active,
+                has_modifications,
+                sparse_checkout_enabled: false, // Would need additional checks
+                sparse_patterns: Vec::new(),    // Would need additional checks
+            })
+        })
+    }
+    fn list_submodules(&self) -> Result<Vec<String>> {
+        self.try_gix_operation(|repo| {
+            let mut submodule_paths = Vec::new();
+            for submodule in repo.submodules()? {
+                let path = submodule.path()?.to_string();
+                submodule_paths.push(path);
+            }
+            Ok(submodule_paths)
+        })
+    }
+    fn fetch_submodule(&self, _path: &str) -> Result<()> {
+        // gix doesn't support submodule fetching yet
+        Err(anyhow::anyhow!(
+            "gix submodule fetching not yet supported, falling back to git2"
+        ))
+    }
+    fn reset_submodule(&self, _path: &str, _hard: bool) -> Result<()> {
+        // gix doesn't support submodule reset yet
+        Err(anyhow::anyhow!(
+            "gix submodule reset not yet supported, falling back to git2"
+        ))
+    }
+    fn clean_submodule(&self, _path: &str, _force: bool, _remove_directories: bool) -> Result<()> {
+        // gix doesn't support submodule cleaning yet
+        Err(anyhow::anyhow!(
+            "gix submodule cleaning not yet supported, falling back to git2"
+        ))
+    }
+    fn stash_submodule(&self, _path: &str, _include_untracked: bool) -> Result<()> {
+        // gix doesn't support stashing yet
+        Err(anyhow::anyhow!(
+            "gix stashing not yet supported, falling back to git2"
+        ))
+    }
+    fn enable_sparse_checkout(&self, _path: &str) -> Result<()> {
+        // gix doesn't support sparse checkout operations yet
+        Err(anyhow::anyhow!(
+            "gix sparse checkout not yet supported, falling back to git2"
+        ))
+    }
+    fn set_sparse_patterns(&self, _path: &str, _patterns: &[String]) -> Result<()> {
+        // gix doesn't support sparse checkout operations yet
+        Err(anyhow::anyhow!(
+            "gix sparse checkout not yet supported, falling back to git2"
+        ))
+    }
+    fn get_sparse_patterns(&self, _path: &str) -> Result<Vec<String>> {
+        // gix doesn't support sparse checkout operations yet
+        Err(anyhow::anyhow!(
+            "gix sparse checkout not yet supported, falling back to git2"
+        ))
+    }
+    fn apply_sparse_checkout(&self, _path: &str) -> Result<()> {
+        // gix doesn't support sparse checkout operations yet
+        Err(anyhow::anyhow!(
+            "gix sparse checkout not yet supported, falling back to git2"
+        ))
+    }
+}

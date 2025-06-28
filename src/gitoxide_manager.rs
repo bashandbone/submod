@@ -49,7 +49,7 @@ Use this module as the backend for CLI commands to manage submodules in a reposi
 "]
 
 use crate::options::{SerializableBranch, SerializableFetchRecurse, SerializableIgnore, SerializableUpdate};
-use crate::config::{Config, Git2SubmoduleOptions, SubmoduleConfig, SubmoduleGitOptions};
+use crate::config::{Config, Git2SubmoduleOptions, SubmoduleEntry, SubmoduleGitOptions};
 use gix::Repository;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -208,8 +208,8 @@ impl GitoxideSubmoduleManager {
         let is_active = self.config.submodules.contains_key(name);
 
         // Check sparse checkout status
-        let sparse_status = if let Some(config) = self.config.submodules.get(name) {
-            if let Some(expected_paths) = &config.sparse_paths {
+        let sparse_status = if let Some(sparse_checkouts) = self.config.submodules.sparse_checkouts() {
+            if let Some(expected_paths) = sparse_checkouts.get(name) {
                 self.check_sparse_checkout_status(&submodule_repo, expected_paths)?
             } else {
                 SparseStatus::NotEnabled
@@ -217,6 +217,10 @@ impl GitoxideSubmoduleManager {
         } else {
             SparseStatus::NotEnabled
         };
+        // Check if submodule has its own submodules
+        let has_submodules = submodule_repo.submodules()
+            .map(|subs| subs.into_iter().count() > 0)
+            .unwrap_or(false);
 
         Ok(SubmoduleStatus {
             path: submodule_path.to_string(),
@@ -226,6 +230,8 @@ impl GitoxideSubmoduleManager {
             is_initialized: true,
             is_active,
             sparse_status,
+            has_submodules,
+            repo: submodule_repo,
         })
     }
 
@@ -504,18 +510,18 @@ impl GitoxideSubmoduleManager {
         url: String,
         sparse_paths: Option<Vec<String>>,
     ) -> Result<(), SubmoduleError> {
-        let submodule_config = SubmoduleConfig {
-            git_options: SubmoduleGitOptions::default(),
-            active: true,
-            path: Some(path),
-            url: Some(url),
-            sparse_paths,
+        let submodule_config = SubmoduleEntry {
+            path: Some(path.to_string()),
+            url: Some(url.to_string()),
+            branch: None,
+            ignore: None,
+            update: None,
+            fetch_recurse: None,
+            active: Some(true),
+            shallow: Some(false),
         };
 
-        self.config.add_submodule(name, submodule_config);
-        self.config
-            .save(&self.config_path)
-            .map_err(|e| SubmoduleError::ConfigError(format!("Failed to save config: {e}")))?;
+        self.config.add_submodule(name.to_string(), submodule_config);
 
         Ok(())
     }
@@ -760,11 +766,11 @@ impl GitoxideSubmoduleManager {
         if submodule_path.exists() && submodule_path.join(".git").exists() {
             println!("✅ {name} already initialized");
             // Even if already initialized, check if we need to configure sparse checkout
-            if let Some(sparse_paths) = &config.sparse_paths {
-                eprintln!(
-                    "DEBUG: Configuring sparse checkout for already initialized submodule: {name}"
-                );
-                self.configure_sparse_checkout(path_str, sparse_paths)?;
+            if let Some(sparse_checkouts) = self.config.submodules.sparse_checkouts() {
+                if let Some(sparse_paths) = sparse_checkouts.get(name) {
+                    eprintln!("DEBUG: Configuring sparse checkout for newly initialized submodule: {name}");
+                    self.configure_sparse_checkout(path_str, sparse_paths)?;
+                }
             }
             return Ok(());
         }
@@ -910,17 +916,18 @@ impl GitoxideSubmoduleManager {
         Ok(())
     }
 
-    fn show_effective_settings(&self, _name: &str, config: &SubmoduleConfig) {
+    fn show_effective_settings(&self, _name: &str, config: &SubmoduleEntry) {
         println!("  📋 Effective settings:");
 
-        if let Some(ignore) = self.config.get_effective_setting(config, "ignore") {
-            println!("     ignore = {ignore}");
+        if let Some(ignore) = &config.ignore {
+            println!("     ignore = {:?}", ignore);
+
         }
-        if let Some(update) = self.config.get_effective_setting(config, "update") {
-            println!("     update = {update}");
+        if let Some(update) = &config.update {
+            println!("     update = {:?}", update);
         }
-        if let Some(branch) = self.config.get_effective_setting(config, "branch") {
-            println!("     branch = {branch}");
+        if let Some(branch) = &config.branch {
+            println!("     branch = {:?}", branch);
         }
     }
 

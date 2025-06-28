@@ -20,15 +20,16 @@ and syncing submodules with features like sparse checkout.
 
 Exits with an error if any operation fails.
 "]
-
+mod git_ops;
 mod options;
 mod commands;
 mod config;
 mod gitoxide_manager;
 mod utilities;
 
-use crate::commands::{Cli, Commands, set_path};
-use crate::config::SerializableBranch as Branch;
+use crate::commands::{Cli, Commands};
+use crate::utilities::set_path;
+use crate::options::SerializableBranch as Branch;
 use crate::gitoxide_manager::GitoxideSubmoduleManager;
 use anyhow::Result;
 use clap::Parser;

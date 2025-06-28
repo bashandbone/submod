@@ -25,10 +25,10 @@ use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, path::Path};
 use crate::options::{
-    GitmodulesConvert, SerializableFetchRecurse, SerializableIgnore, SerializableUpdate
+    ConfigLevel, GitmodulesConvert, SerializableFetchRecurse, SerializableIgnore, SerializableUpdate
 };
 use crate::options::SerializableBranch;
-use crate::GitOperations;
+use crate::git_ops::{GitOperations};
 // TODO: Implement figment::Profile for modular configs
 use figment::{Figment, Metadata, providers::{Toml, Format}, value::{Value, Map, Dict}, Provider, Result as FigmentResult};
 
@@ -628,6 +628,10 @@ impl SubmoduleEntries {
         self.submodules.as_ref()?.get(name)
     }
 
+    pub fn contains_key(&self, name: &str) -> bool {
+        self.submodules.as_ref().map_or(false, |s| s.contains_key(name))
+    }
+
     /// Get an iterator over all submodule entries
     pub fn submodule_iter(&self) -> impl Iterator<Item = (&SubmoduleName, &SubmoduleEntry)> {
         self.submodules.as_ref().into_iter().flat_map(|s| s.iter())
@@ -776,7 +780,7 @@ impl Config {
                 git_ops.set_config_value(
                     &format!("submodule.{}.branch", name),
                     branch.to_string().as_str(),
-                    crate::git_ops::ConfigLevel::Local,
+                    ConfigLevel::Local,
                 )?;
             }
         }

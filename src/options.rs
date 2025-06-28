@@ -19,6 +19,19 @@ use gix_submodule::config::{Branch, FetchRecurse, Ignore, Update};
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 
+/// Configuration levels for git config operations
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ConfigLevel {
+    /// System-wide configuration
+    System,
+    /// Global user configuration
+    Global,
+    /// Local repository configuration
+    Local,
+    /// Worktree-specific configuration
+    Worktree,
+}
+
 pub trait  GitmodulesConvert {
     /// Get the git key for a submodule by the submodule's name (in git config)
     fn gitmodules_key_path(&self, name: &str) -> String;
@@ -213,6 +226,12 @@ impl TryFrom<SerializableIgnore> for Ignore {
     }
 }
 
+impl std::fmt::Display for SerializableIgnore {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.to_gitmodules())
+    }
+}
+
 /// Serializable enum for [`FetchRecurse`] config. Sets the fetch behavior for the submodule and its submodules (they said inception was impossible...).
 #[derive(
     Debug,
@@ -319,6 +338,12 @@ impl TryFrom<SerializableFetchRecurse> for FetchRecurse {
     }
 }
 
+impl std::fmt::Display for SerializableFetchRecurse {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.to_gitmodules())
+    }
+}
+
 /// Serializable enum for [`Branch`] config
 #[derive(Debug, Clone, Ord, PartialOrd, Eq, PartialEq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
@@ -354,6 +379,15 @@ impl TryFrom<SerializableBranch> for Branch {
     }
 }
 
+impl std::fmt::Display for SerializableBranch {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            SerializableBranch::CurrentInSuperproject => write!(f, "."),
+            SerializableBranch::Name(name) => write!(f, "{}", name),
+        }
+    }
+}
+
 impl FromStr for SerializableBranch {
     type Err = ();
 
@@ -362,15 +396,6 @@ impl FromStr for SerializableBranch {
             return Ok(SerializableBranch::CurrentInSuperproject);
         }
         Ok(SerializableBranch::Name(s.to_string()))
-    }
-}
-
-impl ToString for SerializableBranch {
-    fn to_string(&self) -> String {
-        match self {
-            SerializableBranch::CurrentInSuperproject => ".".to_string(),
-            SerializableBranch::Name(name) => name.clone(),
-        }
     }
 }
 
@@ -508,5 +533,11 @@ impl TryFrom<SerializableUpdate> for Update {
 
             _ => return Err(()), // Handle unsupported variants
         })
+    }
+}
+
+impl std::fmt::Display for SerializableUpdate {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.to_gitmodules())
     }
 }
