@@ -91,13 +91,13 @@ impl GitOperations for GixOperations {
                     submodules.insert(name, entry);
                 }
             }
-            Ok(SubmoduleEntries {
-                submodules: if submodules.is_empty() { None } else { Some(submodules) },
-                sparse_checkouts: None, // Will be populated separately if needed
-            })
+            Ok(SubmoduleEntries::new(
+                if submodules.is_empty() { None } else { Some(submodules) },
+                None, // Will be populated separately if needed
+            ))
         })
     }
-    fn write_gitmodules(&self, _config: &SubmoduleEntries) -> Result<()> {
+    fn write_gitmodules(&mut self, _config: &SubmoduleEntries) -> Result<()> {
         // gix doesn't have direct .gitmodules writing yet
         Err(anyhow::anyhow!(
             "gix .gitmodules writing not yet supported, falling back to git2"

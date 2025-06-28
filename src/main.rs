@@ -29,7 +29,7 @@ mod utilities;
 
 use crate::commands::{Cli, Commands};
 use crate::utilities::set_path;
-use crate::options::SerializableBranch as Branch;
+use crate::options::{SerializableBranch as Branch, SerializableIgnore, SerializableFetchRecurse, SerializableUpdate};
 use crate::gitoxide_manager::GitoxideSubmoduleManager;
 use anyhow::Result;
 use clap::Parser;
@@ -54,35 +54,40 @@ fn main() -> Result<()> {
             let mut manager = GitoxideSubmoduleManager::new(cli.config)
                 .map_err(|e| anyhow::anyhow!("Failed to create manager: {}", e))?;
 
-            let sparse_paths_vec = sparse_paths.map(|paths| {
-                paths
-                    .split(',')
-                    .map(|s| s.trim().to_string())
-                    .filter(|s| !s.is_empty())
-                    .collect::<Vec<String>>()
-                    .into_iter()
-                    .map(|s| {
-                        if s.contains('\0') {
+            // Validate sparse paths for null bytes
+            let sparse_paths_vec = match sparse_paths {
+                Some(paths) => {
+                    for path in &paths {
+                        if path.contains('\0') {
                             return Err(anyhow::anyhow!(
                                 "Invalid sparse path pattern: contains null byte"
                             ));
                         }
-                        Ok(s)
-                    })
-                    .collect::<Result<Vec<String>, _>>()
-            });
-
-            let sparse_paths_vec = match sparse_paths_vec {
-                Some(result) => match result {
-                    Ok(paths) => Some(paths),
-                    Err(e) => return Err(e),
+                    }
+                    Some(paths)
                 },
                 None => None,
             };
 
-            // Set the path
-            let set_path_result = set_path(path)
-                .map_err(|e| anyhow::anyhow!("Failed to set path: {}", e))?;
+            // Set the path - handle optional path
+            let set_path_result = match path {
+                Some(p) => set_path(p)
+                    .map_err(|e| anyhow::anyhow!("Failed to set path: {}", e))?,
+                None => {
+                    // Derive path from URL if not provided
+                    let cleaned_url = url.trim_end_matches('/').trim_end_matches(".git");
+                    cleaned_url
+                        .split('/')
+                        .last()
+                        .unwrap_or_else(|| {
+                            cleaned_url
+                                .split(':')
+                                .last()
+                                .unwrap_or("submodule")
+                        })
+                        .to_string()
+                }
+            };
 
             let set_branch = match branch {
                 Some(ref b) => Some(Branch::from_str(b)
@@ -90,8 +95,22 @@ fn main() -> Result<()> {
                 None => Some(Branch::default()),
             };
 
+            // Convert CLI enums to serializable types
+            let serializable_ignore = Some(SerializableIgnore::try_from(ignore)
+                .map_err(|_| anyhow::anyhow!("Failed to convert ignore setting"))?);
+            let serializable_fetch = Some(SerializableFetchRecurse::try_from(fetch)
+                .map_err(|_| anyhow::anyhow!("Failed to convert fetch setting"))?);
+            let serializable_update = Some(SerializableUpdate::try_from(update)
+                .map_err(|_| anyhow::anyhow!("Failed to convert update setting"))?);
+
+            // Handle optional name - derive from path if not provided
+            let submodule_name = name.unwrap_or_else(|| {
+                // Use the path as the name
+                set_path_result.clone()
+            });
+
             manager
-                .add_submodule(name, set_path_result, url, sparse_paths_vec, set_branch, ignore, fetch, update)
+                .add_submodule(submodule_name, set_path_result, url, sparse_paths_vec, set_branch, serializable_ignore, serializable_fetch, serializable_update)
                 .map_err(|e| anyhow::anyhow!("Failed to add submodule: {}", e))?;
         }
         Commands::Check => {

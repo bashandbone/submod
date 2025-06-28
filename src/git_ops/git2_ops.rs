@@ -196,7 +196,7 @@ impl GitOperations for Git2Operations {
                 None, // sparse_checkouts will be populated separately if needed
             ))
     }
-    fn write_gitmodules(&self, config: &SubmoduleEntries) -> Result<()> {
+    fn write_gitmodules(&mut self, config: &SubmoduleEntries) -> Result<()> {
         // git2 doesn't have direct .gitmodules writing, but we can manipulate submodules
         // For now, we'll update individual submodule configurations
         if let Some(submodules) = config.submodules().as_ref() {
