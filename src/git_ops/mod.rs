@@ -1,19 +1,6 @@
 // SPDX-FileCopyrightText: 2025 Adam Poulemanos <89049923+bashandbone@users.noreply.github.com>
 //
 // SPDX-License-Identifier: LicenseRef-PlainMIT OR MIT
-//
-//! Git operations layer with gix-first, git2-fallback strategy.
-//!
-//! This module provides a unified interface for git operations, abstracting over
-//! both gix (gitoxide) and git2 libraries. It implements a fallback strategy where
-//! operations are first attempted with gix, and if they fail or are unsupported,
-//! they fall back to git2.
-//!
-//! The main types are:
-//! - [`GitOperations`] - The main trait defining all git operations
-//! - [`GixOperations`] - Implementation using gix (gitoxide)
-//! - [`Git2Operations`] - Implementation using git2 as fallback
-//! - [`GitOpsManager`] - Unified manager with automatic fallback
 
 pub mod gix_ops;
 pub mod git2_ops;

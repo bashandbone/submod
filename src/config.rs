@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2025 Adam Poulemanos <89049923+bashandbone@users.noreply.github.com>
 //
 // SPDX-License-Identifier: LicenseRef-PlainMIT OR MIT
-//
+
 #![doc = r"
 Configuration types and utilities for submod.
 
@@ -788,6 +788,7 @@ impl Config {
         Ok(())
     }
 
+    /// Load configuration from a file, merging with CLI options
     pub fn load(&self, path: impl AsRef<Path>, cli_options: Config) -> anyhow::Result<Self> {
         let fig = Figment::from(Self::default()) // 1) start from Rust-side defaults
         .merge(Toml::file(path).nested())  // 2) file-based overrides
@@ -798,6 +799,7 @@ impl Config {
         Ok(cfg.apply_defaults())
     }
 
+    /// load configuration from a file without CLI options
     pub fn load_from_file(&self, path: Option<impl AsRef<Path>>) -> anyhow::Result<Self> {
         let p: &dyn AsRef<Path> = match path {
             Some(ref p) => p,
@@ -810,7 +812,7 @@ impl Config {
         Ok(cfg.apply_defaults())
     }
 
-
+    /// Load configuration from config and merge with existing gitmodules options
     pub fn load_with_git_sync(&self, path: impl AsRef<Path>, git_ops: &mut dyn GitOperations, cli_options: Config) -> anyhow::Result<Self> {
         let mut cfg = self.load(path, cli_options)?;
         // Sync with git config

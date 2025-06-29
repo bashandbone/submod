@@ -1,11 +1,12 @@
 // SPDX-FileCopyrightText: 2025 Adam Poulemanos <89049923+bashandbone@users.noreply.github.com>
 //
 // SPDX-License-Identifier: LicenseRef-PlainMIT OR MIT
-//
+
 pub mod utilities;
 /// Configuration management for submodules
 pub mod options;
 pub mod config;
+pub mod shells;
 
 /// Git operations layer with gix-first, git2-fallback strategy
 pub mod git_ops;

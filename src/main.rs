@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2025 Adam Poulemanos <89049923+bashandbone@users.noreply.github.com>
 //
 // SPDX-License-Identifier: LicenseRef-PlainMIT OR MIT
-//
+
 #![doc = r"
 Main entry point for the submod CLI tool.
 
@@ -20,6 +20,8 @@ and syncing submodules with features like sparse checkout.
 
 Exits with an error if any operation fails.
 "]
+mod long_abouts;
+mod shells;
 mod git_ops;
 mod options;
 mod commands;
@@ -224,7 +226,7 @@ fn main() -> Result<()> {
         Commands::NukeItFromOrbit { .. } => {
             return Err(anyhow::anyhow!("NukeItFromOrbit command not yet implemented"));
         }
-        Commands::Completions => {
+        Commands::CompleteMe { .. } => {
             return Err(anyhow::anyhow!("Completions command not yet implemented"));
         }
     }

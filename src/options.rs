@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2025 Adam Poulemanos <89049923+bashandbone@users.noreply.github.com>
 //
 // SPDX-License-Identifier: LicenseRef-PlainMIT OR MIT
-//
+
 #![allow(unreachable_patterns)]
 //! Defines serializable wrappers for git submodule configuration enums.
 //!
@@ -32,6 +32,7 @@ pub enum ConfigLevel {
     Worktree,
 }
 
+/// Trait for converting between git submodule configuration enums and their gitmodules representation
 pub trait  GitmodulesConvert {
     /// Get the git key for a submodule by the submodule's name (in git config)
     fn gitmodules_key_path(&self, name: &str) -> String;
@@ -54,6 +55,7 @@ pub trait  GitmodulesConvert {
 
 }
 
+/// Trait for checking if an enum is unspecified or default
 pub trait OptionsChecks {
     /// Check if the enum is unspecified
     fn is_unspecified(&self) -> bool;
@@ -63,16 +65,19 @@ pub trait OptionsChecks {
 
 }
 
+/// Trait for checking if an enum is unspecified or default
 pub trait IsUnspecified {
     /// Check if the enum is unspecified
     fn is_unspecified(&self) -> bool;
 }
 
+/// Trait for checking if an enum is the default value
 pub trait IsDefault {
     /// Check if the enum is the default value
     fn is_default(&self) -> bool;
 }
 
+/// Trait for converting between `git2` and `gix_submodule` types
 pub trait GixGit2Convert {
     /// Convert from a `git2` type to a `gix_submodule` type
     fn from_git2(git2: Git2SubmoduleIgnore) -> Result<Self, ()>

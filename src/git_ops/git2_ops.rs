@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2025 Adam Poulemanos <89049923+bashandbone@users.noreply.github.com>
 //
 // SPDX-License-Identifier: LicenseRef-PlainMIT OR MIT
-//
+
 use anyhow::{Context, Result};
 use std::collections::HashMap;
 use std::path::Path;

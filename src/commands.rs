@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2025 Adam Poulemanos <89049923+bashandbone@users.noreply.github.com>
 //
 // SPDX-License-Identifier: LicenseRef-PlainMIT OR MIT
-//
+
 #![doc = r#"
 Command-line argument definitions for the `submod` tool.
 
@@ -49,9 +49,12 @@ Use the `--config` option to specify a custom config file location.
 See the [README.md](../README.md) for full usage and configuration details.
 "#]
 
+use crate::shells::Shell;
 use clap::{Parser, Subcommand, command, arg};
+
 use std::{ffi::OsString, path::PathBuf};
 use crate::options::{SerializableFetchRecurse as FetchRecurse, SerializableUpdate as Update, SerializableIgnore as Ignore};
+use crate::long_abouts::COMPLETE_ME;
 
 
 /// Top-level CLI parser for the `submod` tool.
@@ -223,6 +226,9 @@ pub enum Commands {
     },
 
     // TODO: Implement this command (super simple with clap_complete/clap_complete_nushell. The latter is just another enum variant that implements the `Generator` trait like all of the other clap_complete shells.)
-    #[command(name = "completions", visible_aliases = ["comp", "complete"], next_help_heading = "Generate Shell Completions", about = "Generates shell completions for the specified shell.", action= clap::ArgAction::Set, value_parser = clap::value_parser!(Shell))]
-    Completions,
+    #[command(name = "completeme", visible_aliases = ["comp", "complete", "comp-me", "complete-me"], next_help_heading = "Generate Shell Completions", about = "Generates shell completions for the specified shell. Completions generated to stdout.", long_about = COMPLETE_ME, value_parser = clap::value_parser!(Shell))]
+    CompleteMe {
+        #[arg(value_enum, action = clap::ArgAction::Set, help = "The shell to generate completions for. Supported shells: `bash`, `zsh`, `fish`, `powershell`, `elvish`, `nushell`.")]
+        shell: Shell,
+    },
 }
