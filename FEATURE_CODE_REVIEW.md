@@ -6,7 +6,7 @@ SPDX-License-Identifier: LicenseRef-PlainMIT OR MIT
 
 # CLI Migration Mapping -- Assistant Summary of Unresolved CLI and Implementation Issues
 
-This document maps all git CLI calls in `gitoxide_manager.rs` to their equivalent `GitOperations` trait methods.
+This document maps all git CLI calls in `git_manager.rs` to their equivalent `GitOperations` trait methods.
 
 ## CLI Calls Found (17 total)
 
@@ -141,7 +141,7 @@ Command::new("git").args(["submodule", "update", path_str])
 
 ## "For Now" Comments to Address
 
-### 1. `src/gitoxide_manager.rs:539`
+### 1. `src/git_manager.rs:539`
 
 ```rust
 // Enable sparse checkout in git config (using CLI for now since config mutation is complex)
@@ -149,7 +149,7 @@ Command::new("git").args(["submodule", "update", path_str])
 
 **Action:** Replace with `enable_sparse_checkout(path)` from git_ops
 
-### 2. `src/gitoxide_manager.rs:188`
+### 2. `src/git_manager.rs:188`
 
 ```rust
 // For now, use a simple approach - check if there are any uncommitted changes
@@ -157,7 +157,7 @@ Command::new("git").args(["submodule", "update", path_str])
 
 **Action:** Review if this aligns with project goals for comprehensive status checking
 
-### 3. `src/gitoxide_manager.rs:207`
+### 3. `src/git_manager.rs:207`
 
 ```rust
 // For now, consider all submodules active if they exist in config
@@ -165,7 +165,7 @@ Command::new("git").args(["submodule", "update", path_str])
 
 **Action:** Implement proper active status checking using git_ops
 
-### 4. `src/gitoxide_manager.rs:348`
+### 4. `src/git_manager.rs:348`
 
 ```rust
 // For now, return an error to trigger fallback
@@ -190,7 +190,7 @@ Command::new("git").args(["submodule", "update", path_str])
 
 ## Integration Strategy
 
-1. **Phase 1**: Add GitOpsManager to GitoxideSubmoduleManager
+1. **Phase 1**: Add GitOpsManager to GitManager
 2. **Phase 2**: Replace CLI calls one by one with git_ops equivalents
 3. **Phase 3**: Test each replacement for equivalent behavior
 4. **Phase 4**: Remove CLI dependencies entirely
@@ -215,7 +215,7 @@ Generally, it shouldn't be directly implementing any operations. At most it pipe
 2. `apply_sparse_checkout_cli`:
    - Why are we doing CLI commands here, or at all? The whole point of the git_ops modules is to provide a Rust interface to git operations and eliminate direct shell calls.
 
-- I could go on, but actually, I also noticed that the ops modules AREN'T EVEN IMPORTED in the `gitoxide_manager.rs` file. Clearly, this is wrong.
+- I could go on, but actually, I also noticed that the ops modules AREN'T EVEN IMPORTED in the `git_manager.rs` file. Clearly, this is wrong.
 
 
 ### gix_ops

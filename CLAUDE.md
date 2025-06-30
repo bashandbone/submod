@@ -48,7 +48,7 @@ The project follows integration-first testing. Focus on testing complete workflo
 - `src/main.rs` - CLI entry point, parses commands and dispatches to manager
 - `src/commands.rs` - Command-line argument definitions using clap
 - `src/config.rs` - TOML configuration parsing and submodule config management
-- `src/gitoxide_manager.rs` - Core submodule operations using gitoxide/git2
+- `src/git_manager.rs` - Core submodule operations using gitoxide/git2
 - `src/lib.rs` - Library exports (not a stable API)
 
 ### Configuration System

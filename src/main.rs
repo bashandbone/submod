@@ -6,7 +6,7 @@
 Main entry point for the submod CLI tool.
 
 Parses command-line arguments and dispatches submodule management commands using the
-[`GitoxideSubmoduleManager`]. Supports adding, checking, initializing, updating, resetting,
+[`GitManager`]. Supports adding, checking, initializing, updating, resetting,
 and syncing submodules with features like sparse checkout.
 
 # Commands
@@ -26,13 +26,13 @@ mod git_ops;
 mod options;
 mod commands;
 mod config;
-mod gitoxide_manager;
+mod git_manager;
 mod utilities;
 
 use crate::commands::{Cli, Commands};
 use crate::utilities::{name_from_osstring, name_from_url, set_path, get_sparse_paths};
 use crate::options::{SerializableBranch as Branch, SerializableIgnore, SerializableFetchRecurse, SerializableUpdate};
-use crate::gitoxide_manager::GitoxideSubmoduleManager;
+use crate::git_manager::GitManager;
 use anyhow::Result;
 use clap::Parser;
 use submod::options::SerializableBranch;
@@ -71,21 +71,21 @@ fn main() -> Result<()> {
             let set_branch = Branch::set_branch(branch.as_deref())
                 .map_err(|e| anyhow::anyhow!("Failed to set branch: {}", e))?;
 
-            let mut manager = GitoxideSubmoduleManager::new(config_path);
+            let mut manager = GitManager::new(config_path);
 
             manager
                 .add_submodule(set_name, set_path, set_url, sparse_paths_vec, set_branch, ignore, fetch, update, shallow, no_init)
                 .map_err(|e| anyhow::anyhow!("Failed to add submodule: {}", e))?;
         }
         Commands::Check => {
-            let manager = GitoxideSubmoduleManager::new(config_path)
+            let manager = GitManager::new(config_path)
                 .map_err(|e| anyhow::anyhow!("Failed to create manager: {}", e))?;
             manager
                 .check_all_submodules()
                 .map_err(|e| anyhow::anyhow!("Failed to check submodules: {}", e))?;
         }
         Commands::Init => {
-            let manager = GitoxideSubmoduleManager::new(config_path)
+            let manager = GitManager::new(config_path)
                 .map_err(|e| anyhow::anyhow!("Failed to create manager: {}", e))?;
 
             // Initialize all submodules from config
@@ -96,7 +96,7 @@ fn main() -> Result<()> {
             }
         }
         Commands::Update => {
-            let manager = GitoxideSubmoduleManager::new(config_path)
+            let manager = GitManager::new(config_path)
                 .map_err(|e| anyhow::anyhow!("Failed to create manager: {}", e))?;
 
             // Update all submodules from config
@@ -116,7 +116,7 @@ fn main() -> Result<()> {
             }
         }
         Commands::Reset { all, names } => {
-            let manager = GitoxideSubmoduleManager::new(config_path)
+            let manager = GitManager::new(config_path)
                 .map_err(|e| anyhow::anyhow!("Failed to create manager: {}", e))?;
 
             let submodules_to_reset: Vec<String> = if all {
@@ -142,7 +142,7 @@ fn main() -> Result<()> {
             }
         }
         Commands::Sync => {
-            let manager = GitoxideSubmoduleManager::new(cli.config)
+            let manager = GitManager::new(cli.config)
                 .map_err(|e| anyhow::anyhow!("Failed to create manager: {}", e))?;
 
             // Run check, init, and update in sequence

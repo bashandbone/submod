@@ -376,7 +376,7 @@ submod/
 │   ├── main.rs              # CLI entry point
 │   ├── commands.rs          # Command definitions
 │   ├── config.rs            # TOML configuration handling
-│   └── gitoxide_manager.rs  # Core submodule operations
+│   └── git_manager.rs  # Core submodule operations
 ├── tests/                   # Integration tests
 ├── sample_config/           # Example configurations
 ├── scripts/                 # Development scripts

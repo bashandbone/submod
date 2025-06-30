@@ -2,13 +2,13 @@
 
 ## Executive Summary
 
-This plan addresses the architectural disconnect between the intended design and current implementation. The [`GitoxideSubmoduleManager`](src/gitoxide_manager.rs) currently makes 17 direct CLI calls instead of using the [`GitOpsManager`](src/git_ops/mod.rs) abstraction. The [`gix_ops.rs`](src/git_ops/gix_ops.rs) implementation incorrectly assumes gix doesn't support many operations that are actually available.
+This plan addresses the architectural disconnect between the intended design and current implementation. The [`GitManager`](src/git_manager.rs) currently makes 17 direct CLI calls instead of using the [`GitOpsManager`](src/git_ops/mod.rs) abstraction. The [`gix_ops.rs`](src/git_ops/gix_ops.rs) implementation incorrectly assumes gix doesn't support many operations that are actually available.
 
 ## Current State Analysis
 
 ### Architecture Issues
 
-- **Missing Integration**: [`GitoxideSubmoduleManager`](src/gitoxide_manager.rs) doesn't import or use git_ops modules
+- **Missing Integration**: [`GitManager`](src/git_manager.rs) doesn't import or use git_ops modules
 - **Incorrect Assumptions**: [`gix_ops.rs`](src/git_ops/gix_ops.rs) returns errors claiming gix lacks capabilities it actually has
 - **CLI Dependency**: 17 operations use direct CLI calls instead of the trait-based abstraction
 
@@ -23,17 +23,17 @@ This plan addresses the architectural disconnect between the intended design and
 
 ### Phase 1: Architecture Integration (Priority: Critical)
 
-#### 1.1 Import GitOpsManager in GitoxideSubmoduleManager
+#### 1.1 Import GitOpsManager in GitManager
 
 ```rust
-// Add to src/gitoxide_manager.rs imports
+// Add to src/git_manager.rs imports
 use crate::git_ops::{GitOpsManager, GitOperations};
 ```
 
 #### 1.2 Replace Repository Field
 
 ```rust
-pub struct GitoxideSubmoduleManager {
+pub struct GitManager {
     // Replace: repo: Repository,
     git_ops: GitOpsManager,
     config: Config,
@@ -44,7 +44,7 @@ pub struct GitoxideSubmoduleManager {
 #### 1.3 Update Constructor
 
 ```rust
-impl GitoxideSubmoduleManager {
+impl GitManager {
     pub fn new(config_path: PathBuf) -> Result<Self, SubmoduleError> {
         let git_ops = GitOpsManager::new(None)
             .map_err(|_| SubmoduleError::RepositoryError)?;
@@ -135,7 +135,7 @@ fn set_sparse_patterns(&self, path: &str, patterns: &[String]) -> Result<()> {
 
 #### 3.1 Map CLI Calls to GitOperations Methods
 
-The following table reflects the actual [`GitOpsManager`](src/git_ops/mod.rs) API surface and type signatures used in [`gitoxide_manager.rs`](src/gitoxide_manager.rs):
+The following table reflects the actual [`GitOpsManager`](src/git_ops/mod.rs) API surface and type signatures used in [`git_manager.rs`](src/git_manager.rs):
 
 | CLI Call | GitOpsManager Method | Type Signature |
 |---|---|---|
@@ -154,7 +154,7 @@ The following table reflects the actual [`GitOpsManager`](src/git_ops/mod.rs) AP
 
 ```mermaid
 flowchart TD
-    GM[GitoxideSubmoduleManager]
+    GM[GitManager]
     GOP[GitOpsManager]
     GIX[GixOperations]
     GIT2[Git2Operations]
@@ -190,17 +190,17 @@ flowchart TD
     GM --> reset_submodule
 ```
 
-#### 3.2 Update GitoxideSubmoduleManager Methods
+#### 3.2 Update GitManager Methods
 
 **Replace CLI calls in these methods**:
 
-- [`cleanup_existing_submodule()`](src/gitoxide_manager.rs:321)
-- [`add_submodule_with_cli()`](src/gitoxide_manager.rs:399)
-- [`configure_sparse_checkout()`](src/gitoxide_manager.rs:532)
-- [`apply_sparse_checkout_cli()`](src/gitoxide_manager.rs:636)
-- [`update_submodule()`](src/gitoxide_manager.rs:652)
-- [`reset_submodule()`](src/gitoxide_manager.rs:683)
-- [`init_submodule()`](src/gitoxide_manager.rs:751)
+- [`cleanup_existing_submodule()`](src/git_manager.rs:321)
+- [`add_submodule_with_cli()`](src/git_manager.rs:399)
+- [`configure_sparse_checkout()`](src/git_manager.rs:532)
+- [`apply_sparse_checkout_cli()`](src/git_manager.rs:636)
+- [`update_submodule()`](src/git_manager.rs:652)
+- [`reset_submodule()`](src/git_manager.rs:683)
+- [`init_submodule()`](src/git_manager.rs:751)
 
 ### Phase 4: Advanced Gix Research & Implementation
 
@@ -242,13 +242,13 @@ fn apply_sparse_checkout(&self, path: &str) -> Result<()> {
 ```mermaid
 graph TB
     subgraph "Current State"
-        GM[GitoxideSubmoduleManager]
+        GM[GitManager]
         CLI[17 Direct CLI Calls]
         GM --> CLI
     end
 
     subgraph "Target Architecture"
-        GM2[GitoxideSubmoduleManager]
+        GM2[GitManager]
         GOP[GitOpsManager]
         GIX[GixOperations]
         GIT2[Git2Operations]
@@ -308,7 +308,7 @@ gantt
 
 #### Step 1.1: Import and Setup GitOpsManager
 
-1. Add imports to [`src/gitoxide_manager.rs`](src/gitoxide_manager.rs)
+1. Add imports to [`src/git_manager.rs`](src/git_manager.rs)
 2. Replace `Repository` field with `GitOpsManager`
 3. Update constructor to initialize `GitOpsManager`
 4. Update all method signatures to use `&self.git_ops` instead of `&self.repo`
@@ -420,7 +420,7 @@ gantt
 
 #### Step 3.1: High Priority CLI Replacements
 
-**Target Methods in [`GitoxideSubmoduleManager`](src/gitoxide_manager.rs)**:
+**Target Methods in [`GitManager`](src/git_manager.rs)**:
 
 1. **`configure_sparse_checkout()` (line 532)**:
 
@@ -530,7 +530,7 @@ fn apply_sparse_checkout(&self, path: &str) -> Result<()> {
 
 ## Success Criteria
 
-1. **Architecture Integration**: [`GitoxideSubmoduleManager`](src/gitoxide_manager.rs) uses [`GitOpsManager`](src/git_ops/mod.rs) instead of direct CLI calls
+1. **Architecture Integration**: [`GitManager`](src/git_manager.rs) uses [`GitOpsManager`](src/git_ops/mod.rs) instead of direct CLI calls
 2. **Gix Maximization**: All 17 CLI operations replaced with gix-first implementations
 3. **Fallback Preservation**: git2 and CLI fallbacks remain functional
 4. **Feature Parity**: All existing functionality preserved
@@ -605,7 +605,7 @@ Native gix repository operations for reset/clean/fetch
 
 ### Executive Summary
 
-This document provides the researched gix API signatures, types, and concrete implementations needed to replace CLI calls in the GitoxideSubmoduleManager. Based on analysis of the gitoxide documentation and codebase, most operations incorrectly assumed as unavailable in gix can actually be implemented using the available APIs.
+This document provides the researched gix API signatures, types, and concrete implementations needed to replace CLI calls in the GitManager. Based on analysis of the gitoxide documentation and codebase, most operations incorrectly assumed as unavailable in gix can actually be implemented using the available APIs.
 
 ### Key Findings
 
@@ -1331,7 +1331,7 @@ impl GitOperations for GixOperations {
 
 The research shows that **all major git operations can be implemented using gix APIs**. The previous assumptions about gix limitations were incorrect. This implementation will:
 
-1. **Eliminate all 17 CLI calls** from GitoxideSubmoduleManager
+1. **Eliminate all 17 CLI calls** from GitManager
 2. **Provide type-safe configuration access** using `gix::config::tree`
 3. **Enable comprehensive submodule management** via gix APIs
 4. **Support sparse checkout operations** through worktree manipulation

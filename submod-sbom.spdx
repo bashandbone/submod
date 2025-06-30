@@ -371,7 +371,7 @@ LicenseInfoInFile: LicenseRef-PlainMIT
 LicenseInfoInFile: MIT
 FileCopyrightText: <text>SPDX-FileCopyrightText: 2025 Adam Poulemanos <89049923+bashandbone@users.noreply.github.com></text>
 
-FileName: ./src/gitoxide_manager.rs
+FileName: ./src/git_manager.rs
 SPDXID: SPDXRef-020984ce78fbdba5aa8e85c5c82f6da4
 FileChecksum: SHA1: 8824bec4d5a6fd3e82edd03048ba154c3db82061
 LicenseConcluded: LicenseRef-PlainMIT OR MIT
@@ -511,4 +511,3 @@ We are not responsible for any problems or damages that happen because of the wo
 [selflink]: <https://plainlicense.org/licenses/permissive/mit/> "The Plain MIT License"
 [spdx-guide]: <https://spdx.dev/learn/handling-license-info/> "SPDX User Guide"
 </text>
-
