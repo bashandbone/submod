@@ -50,10 +50,11 @@ Use this module as the backend for CLI commands to manage submodules in a reposi
 
 use crate::options::{SerializableBranch, SerializableFetchRecurse, SerializableIgnore, SerializableUpdate};
 use crate::config::{Config, Git2SubmoduleOptions, SubmoduleEntry, SubmoduleGitOptions};
-use gix::Repository;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use crate::git_ops::GitOpsManager;
+use crate::git_ops::GitOperations;
 
 /// Custom error types for submodule operations
 #[derive(Debug, thiserror::Error)]
@@ -95,7 +96,7 @@ pub enum SubmoduleError {
 }
 
 /// Status information for a submodule
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SubmoduleStatus {
     /// Path to the submodule directory
     #[allow(dead_code)]
@@ -117,13 +118,10 @@ pub struct SubmoduleStatus {
 
     /// Whether the submodule has its own submodules
     pub has_submodules: bool,
-
-    /// Gitoxide repo instance for this submodule
-    pub repo: Repository,
 }
 
 /// Sparse checkout status
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SparseStatus {
     /// Sparse checkout is not enabled for this submodule
     NotEnabled,
@@ -142,8 +140,8 @@ pub enum SparseStatus {
 
 /// Main gitoxide-based submodule manager
 pub struct GitoxideSubmoduleManager {
-    /// The main repository instance
-    repo: Repository,
+    /// The main git operations manager (gix-first, git2-fallback)
+    git_ops: GitOpsManager,
     /// Configuration for submodules
     config: Config,
     /// Path to the configuration file
@@ -151,6 +149,23 @@ pub struct GitoxideSubmoduleManager {
 }
 
 impl GitoxideSubmoduleManager {
+    /// Helper method to map git operations errors
+    fn map_git_ops_error(err: anyhow::Error) -> SubmoduleError {
+        SubmoduleError::ConfigError(format!("Git operation failed: {err}"))
+    }
+
+    /// Restore update_toml_config method
+    fn update_toml_config(
+        &mut self,
+        name: String,
+        entry: crate::config::SubmoduleEntry,
+        _sparse_paths: Option<Vec<String>>,
+    ) -> Result<(), SubmoduleError> {
+        self.config.add_submodule(name, entry);
+        // No-op for sparse paths; handled elsewhere.
+        Ok(())
+    }
+
     /// Creates a new `GitoxideSubmoduleManager` by loading configuration from the given path.
     ///
     /// # Arguments
@@ -162,14 +177,15 @@ impl GitoxideSubmoduleManager {
     /// Returns `SubmoduleError::RepositoryError` if the repository cannot be discovered,
     /// or `SubmoduleError::ConfigError` if the configuration fails to load.
     pub fn new(config_path: PathBuf) -> Result<Self, SubmoduleError> {
-        // Use gix::discover for repository detection
-        let repo = gix::discover(".").map_err(|_| SubmoduleError::RepositoryError)?;
+        // Use GitOpsManager for repository detection and operations
+        let git_ops = GitOpsManager::new(Some(Path::new(".")))
+            .map_err(|_| SubmoduleError::RepositoryError)?;
 
         let config = Config::default().load(&config_path, Config::default())
             .map_err(|e| SubmoduleError::ConfigError(format!("Failed to load config: {e}")))?;
 
         Ok(Self {
-            repo,
+            git_ops,
             config,
             config_path,
         })
@@ -181,6 +197,7 @@ impl GitoxideSubmoduleManager {
         submodule_path: &str,
         name: &str,
     ) -> Result<SubmoduleStatus, SubmoduleError> {
+        // NOTE: This is a legacy direct gix usage for status; could be refactored to use GitOpsManager if needed.
         let submodule_repo =
             gix::open(submodule_path).map_err(|_| SubmoduleError::RepositoryError)?;
 
@@ -210,7 +227,7 @@ impl GitoxideSubmoduleManager {
         // Check sparse checkout status
         let sparse_status = if let Some(sparse_checkouts) = self.config.submodules.sparse_checkouts() {
             if let Some(expected_paths) = sparse_checkouts.get(name) {
-                self.check_sparse_checkout_status(&submodule_repo, expected_paths)?
+                self.check_sparse_checkout_status(submodule_path, expected_paths)?
             } else {
                 SparseStatus::NotEnabled
             }
@@ -231,18 +248,18 @@ impl GitoxideSubmoduleManager {
             is_active,
             sparse_status,
             has_submodules,
-            repo: submodule_repo,
         })
     }
 
     /// Check sparse checkout configuration
     pub fn check_sparse_checkout_status(
         &self,
-        repo: &Repository,
+        submodule_path: &str,
         expected_paths: &[String],
     ) -> Result<SparseStatus, SubmoduleError> {
-        // Read sparse-checkout file directly
-        let sparse_checkout_file = repo.git_dir().join("info").join("sparse-checkout");
+        // Try to find the sparse-checkout file for the submodule
+        let git_dir = self.get_git_directory(submodule_path)?;
+        let sparse_checkout_file = git_dir.join("info").join("sparse-checkout");
         if !sparse_checkout_file.exists() {
             return Ok(SparseStatus::NotConfigured);
         }
@@ -286,8 +303,17 @@ impl GitoxideSubmoduleManager {
         if _no_init {
             self.update_toml_config(
                 name.clone(),
-                path.clone(),
-                url.clone(),
+                SubmoduleEntry {
+                    path: Some(path.clone()),
+                    url: Some(url.clone()),
+                    branch: _branch.clone(),
+                    ignore: _ignore.clone(),
+                    update: _update.clone(),
+                    fetch_recurse: _fetch.clone(),
+                    active: Some(true),
+                    shallow: _shallow,
+                    no_init: Some(_no_init),
+                },
                 sparse_paths.clone(),
             )?;
         }
@@ -309,7 +335,21 @@ impl GitoxideSubmoduleManager {
             Ok(()) => {
                 // Configure after successful creation
                 self.configure_submodule_post_creation(&name, &path, sparse_paths.clone())?;
-                self.update_toml_config(name.clone(), path, url, sparse_paths)?;
+                self.update_toml_config(
+                    name.clone(),
+                    SubmoduleEntry {
+                        path: Some(path),
+                        url: Some(url),
+                        branch: _branch,
+                        ignore: _ignore,
+                        update: _update,
+                        fetch_recurse: _fetch,
+                        active: Some(true),
+                        shallow: _shallow,
+                        no_init: Some(_no_init),
+                    },
+                    sparse_paths,
+                )?;
                 println!("Added submodule {name}");
                 Ok(())
             }
@@ -318,32 +358,17 @@ impl GitoxideSubmoduleManager {
     }
 
     /// Clean up existing submodule state using git commands only
-    fn cleanup_existing_submodule(&self, path: &str) -> Result<(), SubmoduleError> {
-        let workdir = self
-            .repo
-            .workdir()
-            .unwrap_or_else(|| std::path::Path::new("."));
+    fn cleanup_existing_submodule(&mut self, path: &str) -> Result<(), SubmoduleError> {
+        // Use GitOpsManager trait methods for cleanup
+        // 1. Deinitialize the submodule (force = true)
+        self.git_ops
+            .deinit_submodule(path, true)
+            .map_err(Self::map_git_ops_error)?;
 
-        // Use git to deinitialize the submodule if it exists
-        let _deinit_output = Command::new("git")
-            .args(["submodule", "deinit", "-f", path])
-            .current_dir(workdir)
-            .output()
-            .map_err(SubmoduleError::IoError)?;
-
-        // Remove from git index if present
-        let _rm_output = Command::new("git")
-            .args(["rm", "--cached", "-f", path])
-            .current_dir(workdir)
-            .output()
-            .map_err(SubmoduleError::IoError)?;
-
-        // Clean any remaining files in the working directory
-        let _clean_output = Command::new("git")
-            .args(["clean", "-fd", path])
-            .current_dir(workdir)
-            .output()
-            .map_err(SubmoduleError::IoError)?;
+        // 2. Delete the submodule completely
+        self.git_ops
+            .delete_submodule(path)
+            .map_err(Self::map_git_ops_error)?;
 
         Ok(())
     }
@@ -367,133 +392,50 @@ impl GitoxideSubmoduleManager {
         let opts = options.unwrap_or_default();
         opts.try_into().unwrap()
     }
+fn add_submodule_with_git2(
+    &mut self,
+    _name: &str,
+    path: &str,
+    url: &str,
+) -> Result<(), SubmoduleError> {
+    let opts = crate::config::SubmoduleAddOptions {
+        name: _name.to_string(),
+        path: std::path::PathBuf::from(path),
+        url: url.to_string(),
+        branch: None,
+        ignore: None,
+        update: None,
+        fetch_recurse: None,
+        shallow: false,
+        no_init: false,
+    };
+    self.git_ops
+        .add_submodule(&opts)
+        .map_err(Self::map_git_ops_error)
+}
 
-    fn add_submodule_with_git2(
-        &self,
-        _name: &str,
-        path: &str,
-        url: &str,
-    ) -> Result<(), SubmoduleError> {
-        let git2_repo = git2::Repository::open(self.repo.git_dir())?;
-        let submodule_path = std::path::Path::new(path);
+fn add_submodule_with_cli(
+    &mut self,
+    _name: &str,
+    path: &str,
+    url: &str,
+) -> Result<(), SubmoduleError> {
+    let opts = crate::config::SubmoduleAddOptions {
+        name: _name.to_string(),
+        path: std::path::PathBuf::from(path),
+        url: url.to_string(),
+        branch: None,
+        ignore: None,
+        update: None,
+        fetch_recurse: None,
+        shallow: false,
+        no_init: false,
+    };
+    self.git_ops
+        .add_submodule(&opts)
+        .map_err(Self::map_git_ops_error)
+}
 
-        // Let git2 handle all directory creation and management
-        let mut submodule = git2_repo.submodule(url, submodule_path, true)?;
-
-        // Initialize the submodule configuration
-        submodule.init(false)?;
-
-        // Set up the subrepository for cloning
-        let _sub_repo = submodule.repo_init(true)?;
-
-        // Clone the repository
-        let _cloned_repo = submodule.clone(None)?;
-
-        // Add the submodule to the index and finalize
-        submodule.add_to_index(true)?;
-        submodule.add_finalize()?;
-
-        Ok(())
-    }
-
-    fn add_submodule_with_cli(
-        &self,
-        _name: &str,
-        path: &str,
-        url: &str,
-    ) -> Result<(), SubmoduleError> {
-        let workdir = self
-            .repo
-            .workdir()
-            .unwrap_or_else(|| std::path::Path::new("."));
-
-        // Configure git to allow file protocol for tests
-        let _config_output = Command::new("git")
-            .args(["config", "protocol.file.allow", "always"])
-            .current_dir(workdir)
-            .output()
-            .map_err(SubmoduleError::IoError)?;
-
-        // Clean up any existing broken submodule state
-        let target_path = std::path::Path::new(workdir).join(path);
-
-        // Always try to clean up, even if the directory doesn't exist
-        // because there might be git metadata left behind
-
-        // Try to deinitialize the submodule first
-        let _ = Command::new("git")
-            .args(["submodule", "deinit", "-f", path])
-            .current_dir(workdir)
-            .output();
-
-        // Remove the submodule from .gitmodules and .git/config
-        let _ = Command::new("git")
-            .args(["rm", "-f", path])
-            .current_dir(workdir)
-            .output();
-
-        // Remove the directory if it exists
-        if target_path.exists() {
-            let _ = std::fs::remove_dir_all(&target_path);
-        }
-
-        // Clean up git modules directory
-        let git_modules_path = std::path::Path::new(workdir)
-            .join(".git/modules")
-            .join(path);
-        if git_modules_path.exists() {
-            let _ = std::fs::remove_dir_all(&git_modules_path);
-        }
-
-        // Also try to clean up parent directories in git modules if they're empty
-        if let Some(parent) = git_modules_path.parent() {
-            let _ = std::fs::remove_dir(parent); // This will only succeed if empty
-        }
-
-        // Use --force to ensure git overwrites any stale state
-        // Explicitly specify the main branch to avoid default branch issues
-        let output = Command::new("git")
-            .args(["submodule", "add", "--force", "--branch", "main", url, path])
-            .current_dir(workdir)
-            .output()
-            .map_err(SubmoduleError::IoError)?;
-
-        if !output.status.success() {
-            let stderr = String::from_utf8_lossy(&output.stderr);
-            return Err(SubmoduleError::CliError(format!(
-                "Git submodule add failed: {stderr}"
-            )));
-        }
-
-        // Initialize and update the submodule to ensure it's properly checked out
-        let init_output = Command::new("git")
-            .args(["submodule", "init", path])
-            .current_dir(workdir)
-            .output()
-            .map_err(SubmoduleError::IoError)?;
-
-        if !init_output.status.success() {
-            let stderr = String::from_utf8_lossy(&init_output.stderr);
-            return Err(SubmoduleError::CliError(format!(
-                "Git submodule init failed: {stderr}"
-            )));
-        }
-
-        let update_output = Command::new("git")
-            .args(["submodule", "update", path])
-            .current_dir(workdir)
-            .output()
-            .map_err(SubmoduleError::IoError)?;
-
-        if !update_output.status.success() {
-            let stderr = String::from_utf8_lossy(&update_output.stderr);
-            return Err(SubmoduleError::CliError(format!(
-                "Git submodule update failed: {stderr}"
-            )));
-        }
-
-        Ok(())
-    }
 
     /// Configure submodule for post-creation setup
     fn configure_submodule_post_creation(
@@ -513,24 +455,9 @@ impl GitoxideSubmoduleManager {
         Ok(())
     }
 
-    /// Update TOML configuration
-    fn update_toml_config(
-        &mut self,
-        name: String,
-        config: SubmoduleEntry,
-        _sparse_paths: Option<Vec<String>>,
-    ) -> Result<(), SubmoduleError> {
-        self.config.add_submodule(name.to_string(), config);
-        if _sparse_paths.is_some() {
-            self.apply_sparse_checkout_cli(_sparse_paths);
-        }
-
-        Ok(())
-    }
-
     /// Configure sparse checkout using basic file operations
     pub fn configure_sparse_checkout(
-        &self,
+        &mut self,
         submodule_path: &str,
         patterns: &[String],
     ) -> Result<(), SubmoduleError> {
@@ -538,41 +465,17 @@ impl GitoxideSubmoduleManager {
             "DEBUG: Configuring sparse checkout for {submodule_path} with patterns: {patterns:?}"
         );
 
-        // Enable sparse checkout in git config (using CLI for now since config mutation is complex)
-        let output = Command::new("git")
-            .args(["config", "core.sparseCheckout", "true"])
-            .current_dir(submodule_path)
-            .output()?;
+        self.git_ops
+            .enable_sparse_checkout(submodule_path)
+            .map_err(|e| SubmoduleError::GitoxideError(format!("Enable sparse checkout failed: {e}")))?;
 
-        if !output.status.success() {
-            let stderr = String::from_utf8_lossy(&output.stderr);
-            return Err(SubmoduleError::CliError(format!(
-                "Failed to enable sparse checkout: {stderr}"
-            )));
-        }
+        self.git_ops
+            .set_sparse_patterns(submodule_path, patterns)
+            .map_err(|e| SubmoduleError::GitoxideError(format!("Set sparse patterns failed: {e}")))?;
 
-        // Get the actual git directory (handles both regular repos and submodules with gitlinks)
-        let git_dir = self.get_git_directory(submodule_path)?;
-        eprintln!(
-            "DEBUG: Git directory for {}: {}",
-            submodule_path,
-            git_dir.display()
-        );
-
-        // Write sparse-checkout file
-        let info_dir = git_dir.join("info");
-        fs::create_dir_all(&info_dir)?;
-
-        let sparse_checkout_file = info_dir.join("sparse-checkout");
-        let content = patterns.join("\n") + "\n";
-        fs::write(&sparse_checkout_file, &content)?;
-        eprintln!(
-            "DEBUG: Wrote sparse-checkout file to: {}",
-            sparse_checkout_file.display()
-        );
-
-        // Apply sparse checkout
-        self.apply_sparse_checkout_cli(submodule_path)?;
+        self.git_ops
+            .apply_sparse_checkout(submodule_path)
+            .map_err(|e| SubmoduleError::GitoxideError(format!("Apply sparse checkout failed: {e}")))?;
 
         println!("Configured sparse checkout");
 
@@ -632,62 +535,40 @@ impl GitoxideSubmoduleManager {
             }
         }
     }
-
-    fn apply_sparse_checkout_cli(&self, sparse_paths: &Option<Vec<String>>) -> Result<(), SubmoduleError> {
-        let output = Command::new("git")
-            .args(["sparse-checkout", "set"])
-            .args(sparse_paths.as_deref().unwrap_or(&vec![]))
-            .current_dir(self.repo.workdir().unwrap_or_else(|| Path::new(".")))
-            .output()?;
-
-        if !output.status.success() {
-            let stderr = String::from_utf8_lossy(&output.stderr);
-            eprintln!("Warning applying sparse checkout: {stderr}");
-        }
-
-        Ok(())
-    }
+// Removed: apply_sparse_checkout_cli is obsolete; sparse checkout is handled by GitOpsManager abstraction.
 
     /// Update submodule using CLI fallback (gix remote operations are complex for this use case)
-    pub fn update_submodule(&self, name: &str) -> Result<(), SubmoduleError> {
-        let config =
-            self.config
-                .submodules
-                .get(name)
-                .ok_or_else(|| SubmoduleError::SubmoduleNotFound {
-                    name: name.to_string(),
-                })?;
+    pub fn update_submodule(&mut self, name: &str) -> Result<(), SubmoduleError> {
+        let config = self.config
+            .submodules
+            .get(name)
+            .ok_or_else(|| SubmoduleError::SubmoduleNotFound {
+                name: name.to_string(),
+            })?;
 
         let submodule_path = config.path.as_ref().ok_or_else(|| {
             SubmoduleError::ConfigError("No path configured for submodule".to_string())
         })?;
 
-        // Use CLI for update operations for reliability
-        let output = Command::new("git")
-            .args(["pull", "origin", "HEAD"])
-            .current_dir(submodule_path)
-            .output()?;
+        // Prepare update options (use defaults for now)
+        let update_opts = crate::config::SubmoduleUpdateOptions::default();
 
-        if !output.status.success() {
-            let stderr = String::from_utf8_lossy(&output.stderr);
-            return Err(SubmoduleError::CliError(format!(
-                "Update failed for {name}: {stderr}"
-            )));
-        }
+        self.git_ops
+            .update_submodule(submodule_path, &update_opts)
+            .map_err(|e| SubmoduleError::GitoxideError(format!("GitOpsManager update failed: {e}")))?;
 
-        println!("✅ Updated {name} using git CLI");
+        println!("✅ Updated {name} using GitOpsManager abstraction");
         Ok(())
     }
 
     /// Reset submodule using CLI operations
-    pub fn reset_submodule(&self, name: &str) -> Result<(), SubmoduleError> {
-        let config =
-            self.config
-                .submodules
-                .get(name)
-                .ok_or_else(|| SubmoduleError::SubmoduleNotFound {
-                    name: name.to_string(),
-                })?;
+    pub fn reset_submodule(&mut self, name: &str) -> Result<(), SubmoduleError> {
+        let config = self.config
+            .submodules
+            .get(name)
+            .ok_or_else(|| SubmoduleError::SubmoduleNotFound {
+                name: name.to_string(),
+            })?;
 
         let submodule_path = config.path.as_ref().ok_or_else(|| {
             SubmoduleError::ConfigError("No path configured for submodule".to_string())
@@ -697,61 +578,32 @@ impl GitoxideSubmoduleManager {
 
         // Step 1: Stash changes
         println!("  📦 Stashing working changes...");
-        let stash_output = Command::new("git")
-            .args([
-                "stash",
-                "push",
-                "--include-untracked",
-                "-m",
-                "Submod reset stash",
-            ])
-            .current_dir(submodule_path)
-            .output()?;
-
-        if !stash_output.status.success() {
-            let stderr = String::from_utf8_lossy(&stash_output.stderr);
-            if !stderr.contains("No local changes to save") {
-                println!("  ⚠️  Stash warning: {}", stderr.trim());
-            }
+        match self.git_ops.stash_submodule(submodule_path, true) {
+            Ok(_) => {}
+            Err(e) => println!("  ⚠️  Stash warning: {e}"),
         }
 
         // Step 2: Hard reset
         println!("  🔄 Resetting to HEAD...");
-        let reset_output = Command::new("git")
-            .args(["reset", "--hard", "HEAD"])
-            .current_dir(submodule_path)
-            .output()?;
-
-        if !reset_output.status.success() {
-            let stderr = String::from_utf8_lossy(&reset_output.stderr);
-            return Err(SubmoduleError::CliError(format!(
-                "Git reset failed: {stderr}"
-            )));
-        }
+        self.git_ops
+            .reset_submodule(submodule_path, true)
+            .map_err(|e| SubmoduleError::GitoxideError(format!("GitOpsManager reset failed: {e}")))?;
 
         // Step 3: Clean untracked files
         println!("  🧹 Cleaning untracked files...");
-        let clean_output = Command::new("git")
-            .args(["clean", "-fdx"])
-            .current_dir(submodule_path)
-            .output()?;
-
-        if !clean_output.status.success() {
-            let stderr = String::from_utf8_lossy(&clean_output.stderr);
-            return Err(SubmoduleError::CliError(format!(
-                "Git clean failed: {stderr}"
-            )));
-        }
+        self.git_ops
+            .clean_submodule(submodule_path, true, true)
+            .map_err(|e| SubmoduleError::GitoxideError(format!("GitOpsManager clean failed: {e}")))?;
 
         println!("✅ {name} reset complete");
         Ok(())
     }
 
     /// Initialize submodule - add it first if not registered, then initialize
-    pub fn init_submodule(&self, name: &str) -> Result<(), SubmoduleError> {
+    pub fn init_submodule(&mut self, name: &str) -> Result<(), SubmoduleError> {
+        let submodules = self.config.clone().submodules;
         let config =
-            self.config
-                .submodules
+            submodules
                 .get(name)
                 .ok_or_else(|| SubmoduleError::SubmoduleNotFound {
                     name: name.to_string(),
@@ -769,21 +621,18 @@ impl GitoxideSubmoduleManager {
         if submodule_path.exists() && submodule_path.join(".git").exists() {
             println!("✅ {name} already initialized");
             // Even if already initialized, check if we need to configure sparse checkout
-            if let Some(sparse_checkouts) = self.config.submodules.sparse_checkouts() {
-                if let Some(sparse_paths) = sparse_checkouts.get(name) {
-                    eprintln!("DEBUG: Configuring sparse checkout for newly initialized submodule: {name}");
-                    self.configure_sparse_checkout(path_str, sparse_paths)?;
-                }
+            let sparse_paths_opt = self.config.submodules.sparse_checkouts()
+                .and_then(|sparse_checkouts| sparse_checkouts.get(name).cloned());
+            if let Some(sparse_paths) = sparse_paths_opt {
+                eprintln!("DEBUG: Configuring sparse checkout for newly initialized submodule: {name}");
+                self.configure_sparse_checkout(path_str, &sparse_paths)?;
             }
             return Ok(());
         }
 
         println!("🔄 Initializing {name}...");
 
-        let workdir = self
-            .repo
-            .workdir()
-            .unwrap_or_else(|| std::path::Path::new("."));
+        let workdir = std::path::Path::new(".");
 
         // First check if submodule is registered in .gitmodules
         let gitmodules_path = workdir.join(".gitmodules");
@@ -828,7 +677,7 @@ impl GitoxideSubmoduleManager {
         println!("  ✅ Initialized using git submodule commands: {path_str}");
 
         // Configure sparse checkout if specified
-        if let Some(sparse_checkouts) = self.config.submodules.sparse_checkouts() {
+        if let Some(sparse_checkouts) = submodules.sparse_checkouts() {
             if let Some(sparse_paths) = sparse_checkouts.get(name) {
                 eprintln!("DEBUG: Configuring sparse checkout for newly initialized submodule: {name}");
                 self.configure_sparse_checkout(path_str, sparse_paths)?;
@@ -935,9 +784,19 @@ impl GitoxideSubmoduleManager {
             println!("     branch = {:?}", branch);
         }
     }
-
     /// Get reference to the underlying config
     pub const fn config(&self) -> &Config {
         &self.config
     }
+
+    /// Get mutable reference to the underlying config
+    pub const fn config_mut(&mut self) -> &mut Config {
+        &mut self.config
+    }
+
+    /// Get a clone of the underlying config
+    pub fn config_clone(&self) -> Config {
+        self.config.clone()
+    }
+
 }

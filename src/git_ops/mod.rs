@@ -63,7 +63,7 @@ bitflags! {
 }
 
 /// Comprehensive submodule status information
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct DetailedSubmoduleStatus {
     /// Path of the submodule
     pub path: String,
@@ -121,9 +121,9 @@ pub trait GitOperations {
     /// Update a submodule
     fn update_submodule(&mut self, path: &str, opts: &SubmoduleUpdateOptions) -> Result<()>;
     /// Delete a submodule completely
-    fn delete_submodule(&self, path: &str) -> Result<()>;
+    fn delete_submodule(&mut self, path: &str) -> Result<()>;
     /// Deinitialize a submodule
-    fn deinit_submodule(&self, path: &str, force: bool) -> Result<()>;
+    fn deinit_submodule(&mut self, path: &str, force: bool) -> Result<()>;
     /// Get detailed status of a submodule
     fn get_submodule_status(&self, path: &str) -> Result<DetailedSubmoduleStatus>;
     /// List all submodules
@@ -259,15 +259,15 @@ impl GitOperations for GitOpsManager {
         )
     }
 
-    fn delete_submodule(&self, path: &str) -> Result<()> {
-        self.try_with_fallback(
-            |gix| gix.delete_submodule(path),
-            |git2| git2.delete_submodule(path),
-        )
-    }
+    fn delete_submodule(&mut self, path: &str) -> Result<()> {
+            self.try_with_fallback_mut(
+                |gix| gix.delete_submodule(path),
+                |git2| git2.delete_submodule(path),
+            )
+        }
 
-    fn deinit_submodule(&self, path: &str, force: bool) -> Result<()> {
-        self.try_with_fallback(
+    fn deinit_submodule(&mut self, path: &str, force: bool) -> Result<()> {
+        self.try_with_fallback_mut(
             |gix| gix.deinit_submodule(path, force),
             |git2| git2.deinit_submodule(path, force),
         )

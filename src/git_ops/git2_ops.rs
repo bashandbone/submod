@@ -350,7 +350,7 @@ impl GitOperations for Git2Operations {
         submodule.update(true, Some(&mut update_opts))?;
         Ok(())
     }
-    fn delete_submodule(&self, path: &str) -> Result<()> {
+    fn delete_submodule(&mut self, path: &str) -> Result<()> {
         // git2 doesn't have direct submodule deletion, so we need to do it manually
 
         // 1. Deinitialize the submodule
@@ -372,7 +372,7 @@ impl GitOperations for Git2Operations {
         // For now, we'll leave this to be handled by higher-level logic
         Ok(())
     }
-    fn deinit_submodule(&self, path: &str, force: bool) -> Result<()> {
+    fn deinit_submodule(&mut self, path: &str, force: bool) -> Result<()> {
         let submodule = self.repo.find_submodule(path)
             .with_context(|| format!("Submodule not found: {}", path))?;
         // git2 doesn't have a direct deinit method, so we need to:
@@ -621,5 +621,11 @@ impl Git2Operations {
         // Get sparse patterns
         let patterns = self.get_sparse_patterns(path)?;
         Ok((true, patterns))
+    }
+}
+
+impl From<super::GitOpsManager> for Git2Operations {
+    fn from(ops: super::GitOpsManager) -> Self {
+        ops.git2_ops
     }
 }
