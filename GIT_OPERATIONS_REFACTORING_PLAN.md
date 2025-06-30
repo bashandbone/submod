@@ -135,22 +135,60 @@ fn set_sparse_patterns(&self, path: &str, patterns: &[String]) -> Result<()> {
 
 #### 3.1 Map CLI Calls to GitOperations Methods
 
-**From FEATURE_CODE_REVIEW.md**, replace these 17 CLI calls:
+The following table reflects the actual [`GitOpsManager`](src/git_ops/mod.rs) API surface and type signatures used in [`gitoxide_manager.rs`](src/gitoxide_manager.rs):
 
-| Current CLI Call | Target GitOperations Method | Implementation Priority |
-|------------------|----------------------------|------------------------|
-| `git config core.sparseCheckout true` | `set_config_value()` | High |
-| `git sparse-checkout set` | `set_sparse_patterns()` + `apply_sparse_checkout()` | High |
-| `git submodule deinit -f` | `deinit_submodule()` | Medium |
-| `git rm --cached -f` | Custom index manipulation | Medium |
-| `git clean -fd` | `clean_submodule()` | Medium |
-| `git submodule add --force` | `add_submodule()` | High |
-| `git submodule init` | `init_submodule()` | High |
-| `git submodule update` | `update_submodule()` | High |
-| `git pull origin HEAD` | `fetch_submodule()` + merge logic | Medium |
-| `git stash push --include-untracked` | `stash_submodule()` | Low |
-| `git reset --hard HEAD` | `reset_submodule()` | Medium |
-| `git clean -fdx` | `clean_submodule()` | Medium |
+| CLI Call | GitOpsManager Method | Type Signature |
+|---|---|---|
+| git config core.sparseCheckout true | set_config_value | fn set_config_value(&self, key: &str, value: &str, level: ConfigLevel) -> Result<()> |
+| git sparse-checkout set | set_sparse_patterns | fn set_sparse_patterns(&self, path: &str, patterns: &[String]) -> Result<()> |
+| git sparse-checkout set | apply_sparse_checkout | fn apply_sparse_checkout(&self, path: &str) -> Result<()> |
+| git submodule deinit -f | deinit_submodule | fn deinit_submodule(&mut self, path: &str, force: bool) -> Result<()> |
+| git rm --cached -f | delete_submodule | fn delete_submodule(&mut self, path: &str) -> Result<()> |
+| git clean -fd / -fdx | clean_submodule | fn clean_submodule(&self, path: &str, force: bool, remove_directories: bool) -> Result<()> |
+| git submodule add --force | add_submodule | fn add_submodule(&mut self, opts: &SubmoduleAddOptions) -> Result<()> |
+| git submodule init | init_submodule | fn init_submodule(&mut self, path: &str) -> Result<()> |
+| git submodule update | update_submodule | fn update_submodule(&mut self, path: &str, opts: &SubmoduleUpdateOptions) -> Result<()> |
+| git pull origin HEAD | fetch_submodule | fn fetch_submodule(&self, path: &str) -> Result<()> |
+| git stash push --include-untracked | stash_submodule | fn stash_submodule(&self, path: &str, include_untracked: bool) -> Result<()> |
+| git reset --hard HEAD | reset_submodule | fn reset_submodule(&self, path: &str, hard: bool) -> Result<()> |
+
+```mermaid
+flowchart TD
+    GM[GitoxideSubmoduleManager]
+    GOP[GitOpsManager]
+    GIX[GixOperations]
+    GIT2[Git2Operations]
+
+    GM -->|calls| GOP
+    GOP -->|delegates| GIX
+    GOP -->|fallback| GIT2
+
+    subgraph "Key Methods"
+        set_config_value["set_config_value(key, value, level)"]
+        set_sparse_patterns["set_sparse_patterns(path, patterns)"]
+        deinit_submodule["deinit_submodule(path, force)"]
+        delete_submodule["delete_submodule(path)"]
+        clean_submodule["clean_submodule(path, force, remove_dirs)"]
+        add_submodule["add_submodule(opts)"]
+        init_submodule["init_submodule(path)"]
+        update_submodule["update_submodule(path, opts)"]
+        fetch_submodule["fetch_submodule(path)"]
+        stash_submodule["stash_submodule(path, include_untracked)"]
+        reset_submodule["reset_submodule(path, hard)"]
+    end
+
+    GM --> set_config_value
+    GM --> set_sparse_patterns
+    GM --> deinit_submodule
+    GM --> delete_submodule
+    GM --> clean_submodule
+    GM --> add_submodule
+    GM --> init_submodule
+    GM --> update_submodule
+    GM --> fetch_submodule
+    GM --> stash_submodule
+    GM --> reset_submodule
+```
 
 #### 3.2 Update GitoxideSubmoduleManager Methods
 
