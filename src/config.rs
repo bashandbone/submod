@@ -236,6 +236,7 @@ impl SubmoduleUpdateOptions {
         }
     }
 
+    /// Create a new instance with default values
     pub fn default() -> Self {
         Self {
             strategy: SerializableUpdate::default(),
@@ -244,6 +245,7 @@ impl SubmoduleUpdateOptions {
         }
     }
 
+    /// Get a new instance with the recursive flag set
     pub fn forced(&self) -> Self {
         Self {
             strategy: self.strategy.clone(),
@@ -252,6 +254,7 @@ impl SubmoduleUpdateOptions {
         }
     }
 
+    /// Convert from SubmoduleGitOptions to SubmoduleUpdateOptions
     pub fn from_options(
         options: SubmoduleGitOptions,
     ) -> Self {
@@ -266,6 +269,7 @@ impl SubmoduleUpdateOptions {
     }
 }
 
+/// Settings for a submodule that are not git-specific
 #[derive(Debug, Default, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub struct OtherSubmoduleSettings {
     /// URL of the submodule repository. This can be either a remote (https, ssh, etc) or a *relative* local path like `../some/other/repo`.
@@ -285,10 +289,15 @@ pub struct OtherSubmoduleSettings {
     /// When true, only the last commit will be included in the submodule's history.
     #[serde(default = "default_false", skip_serializing_if = "shallow_filter")]
     pub shallow: bool,
+
+    /// Whether to skip initialization after adding the submodule
+    #[serde(default = "default_false")]
+    pub no_init: bool,
 }
 
 impl OtherSubmoduleSettings {
 
+    /// Create a new instance with default values
     fn default() -> Self {
         Self {
             url: None, // Default to None, which makes it easier to identify missing values
@@ -296,10 +305,11 @@ impl OtherSubmoduleSettings {
             name: None, // Default to None
             active: true,           // Default to active
             shallow: false,         // Default to not shallow
+            no_init: false,         // Default to not skipping initialization
         }
     }
 
-    fn new(url: Option<String>, path: Option<String>, name: Option<String>, active: Option<bool>, shallow: Option<bool>) -> Self {
+    fn new(url: Option<String>, path: Option<String>, name: Option<String>, active: Option<bool>, shallow: Option<bool>, no_init: Option<bool>) -> Self {
         Self {
             url: url.clone().or_else(|| Some(".".to_string())),
             path: path.clone().or_else(|| if let Some(ref u) = url {
@@ -316,6 +326,7 @@ impl OtherSubmoduleSettings {
             }),
             active: active.unwrap_or(true), // Default to true if not specified
             shallow: shallow.unwrap_or(false), // Default to false if not specified
+            no_init: no_init.unwrap_or(false), // Default to false if not specified
         }
     }
 
@@ -334,6 +345,7 @@ impl OtherSubmoduleSettings {
             name,
             entry.active,
             entry.shallow,
+            entry.no_init,
         )
     }
 
@@ -371,7 +383,10 @@ pub struct SubmoduleEntry {
     /// Whether the submodule is active
     pub active: Option<bool>,
     /// Whether the submodule is shallow (depth == 1)
-    pub shallow: Option<bool>
+    pub shallow: Option<bool>,
+    /// Whether to skip initialization after adding
+    #[serde(skip)] // never write, we use this for stateful decisions
+    pub no_init: Option<bool>,
 }
 
 impl SubmoduleEntry {
@@ -385,6 +400,7 @@ impl SubmoduleEntry {
         fetch_recurse: Option<SerializableFetchRecurse>,
         active: Option<bool>,
         shallow: Option<bool>,
+        no_init: Option<bool>,
     ) -> Self {
         Self {
             url, // keep url explicitly None if we can't get it right now
@@ -395,9 +411,11 @@ impl SubmoduleEntry {
             fetch_recurse,
             active: active,
             shallow: shallow,
+            no_init: no_init,
         }
     }
 
+    /// Create a new submodule entry with defaults, using the URL and path from OtherSubmoduleSettings
     pub fn from_options_and_settings(
         options: SubmoduleGitOptions,
         other_settings: OtherSubmoduleSettings,
@@ -411,6 +429,7 @@ impl SubmoduleEntry {
             options.fetch_recurse,
             Some(other_settings.active),
             Some(other_settings.shallow),
+            Some(other_settings.no_init),
         )
     }
 
@@ -449,6 +468,7 @@ impl SubmoduleEntry {
         }
         new_self.active = Some(other_settings.active);
         new_self.shallow = Some(other_settings.shallow);
+        new_self.no_init = Some(other_settings.no_init);
         new_self
     }
 
@@ -487,6 +507,7 @@ impl SubmoduleEntry {
             path: self.path.clone(),
             active: self.active.unwrap_or(true),
             shallow: self.shallow.unwrap_or(false),
+            no_init: self.no_init.unwrap_or(false),
         }
     }
 
@@ -523,6 +544,7 @@ impl From<OtherSubmoduleSettings> for SubmoduleEntry {
             fetch_recurse: default_git_options.fetch_recurse,
             branch: default_git_options.branch,
             update: default_git_options.update,
+            no_init: Some(other.no_init),
         }
     }
 }

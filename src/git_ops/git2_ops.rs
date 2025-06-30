@@ -57,6 +57,7 @@ impl Git2Operations {
             fetch_recurse,
             active: Some(active),
             shallow: Some(shallow),
+            no_init: Some(false), // not used here
         };
         Ok((name, entry))
     }
@@ -205,7 +206,7 @@ impl GitOperations for Git2Operations {
                         if let Some(ignore) = &entry.ignore {
                             let ignore_str = match ignore {
                                 SerializableIgnore::All => "all",
-                                SerializableIgnore::Dirty => "dirty", 
+                                SerializableIgnore::Dirty => "dirty",
                                 SerializableIgnore::Untracked => "untracked",
                                 SerializableIgnore::None => "none",
                                 SerializableIgnore::Unspecified => continue, // Skip unspecified
@@ -216,7 +217,7 @@ impl GitOperations for Git2Operations {
                             let update_str = match update {
                                 SerializableUpdate::Checkout => "checkout",
                                 SerializableUpdate::Rebase => "rebase",
-                                SerializableUpdate::Merge => "merge", 
+                                SerializableUpdate::Merge => "merge",
                                 SerializableUpdate::None => "none",
                                 SerializableUpdate::Unspecified => continue, // Skip unspecified
                             };

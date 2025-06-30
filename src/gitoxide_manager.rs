@@ -280,7 +280,18 @@ impl GitoxideSubmoduleManager {
         _ignore: Option<SerializableIgnore>,
         _fetch: Option<SerializableFetchRecurse>,
         _update: Option<SerializableUpdate>,
+        _shallow: Option<bool>,
+        _no_init: bool,
     ) -> Result<(), SubmoduleError> {
+        if _no_init {
+            self.update_toml_config(
+                name.clone(),
+                path.clone(),
+                url.clone(),
+                sparse_paths.clone(),
+            )?;
+        }
+
         // Clean up any existing submodule state using git commands
         self.cleanup_existing_submodule(&path)?;
 
@@ -506,22 +517,13 @@ impl GitoxideSubmoduleManager {
     fn update_toml_config(
         &mut self,
         name: String,
-        path: String,
-        url: String,
+        config: SubmoduleEntry,
         _sparse_paths: Option<Vec<String>>,
     ) -> Result<(), SubmoduleError> {
-        let submodule_config = SubmoduleEntry {
-            path: Some(path.to_string()),
-            url: Some(url.to_string()),
-            branch: None,
-            ignore: None,
-            update: None,
-            fetch_recurse: None,
-            active: Some(true),
-            shallow: Some(false),
-        };
-
-        self.config.add_submodule(name.to_string(), submodule_config);
+        self.config.add_submodule(name.to_string(), config);
+        if _sparse_paths.is_some() {
+            self.apply_sparse_checkout_cli(_sparse_paths);
+        }
 
         Ok(())
     }
@@ -631,10 +633,11 @@ impl GitoxideSubmoduleManager {
         }
     }
 
-    fn apply_sparse_checkout_cli(&self, path: &str) -> Result<(), SubmoduleError> {
+    fn apply_sparse_checkout_cli(&self, sparse_paths: &Option<Vec<String>>) -> Result<(), SubmoduleError> {
         let output = Command::new("git")
-            .args(["read-tree", "-m", "-u", "HEAD"])
-            .current_dir(path)
+            .args(["sparse-checkout", "set"])
+            .args(sparse_paths.as_deref().unwrap_or(&vec![]))
+            .current_dir(self.repo.workdir().unwrap_or_else(|| Path::new(".")))
             .output()?;
 
         if !output.status.success() {

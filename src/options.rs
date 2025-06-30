@@ -412,6 +412,21 @@ impl Default for SerializableBranch {
     }
 }
 
+impl SerializableBranch {
+    pub fn set_branch(branch: Option<String>) -> Result<Self, anyhow::Error> {
+        let branch = if let Some(b) = branch {
+            if !b.is_empty() {
+                Some(SerializableBranch::from_str(b.trim()).map_err(|_| anyhow::anyhow!("Invalid branch string")))
+            } else {
+                Some(Ok(SerializableBranch::default()))
+            }
+        } else {
+            Some(Ok(SerializableBranch::default()))
+        };
+        branch.unwrap_or_else(|| Ok(SerializableBranch::default()))
+    }
+}
+
 /// Serializable enum for [`Update`] config
 #[derive(
     Debug, Clone, Default, Ord, PartialOrd, Eq, PartialEq, Hash, Serialize, Deserialize, ValueEnum,

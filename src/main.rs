@@ -30,15 +30,19 @@ mod gitoxide_manager;
 mod utilities;
 
 use crate::commands::{Cli, Commands};
-use crate::utilities::set_path;
+use crate::utilities::{name_from_osstring, name_from_url, set_path, get_sparse_paths};
 use crate::options::{SerializableBranch as Branch, SerializableIgnore, SerializableFetchRecurse, SerializableUpdate};
 use crate::gitoxide_manager::GitoxideSubmoduleManager;
 use anyhow::Result;
 use clap::Parser;
+use submod::options::SerializableBranch;
+use std::ffi::OsString;
 use std::str::FromStr;
 
 fn main() -> Result<()> {
     let cli = Cli::parse();
+    // config-path is always set because it has a default value, "submod.toml"
+    let config_path = cli.config.clone();
 
     match cli.command {
         Commands::Add {
@@ -53,77 +57,35 @@ fn main() -> Result<()> {
             shallow,
             no_init,
         } => {
-            let mut manager = GitoxideSubmoduleManager::new(cli.config)
-                .map_err(|e| anyhow::anyhow!("Failed to create manager: {}", e))?;
-
             // Validate sparse paths for null bytes
-            let sparse_paths_vec = match sparse_paths {
-                Some(paths) => {
-                    for path in &paths {
-                        if path.contains('\0') {
-                            return Err(anyhow::anyhow!(
-                                "Invalid sparse path pattern: contains null byte"
-                            ));
-                        }
-                    }
-                    Some(paths)
-                },
-                None => None,
-            };
+            let sparse_paths_vec = get_sparse_paths(sparse_paths)
+                .map_err(|e| anyhow::anyhow!("Invalid sparse paths: {}", e))?;
 
-            // Set the path - handle optional path
-            let set_path_result = match path {
-                Some(p) => set_path(p)
-                    .map_err(|e| anyhow::anyhow!("Failed to set path: {}", e))?,
-                None => {
-                    // Derive path from URL if not provided
-                    let cleaned_url = url.trim_end_matches('/').trim_end_matches(".git");
-                    cleaned_url
-                        .split('/')
-                        .last()
-                        .unwrap_or_else(|| {
-                            cleaned_url
-                                .split(':')
-                                .last()
-                                .unwrap_or("submodule")
-                        })
-                        .to_string()
-                }
-            };
+            let set_name = get_name(&name, &url, &path)
+                .map_err(|e| anyhow::anyhow!("Failed to get submodule name: {}", e))?;
 
-            let set_branch = match branch {
-                Some(ref b) => Some(Branch::from_str(b)
-                    .map_err(|e| anyhow::anyhow!("Failed to set branch: {:#?}", e))?),
-                None => Some(Branch::default()),
-            };
+            let set_path = path.map(|p| set_path(p).map_err(|e| anyhow::anyhow!("Invalid path: {}", e))).transpose()?;
 
-            // Convert CLI enums to serializable types
-            let serializable_ignore = Some(SerializableIgnore::try_from(ignore)
-                .map_err(|_| anyhow::anyhow!("Failed to convert ignore setting"))?);
-            let serializable_fetch = Some(SerializableFetchRecurse::try_from(fetch)
-                .map_err(|_| anyhow::anyhow!("Failed to convert fetch setting"))?);
-            let serializable_update = Some(SerializableUpdate::try_from(update)
-                .map_err(|_| anyhow::anyhow!("Failed to convert update setting"))?);
+            let set_url = url.trim().to_string();
 
-            // Handle optional name - derive from path if not provided
-            let submodule_name = name.unwrap_or_else(|| {
-                // Use the path as the name
-                set_path_result.clone()
-            });
+            let set_branch = Branch::set_branch(branch.as_deref())
+                .map_err(|e| anyhow::anyhow!("Failed to set branch: {}", e))?;
+
+            let mut manager = GitoxideSubmoduleManager::new(config_path);
 
             manager
-                .add_submodule(submodule_name, set_path_result, url, sparse_paths_vec, set_branch, serializable_ignore, serializable_fetch, serializable_update)
+                .add_submodule(set_name, set_path, set_url, sparse_paths_vec, set_branch, ignore, fetch, update, shallow, no_init)
                 .map_err(|e| anyhow::anyhow!("Failed to add submodule: {}", e))?;
         }
         Commands::Check => {
-            let manager = GitoxideSubmoduleManager::new(cli.config)
+            let manager = GitoxideSubmoduleManager::new(config_path)
                 .map_err(|e| anyhow::anyhow!("Failed to create manager: {}", e))?;
             manager
                 .check_all_submodules()
                 .map_err(|e| anyhow::anyhow!("Failed to check submodules: {}", e))?;
         }
         Commands::Init => {
-            let manager = GitoxideSubmoduleManager::new(cli.config)
+            let manager = GitoxideSubmoduleManager::new(config_path)
                 .map_err(|e| anyhow::anyhow!("Failed to create manager: {}", e))?;
 
             // Initialize all submodules from config
@@ -134,7 +96,7 @@ fn main() -> Result<()> {
             }
         }
         Commands::Update => {
-            let manager = GitoxideSubmoduleManager::new(cli.config)
+            let manager = GitoxideSubmoduleManager::new(config_path)
                 .map_err(|e| anyhow::anyhow!("Failed to create manager: {}", e))?;
 
             // Update all submodules from config
@@ -154,7 +116,7 @@ fn main() -> Result<()> {
             }
         }
         Commands::Reset { all, names } => {
-            let manager = GitoxideSubmoduleManager::new(cli.config)
+            let manager = GitoxideSubmoduleManager::new(config_path)
                 .map_err(|e| anyhow::anyhow!("Failed to create manager: {}", e))?;
 
             let submodules_to_reset: Vec<String> = if all {

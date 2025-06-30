@@ -110,7 +110,7 @@ pub enum Commands {
         no_init: bool,
     },
     // TODO: Implement this command
-    #[command(name = "change", next_help_heading = "Change a Submodule's Settings", about = "Change the configuration of an existing submodule. Any field you provide will overwrite an existing value (unless both are defaults). If you change the path, it will nuke the submodule from orbit (delete it and re-clone it).")]
+    #[command(name = "change", next_help_heading = "Change a Submodule's Settings", about = "Change the configuration of an existing submodule. Any field you provide will overwrite an existing value (unless both are defaults). If you change the path, it will nuke-it-from-orbit (delete it and re-clone it).")]
     Change {
         #[arg(required = true, value_parser = clap::value_parser!(String), value_hint = clap::ValueHint::CommandName, help = "The name of the submodule to change. Must match an existing submodule.", long_help = "The name of the submodule to change. Must match an existing submodule in your submod.toml. Because we use this value to lookup your config, you cannot change the name from the CLI. You must manually change it in your submod.toml. All other options can be changed here.")]
         name: String,
@@ -138,6 +138,7 @@ pub enum Commands {
 
         #[arg(short = 's', long = "shallow", default_value = "false", default_missing_value = "true", help = "If true, sets the submodule as a shallow clone. Set false to disable shallow cloning.")]
         shallow: bool,
+
         #[arg(short = 'u', long = "url", value_parser = clap::value_parser!(String), help = "Change the URL of the submodule. The submodule name from the url must match an existing submodule.")]
         url: Option<String>,
 
@@ -149,11 +150,11 @@ pub enum Commands {
     ChangeGlobal {
 
         #[arg(short = 'i', long = "ignore", help = "Sets the default ignore behavior for all submodules in this repository. This will override any individual submodule settings.")]
-
         ignore: Option<Ignore>,
-        #[arg(short = 'f', long = "fetch", help = "Sets the default fetch behavior for all submodules in this repository. This will override any individual submodule settings.")]
 
+        #[arg(short = 'f', long = "fetch", help = "Sets the default fetch behavior for all submodules in this repository. This will override any individual submodule settings.")]
         fetch: Option<FetchRecurse>,
+
         #[arg(short = 'u', long = "update", help = "Sets the default update behavior for all submodules in this repository. This will override any individual submodule settings.")]
         update: Option<Update>,
     },

@@ -7,6 +7,7 @@ use std::result::Result;
 use anyhow::Ok;
 use git2::Repository as Git2Repository;
 use gix::{open::Options};
+
 // Get the current repository using git2.
 pub fn get_current_git2_repository(repo: Option<Git2Repository>) -> Result<Git2Repository, anyhow::Error> {
     match repo {
@@ -38,6 +39,7 @@ pub fn get_cwd() -> Result<PathBuf, anyhow::Error> {
         .map_err(|e| anyhow::anyhow!("Failed to get current working directory: {}", e))
 }
 
+/// Get a thread-local repository from the given repository.
 pub fn get_thread_local_repo(repo: &gix::Repository) -> Result<gix::Repository, anyhow::Error> {
     // Get a full access repository from the given repository
     let safe_repo = repo.to_owned().into_sync().to_thread_local();
@@ -125,5 +127,82 @@ pub fn set_path(path: std::ffi::OsString) -> Result<String, anyhow::Error> {
         }
         None => { Ok(path_to_string_lossy(&PathBuf::from(path)))  // Use lossy conversion if the path is not valid UTF-8
         }
+    }
+}
+
+/// Extract the name from a URL, trimming trailing slashes and `.git` suffix
+pub fn name_from_url(url: &str) -> Result<String, anyhow::Error> {
+    if url.is_empty() {
+        return Err(anyhow::anyhow!("URL cannot be empty"));
+    }
+    let cleaned_url = url.trim_end_matches('/').trim_end_matches(".git");
+    cleaned_url
+        .split('/')
+        .last()
+        .map(|name| name.to_string())
+        .ok_or_else(|| anyhow::anyhow!("Failed to extract name from URL"))
+}
+
+/// Convert an `OsString` to a `String`, extracting the name from the path
+pub fn name_from_osstring(os_string: std::ffi::OsString) -> Result<String, anyhow::Error> {
+    osstring_to_string(os_string).and_then(|s| {
+        if s.is_empty() {
+            if s.contains('\0') {
+                Err(anyhow::anyhow!("Name cannot contain null bytes"))
+            } else {
+                Ok(s)
+            }
+        } else {
+            let sep = std::path::MAIN_SEPARATOR.to_string();
+            s.trim().split(&sep)
+                .last()
+                .map(|name| name.to_string())
+                .ok_or_else(|| anyhow::anyhow!("Failed to extract name from OsString"))
+        }
+    })
+}
+
+/// Convert an `OsString` to a `String`, returning an error if the conversion fails
+pub fn osstring_to_string(os_string: std::ffi::OsString) -> Result<String, anyhow::Error> {
+    os_string
+        .into_string()
+        .map_err(|_| anyhow::anyhow!("Failed to convert OsString to String"))
+}
+
+pub fn get_sparse_paths(
+    sparse_paths: Option<Vec<String>>,
+) -> Result<Option<Vec<String>>, anyhow::Error> {
+    let sparse_paths_vec = match sparse_paths {
+        Some(paths) => {
+            for path in &paths {
+                if path.contains('\0') {
+                    return Err(anyhow::anyhow!(
+                        "Invalid sparse path pattern: contains null byte"
+                    ));
+                }
+            }
+            Some(paths)
+        },
+        None => None,
+    };
+    Ok(sparse_paths_vec)
+}
+
+/// Get the name from either a provided name, URL, or path.
+pub fn get_name(
+    name: Option<String>, url: Option<String>, path: Option<std::ffi::OsString>,
+) -> Result<String, anyhow::Error> {
+    if let Some(name) = name {
+        let trimmed_name = name.trim().to_string();
+        match trimmed_name.is_empty() {
+            true => get_name(None, url, path), // recycle to get name from URL or path
+            false => Ok(trimmed_name),
+        }
+    } else if let Some(path) = path {
+        name_from_osstring(path)
+    } else if let Some(url) = url {
+        name_from_url(&url)
+    } else {
+        Err(anyhow::anyhow!("No valid name source provided"))
     }
 }
