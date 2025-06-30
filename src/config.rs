@@ -582,6 +582,13 @@ impl SubmoduleEntries {
         }
     }
 
+    /// Remove a submodule entry
+    pub fn remove_submodule(&mut self, name: &str) {
+        if let Some(submodules) = &mut self.submodules {
+            submodules.remove(name);
+        }
+    }
+
     /// Get the submodules map
     pub fn submodules(&self) -> Option<&HashMap<SubmoduleName, SubmoduleEntry>> {
         self.submodules.as_ref()
