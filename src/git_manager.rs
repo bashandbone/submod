@@ -669,30 +669,13 @@ impl GitManager {
             eprintln!("DEBUG: Submodule not registered in .gitmodules, adding first");
             self.add_submodule_with_cli(name, path_str, url_str)?;
         } else {
-            // Submodule is registered, just initialize and update
-            let init_output = Command::new("git")
-                .args(["submodule", "init", path_str])
-                .current_dir(workdir)
-                .output()?;
+            // Submodule is registered, just initialize and update using GitOperations
+            self.git_ops.init_submodule(path_str)
+                .map_err(Self::map_git_ops_error)?;
 
-            if !init_output.status.success() {
-                let stderr = String::from_utf8_lossy(&init_output.stderr);
-                return Err(SubmoduleError::CliError(format!(
-                    "Git submodule init failed: {stderr}"
-                )));
-            }
-
-            let update_output = Command::new("git")
-                .args(["submodule", "update", path_str])
-                .current_dir(workdir)
-                .output()?;
-
-            if !update_output.status.success() {
-                let stderr = String::from_utf8_lossy(&update_output.stderr);
-                return Err(SubmoduleError::CliError(format!(
-                    "Git submodule update failed: {stderr}"
-                )));
-            }
+            let update_opts = crate::config::SubmoduleUpdateOptions::default();
+            self.git_ops.update_submodule(path_str, &update_opts)
+                .map_err(Self::map_git_ops_error)?;
         }
 
         println!("  ✅ Initialized using git submodule commands: {path_str}");
