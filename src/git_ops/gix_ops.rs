@@ -221,33 +221,366 @@ impl GitOperations for GixOperations {
                 ConfigLevel::Worktree => gix::config::Source::Worktree,
             };
 
-            // Extract entries from the specified level
+            // Use config access for known keys where available
+            // Note: Using string-based access for compatibility across gix versions
+            
+            // Core configuration
+            if let Some(value) = config_snapshot.boolean("core.bare") {
+                entries.insert("core.bare".to_string(), value.to_string());
+            }
+            if let Some(value) = config_snapshot.boolean("core.sparseCheckout") {
+                entries.insert("core.sparseCheckout".to_string(), value.to_string());
+            }
+            if let Some(value) = config_snapshot.string("core.worktree") {
+                entries.insert("core.worktree".to_string(), value.to_string());
+            }
+            if let Some(value) = config_snapshot.string("core.editor") {
+                entries.insert("core.editor".to_string(), value.to_string());
+            }
+            if let Some(value) = config_snapshot.boolean("core.symlinks") {
+                entries.insert("core.symlinks".to_string(), value.to_string());
+            }
+
+            // User configuration
+            if let Some(value) = config_snapshot.string("user.name") {
+                entries.insert("user.name".to_string(), value.to_string());
+            }
+            if let Some(value) = config_snapshot.string("user.email") {
+                entries.insert("user.email".to_string(), value.to_string());
+            }
+
+            // Protocol configuration
+            if let Some(value) = config_snapshot.string("protocol.file.allow") {
+                entries.insert("protocol.file.allow".to_string(), value.to_string());
+            }
+
+            // Extract additional entries from the specified level using raw iteration
             for section in config_snapshot.sections() {
                 if section.meta().source == source_filter {
                     let section_name = section.header().name();
-                    // For now, use a simplified approach to extract key-value pairs
-                    // The exact iteration method may vary based on gix version
-                    // This is a placeholder that will need adjustment based on actual API
-                    entries.insert(format!("{}.placeholder", section_name), "placeholder".to_string());
+                    // Extract key-value pairs from this section
+                    // Note: This is a simplified extraction - the exact API may vary
+                    // For now, we'll skip the detailed section iteration to focus on the main config operations
+                    let section_name_str = section_name.to_string();
+                    entries.insert(format!("{}.section_present", section_name_str), "true".to_string());
                 }
             }
 
             Ok(GitConfig { entries })
         })
     }
-    fn write_git_config(&self, _config: &GitConfig, _level: ConfigLevel) -> Result<()> {
-        // For now, fall back to git2 to avoid complex lifetime issues with gix_config
-        // This can be improved later when gix_config API is more stable
-        Err(anyhow::anyhow!(
-            "gix config writing has lifetime complexities, falling back to git2"
-        ))
+    fn write_git_config(&self, config: &GitConfig, level: ConfigLevel) -> Result<()> {
+        self.try_gix_operation(|repo| {
+            // Get the appropriate config file path based on level
+            let config_path = match level {
+                ConfigLevel::System => {
+                    // System config is typically read-only, fall back to git2
+                    return Err(anyhow::anyhow!("System config modification not supported via gix, falling back to git2"));
+                }
+                ConfigLevel::Global => {
+                    // Global config (~/.gitconfig)
+                    let home = std::env::var("HOME").context("HOME environment variable not set")?;
+                    std::path::PathBuf::from(home).join(".gitconfig")
+                }
+                ConfigLevel::Local => {
+                    // Local config (.git/config)
+                    repo.git_dir().join("config")
+                }
+                ConfigLevel::Worktree => {
+                    // Worktree config (.git/config.worktree)
+                    repo.git_dir().join("config.worktree")
+                }
+            };
+
+            // Read existing config or create new one
+            let mut config_file = if config_path.exists() {
+                let mut content = std::fs::read(&config_path)?;
+                gix::config::File::from_bytes_owned(
+                    &mut content,
+                    gix::config::file::Metadata::from(match level {
+                        ConfigLevel::System => gix::config::Source::System,
+                        ConfigLevel::Global => gix::config::Source::User,
+                        ConfigLevel::Local => gix::config::Source::Local,
+                        ConfigLevel::Worktree => gix::config::Source::Worktree,
+                    }),
+                    Default::default(),
+                )?
+            } else {
+                gix::config::File::new(gix::config::file::Metadata::from(match level {
+                    ConfigLevel::System => gix::config::Source::System,
+                    ConfigLevel::Global => gix::config::Source::User,
+                    ConfigLevel::Local => gix::config::Source::Local,
+                    ConfigLevel::Worktree => gix::config::Source::Worktree,
+                }))
+            };
+
+            // Apply all config entries
+            for (key, value) in &config.entries {
+                // Use type-safe setting for known keys, raw setting for others
+                match key.as_str() {
+                    "core.sparseCheckout" => {
+                        let bool_value = match value.to_lowercase().as_str() {
+                            "true" | "1" | "yes" | "on" => true,
+                            "false" | "0" | "no" | "off" => false,
+                            _ => return Err(anyhow::anyhow!("Invalid boolean value for core.sparseCheckout: {}", value)),
+                        };
+                        config_file.set_raw_value_by("core", None, "sparseCheckout", bool_value.to_string().as_bytes().as_bstr())?;
+                    }
+                    "core.bare" => {
+                        let bool_value = match value.to_lowercase().as_str() {
+                            "true" | "1" | "yes" | "on" => true,
+                            "false" | "0" | "no" | "off" => false,
+                            _ => return Err(anyhow::anyhow!("Invalid boolean value for core.bare: {}", value)),
+                        };
+                        config_file.set_raw_value_by("core", None, "bare", bool_value.to_string().as_bytes().as_bstr())?;
+                    }
+                    "protocol.file.allow" => {
+                        config_file.set_raw_value_by("protocol", Some("file".as_bytes().as_bstr()), "allow", value.as_bytes().as_bstr())?;
+                    }
+                    "user.name" => {
+                        config_file.set_raw_value_by("user", None, "name", value.as_bytes().as_bstr())?;
+                    }
+                    "user.email" => {
+                        config_file.set_raw_value_by("user", None, "email", value.as_bytes().as_bstr())?;
+                    }
+                    _ => {
+                        // Parse the key to extract section, subsection, and key name
+                        let parts: Vec<&str> = key.split('.').collect();
+                        if parts.len() < 2 {
+                            return Err(anyhow::anyhow!("Invalid config key format: {}", key));
+                        }
+
+                        let section_name = parts[0];
+                        let key_name = parts.last().unwrap();
+                        let subsection_name = if parts.len() > 2 {
+                            Some(parts[1..parts.len()-1].join("."))
+                        } else {
+                            None
+                        };
+
+                        // Set the raw value using string conversion
+                        // Note: This is a simplified approach - for complex config manipulation,
+                        // we might need to use a different API or approach
+                        match (section_name, *key_name) {
+                            ("core", "bare") => {
+                                let bool_value = match value.to_lowercase().as_str() {
+                                    "true" | "1" | "yes" | "on" => true,
+                                    "false" | "0" | "no" | "off" => false,
+                                    _ => return Err(anyhow::anyhow!("Invalid boolean value: {}", value)),
+                                };
+                                config_file.set_raw_value_by("core", None, "bare", bool_value.to_string().as_bytes().as_bstr())?;
+                            }
+                            ("user", "name") => {
+                                config_file.set_raw_value_by("user", None, "name", value.as_bytes().as_bstr())?;
+                            }
+                            ("user", "email") => {
+                                config_file.set_raw_value_by("user", None, "email", value.as_bytes().as_bstr())?;
+                            }
+                            _ => {
+                                // For other keys, we'll skip for now as the API is complex
+                                return Err(anyhow::anyhow!("Unsupported config key: {}.{}", section_name, key_name));
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Write the config file back
+            let mut file = std::fs::File::create(&config_path)?;
+            config_file.write_to(&mut file)?;
+            Ok(())
+        })
     }
-    fn set_config_value(&self, _key: &str, _value: &str, _level: ConfigLevel) -> Result<()> {
-        // For now, fall back to git2 to avoid complex lifetime issues with gix_config
-        // This can be improved later when gix_config API is more stable
-        Err(anyhow::anyhow!(
-            "gix config writing has lifetime complexities, falling back to git2"
-        ))
+    fn set_config_value(&self, key: &str, value: &str, level: ConfigLevel) -> Result<()> {
+        self.try_gix_operation(|repo| {
+            // Get the appropriate config file path based on level
+            let config_path = match level {
+                ConfigLevel::System => {
+                    // System config is typically read-only, fall back to git2
+                    return Err(anyhow::anyhow!("System config modification not supported via gix, falling back to git2"));
+                }
+                ConfigLevel::Global => {
+                    // Global config (~/.gitconfig)
+                    let home = std::env::var("HOME").context("HOME environment variable not set")?;
+                    std::path::PathBuf::from(home).join(".gitconfig")
+                }
+                ConfigLevel::Local => {
+                    // Local config (.git/config)
+                    repo.git_dir().join("config")
+                }
+                ConfigLevel::Worktree => {
+                    // Worktree config (.git/config.worktree)
+                    repo.git_dir().join("config.worktree")
+                }
+            };
+
+            // Use type-safe config setting for known keys
+            match key {
+                "core.sparseCheckout" => {
+                    let bool_value = match value.to_lowercase().as_str() {
+                        "true" | "1" | "yes" | "on" => true,
+                        "false" | "0" | "no" | "off" => false,
+                        _ => return Err(anyhow::anyhow!("Invalid boolean value for core.sparseCheckout: {}", value)),
+                    };
+                    
+                    // Read existing config, modify it, and write back
+                    let mut config_file = if config_path.exists() {
+                        let mut content = std::fs::read(&config_path)?;
+                        gix::config::File::from_bytes_owned(
+                            &mut content,
+                            gix::config::file::Metadata::from(gix::config::Source::Local),
+                            Default::default(),
+                        )?
+                    } else {
+                        gix::config::File::new(gix::config::file::Metadata::from(gix::config::Source::Local))
+                    };
+
+                    // Set the value using raw config manipulation
+                    config_file.set_raw_value_by("core", None, "sparseCheckout", bool_value.to_string().as_bytes().as_bstr())?;
+                    
+                    // Write the config file back
+                    let mut file = std::fs::File::create(&config_path)?;
+                    config_file.write_to(&mut file)?;
+                    Ok(())
+                }
+                "core.bare" => {
+                    let bool_value = match value.to_lowercase().as_str() {
+                        "true" | "1" | "yes" | "on" => true,
+                        "false" | "0" | "no" | "off" => false,
+                        _ => return Err(anyhow::anyhow!("Invalid boolean value for core.bare: {}", value)),
+                    };
+                    
+                    let mut config_file = if config_path.exists() {
+                        let mut content = std::fs::read(&config_path)?;
+                        gix::config::File::from_bytes_owned(
+                            &mut content,
+                            gix::config::file::Metadata::from(gix::config::Source::Local),
+                            Default::default(),
+                        )?
+                    } else {
+                        gix::config::File::new(gix::config::file::Metadata::from(gix::config::Source::Local))
+                    };
+
+                    config_file.set_raw_value_by("core", None, "bare", bool_value.to_string().as_bytes().as_bstr())?;
+                    
+                    let mut file = std::fs::File::create(&config_path)?;
+                    config_file.write_to(&mut file)?;
+                    Ok(())
+                }
+                "protocol.file.allow" => {
+                    let mut config_file = if config_path.exists() {
+                        let mut content = std::fs::read(&config_path)?;
+                        gix::config::File::from_bytes_owned(
+                            &mut content,
+                            gix::config::file::Metadata::from(gix::config::Source::Local),
+                            Default::default(),
+                        )?
+                    } else {
+                        gix::config::File::new(gix::config::file::Metadata::from(gix::config::Source::Local))
+                    };
+
+                    config_file.set_raw_value_by("protocol", Some("file".as_bytes().as_bstr()), "allow", value.as_bytes().as_bstr())?;
+                    
+                    let mut file = std::fs::File::create(&config_path)?;
+                    config_file.write_to(&mut file)?;
+                    Ok(())
+                }
+                "user.name" => {
+                    let mut config_file = if config_path.exists() {
+                        let mut content = std::fs::read(&config_path)?;
+                        gix::config::File::from_bytes_owned(
+                            &mut content,
+                            gix::config::file::Metadata::from(gix::config::Source::Local),
+                            Default::default(),
+                        )?
+                    } else {
+                        gix::config::File::new(gix::config::file::Metadata::from(gix::config::Source::Local))
+                    };
+
+                    config_file.set_raw_value_by("user", None, "name", value.as_bytes().as_bstr())?;
+                    
+                    let mut file = std::fs::File::create(&config_path)?;
+                    config_file.write_to(&mut file)?;
+                    Ok(())
+                }
+                "user.email" => {
+                    let mut config_file = if config_path.exists() {
+                        let mut content = std::fs::read(&config_path)?;
+                        gix::config::File::from_bytes_owned(
+                            &mut content,
+                            gix::config::file::Metadata::from(gix::config::Source::Local),
+                            Default::default(),
+                        )?
+                    } else {
+                        gix::config::File::new(gix::config::file::Metadata::from(gix::config::Source::Local))
+                    };
+
+                    config_file.set_raw_value_by("user", None, "email", value.as_bytes().as_bstr())?;
+                    
+                    let mut file = std::fs::File::create(&config_path)?;
+                    config_file.write_to(&mut file)?;
+                    Ok(())
+                }
+                _ => {
+                    // For unknown keys, use raw config manipulation
+                    let mut config_file = if config_path.exists() {
+                        let mut content = std::fs::read(&config_path)?;
+                        gix::config::File::from_bytes_owned(
+                            &mut content,
+                            gix::config::file::Metadata::from(gix::config::Source::Local),
+                            Default::default(),
+                        )?
+                    } else {
+                        gix::config::File::new(gix::config::file::Metadata::from(gix::config::Source::Local))
+                    };
+
+                    // Parse the key to extract section, subsection, and key name
+                    let parts: Vec<&str> = key.split('.').collect();
+                    if parts.len() < 2 {
+                        return Err(anyhow::anyhow!("Invalid config key format: {}", key));
+                    }
+
+                    let section_name = parts[0];
+                    let key_name = parts.last().unwrap();
+                    let subsection_name = if parts.len() > 2 {
+                        Some(parts[1..parts.len()-1].join("."))
+                    } else {
+                        None
+                    };
+
+                    // Set the raw value using string conversion
+                    // Note: This is a simplified approach - for complex config manipulation,
+                    // we might need to use a different API or approach
+                    match (section_name, *key_name) {
+                        ("core", "bare") => {
+                            let bool_value = match value.to_lowercase().as_str() {
+                                "true" | "1" | "yes" | "on" => true,
+                                "false" | "0" | "no" | "off" => false,
+                                _ => return Err(anyhow::anyhow!("Invalid boolean value: {}", value)),
+                            };
+                            config_file.set_raw_value_by("core", None, "bare", bool_value.to_string().as_bytes().as_bstr())?;
+                        }
+                        ("user", "name") => {
+                            config_file.set_raw_value_by("user", None, "name", value.as_bytes().as_bstr())?;
+                        }
+                        ("user", "email") => {
+                            config_file.set_raw_value_by("user", None, "email", value.as_bytes().as_bstr())?;
+                        }
+                        ("protocol", "allow") if subsection_name.as_deref() == Some("file") => {
+                            config_file.set_raw_value_by("protocol", Some("file".as_bytes().as_bstr()), "allow", value.as_bytes().as_bstr())?;
+                        }
+                        _ => {
+                            // For other keys, we'll skip for now as the API is complex
+                            return Err(anyhow::anyhow!("Unsupported config key: {}.{}", section_name, key_name));
+                        }
+                    }
+                    
+                    let mut file = std::fs::File::create(&config_path)?;
+                    config_file.write_to(&mut file)?;
+                    Ok(())
+                }
+            }
+        })
     }
     fn add_submodule(&mut self, _opts: &SubmoduleAddOptions) -> Result<()> {
         // gix doesn't support submodule addition yet
@@ -322,8 +655,25 @@ impl GitOperations for GixOperations {
     }
     fn enable_sparse_checkout(&self, _path: &str) -> Result<()> {
         self.try_gix_operation(|repo| {
-            // Set core.sparseCheckout = true in repository config
-            self.set_config_value("core.sparseCheckout", "true", ConfigLevel::Local)?;
+            // Set core.sparseCheckout = true in repository config using direct config manipulation
+            let config_path = repo.git_dir().join("config");
+            let mut config_file = if config_path.exists() {
+                let mut content = std::fs::read(&config_path)?;
+                gix::config::File::from_bytes_owned(
+                    &mut content,
+                    gix::config::file::Metadata::from(gix::config::Source::Local),
+                    Default::default(),
+                )?
+            } else {
+                gix::config::File::new(gix::config::file::Metadata::from(gix::config::Source::Local))
+            };
+
+            // Set core.sparseCheckout = true using raw config manipulation
+            config_file.set_raw_value_by("core", None, "sparseCheckout", "true".as_bytes().as_bstr())?;
+            
+            // Write the config file back
+            let mut file = std::fs::File::create(&config_path)?;
+            config_file.write_to(&mut file)?;
 
             // Create sparse-checkout file if it doesn't exist
             let sparse_checkout_path = repo.git_dir().join("info").join("sparse-checkout");
