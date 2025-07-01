@@ -27,6 +27,13 @@ pub fn get_current_git2_repository(repo: Option<Git2Repository>) -> Result<Git2R
  **                          Gix Utilities
  *========================================================================**/
 
+pub fn repo_from_path(path: &PathBuf) -> Result<gix::Repository, anyhow::Error> {
+    let options = Options::isolated();
+    gix::ThreadSafeRepository::open_opts(path, options)
+        .map(|repo| repo.to_thread_local())
+        .map_err(|e| anyhow::anyhow!("Failed to open repository at {:?}: {}", path, e))
+}
+
 /// Get the current repository. The returned repository is isolated (has very limited access to the working tree and environment).
 pub fn get_current_repository() -> Result<gix::Repository, anyhow::Error> {
     let options = Options::isolated();

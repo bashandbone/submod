@@ -37,15 +37,17 @@ resolver = "3"
 [dependencies]
 # Gitoxide ops
 gix = { version = "0.72.1", default-features = false, features = [
-  "async-network-client",
   "attributes",
+  "blocking-network-client",
   "excludes",
   "status",
   "command",
   "parallel",
   "serde",
   "status",
+  "worktree-mutation"
 ] }
+gitoxide-core = { version = "0.47.1", default-features = false, features = ["blocking-client", "organize", "clean", "serde"]}
 gix-config = { version = "0.45.1", features = ["serde"] }
 gix-submodule = "0.19.1"
 bstr = { version = "1.12.0", default-features = false }

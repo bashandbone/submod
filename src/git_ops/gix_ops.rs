@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2025 Adam Poulemanos <89049923+bashandbone@users.noreply.github.com>
 //
 // SPDX-License-Identifier: LicenseRef-PlainMIT OR MIT
-
+// TODO: This module is very not-DRY...but it's low priority right now.
 use anyhow::{Context, Result};
 use std::collections::HashMap;
 use std::path::Path;
@@ -30,6 +30,7 @@ use crate::options::{
     ConfigLevel, GitmodulesConvert,
 };
 use crate::config::{SubmoduleAddOptions, SubmoduleEntry, SubmoduleEntries, SubmoduleUpdateOptions};
+use crate::utilities;
 
 /// Primary implementation using gix (gitoxide)
 #[derive(Debug, Clone, PartialEq)]
@@ -47,6 +48,70 @@ impl GixOperations {
         };
         Ok(Self { repo })
     }
+
+    /// Helper: Ensure the submodule directory exists (create if missing)
+    fn ensure_submodule_dir(&self, submodule_path: &std::path::Path) -> Result<()> {
+        if !submodule_path.exists() {
+            std::fs::create_dir_all(submodule_path)?;
+        }
+        Ok(())
+    }
+
+    /// Helper: Clone or fetch+checkout a repo/submodule at the given path
+    /// Used by add_submodule, init_submodule, update_submodule
+    fn clone_or_fetch_then_checkout(
+        &self,
+        url: &str,
+        submodule_path: &std::path::Path,
+        shallow: bool,
+        branch: Option<&crate::options::SerializableBranch>,
+    ) -> Result<()> {
+        // If .git does not exist, clone
+        if !submodule_path.exists() || !submodule_path.join(".git").exists() {
+            self.ensure_submodule_dir(submodule_path)?;
+            let mut prepare = gix::prepare_clone(url, submodule_path)?;
+            if shallow {
+                prepare = prepare.with_shallow(gix::remote::fetch::Shallow::DepthAtRemote(1.try_into()?));
+            }
+            let should_interrupt = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+            let progress = gix::progress::Discard;
+            let (mut checkout, _outcome) = prepare.fetch_then_checkout(progress, &should_interrupt)?;
+            if let Some(branch) = branch {
+                if let crate::options::SerializableBranch::Name(branch_name) = branch {
+                    let repo = checkout.repo();
+                    let config = repo.config_snapshot();
+                    let mut config_file = config.to_owned();
+                    config_file.set_raw_value_by(
+                        "branch",
+                        Some(branch_name.as_bytes().as_bstr()),
+                        "remote",
+                        "origin".as_bytes().as_bstr(),
+                    )?;
+                    config_file.set_raw_value_by(
+                        "branch",
+                        Some(branch_name.as_bytes().as_bstr()),
+                        "merge",
+                        format!("refs/heads/{}", branch_name).as_bytes().as_bstr(),
+                    )?;
+                }
+            }
+        } else {
+            // Already exists: fetch and checkout
+            let submodule_repo = gix::open(submodule_path)?;
+            let remote = submodule_repo.find_default_remote(gix::remote::Direction::Fetch)
+                .ok_or_else(|| anyhow::anyhow!("No default remote found for submodule"))?;
+            let connection = remote.connect(gix::remote::Direction::Fetch)?;
+            let should_interrupt = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+            let progress = gix::progress::Discard;
+            connection.prepare_fetch(progress, gix::remote::fetch::RefLogMessage::Override {
+                message: format!("fetch from {}", url).into(),
+            })?
+            .receive(progress, &should_interrupt)?;
+            // Optionally: checkout logic could be added here if needed
+        }
+        Ok(())
+    }
+
     /// Try to perform operation with gix, return error if not supported
     fn try_gix_operation<T, F>(&self, operation: F) -> Result<T>
     where
@@ -62,7 +127,6 @@ impl GixOperations {
     {
         operation(&mut self.repo)
     }
-
     /// Convert gix_submodule File + name to our SubmoduleEntry format
     fn convert_gix_submodule_to_entry(
         &self,
@@ -243,10 +307,10 @@ impl GitOperations for GixOperations {
             for section in config_snapshot.sections() {
                 if section.meta().source == source_filter {
                     let section_name = section.header().name();
-                    // For now, use a simplified approach to extract key-value pairs
-                    // The exact iteration method may vary based on gix version
-                    // This is a placeholder that will need adjustment based on actual API
-                    entries.insert(format!("{}.placeholder", section_name), "placeholder".to_string());
+                    let body_iter = section.body().iter();
+                    for (key, value) in body_iter {
+                        entries.insert(format!("{}.{}", section_name, key), value.to_string());
+                    }
                 }
             }
 
@@ -312,31 +376,18 @@ impl GitOperations for GixOperations {
         }
 
         self.try_gix_operation(|repo| {
-            // 1. Get values from options
             let path = &opts.path;
             let url = &opts.url;
-            let name = &opts.name;
-
-            // 3. Clone the repository to the target path
             let workdir = repo.workdir()
                 .ok_or_else(|| anyhow::anyhow!("Repository has no working directory"))?;
             let target_path = workdir.join(path);
-
-            // Create parent directories if they don't exist
-            if let Some(parent) = target_path.parent() {
-                std::fs::create_dir_all(parent)?;
-            }
-
-            // Clone the submodule repository using gix
-            let mut prepare = gix::prepare_clone(url.clone(), &target_path)?;
-            if opts.shallow == Some(true) {
-                prepare = prepare.with_shallow(gix::remote::fetch::Shallow::DepthAtRemote(1.try_into()?));
-            }
-            let should_interrupt = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
-            let progress = gix::progress::Discard;
-            let (_checkout, _outcome) = prepare
-                .fetch_then_checkout(progress, &should_interrupt)?;
-            Ok(())
+            // Use helper for clone/fetch/checkout
+            self.clone_or_fetch_then_checkout(
+                url,
+                &target_path,
+                opts.shallow == Some(true),
+                opts.branch.as_ref(),
+            )
         })
     }
 
@@ -439,7 +490,20 @@ impl GitOperations for GixOperations {
                         )?;
                     },
                     crate::options::SerializableBranch::CurrentInSuperproject => {
-                        // No-op or implement as needed
+                        // Set branch to current branch in superproject
+                        let superproject_branch = self.get_superproject_branch()?;
+                        config_file.set_raw_value_by(
+                            "branch",
+                            Some(superproject_branch.as_bytes().as_bstr()),
+                            "remote",
+                            "origin".as_bytes().as_bstr()
+                        )?;
+                        config_file.set_raw_value_by(
+                            "branch",
+                            Some(superproject_branch.as_bytes().as_bstr()),
+                            "merge",
+                            format!("refs/heads/{}", superproject_branch).as_bytes().as_bstr()
+                        )?;
                     }
                 }
             }
@@ -455,8 +519,14 @@ impl GitOperations for GixOperations {
             })?
             .receive(progress, &should_interrupt)?;
             match opts.strategy {
-                crate::options::SerializableUpdate::Checkout => {
-                    // TODO: Implement checkout logic using gix
+                crate::options::SerializableUpdate::Checkout | crate::options::SerializableUpdate::Unspecified => {
+                // Use helper for clone/fetch/checkout
+                self.clone_or_fetch_then_checkout(
+                    url,
+                    &submodule_path,
+                    entry.shallow == Some(true),
+                    entry.branch.as_ref(),
+                )?;
                 },
                 crate::options::SerializableUpdate::Merge => {
                     return Err(anyhow::anyhow!("Merge strategy not yet implemented with gix"));
@@ -569,6 +639,7 @@ impl GitOperations for GixOperations {
             // 2. Check if submodule has uncommitted changes (unless force is true)
             if !force && submodule_path.exists() && submodule_path.join(".git").exists() {
                 if let Ok(submodule_repo) = gix::open(&submodule_path) {
+                    // TODO: properly implement this
                     // Check for uncommitted changes
                     // Note: gix status API is complex, for now we'll do a simple check
                     // by looking at the index vs HEAD
@@ -660,12 +731,28 @@ impl GitOperations for GixOperations {
             Ok(submodule_paths)
         })
     }
-    fn fetch_submodule(&self, _path: &str) -> Result<()> {
-        // gix doesn't support submodule fetching yet
-        Err(anyhow::anyhow!(
-            "gix submodule fetching not yet supported, falling back to git2"
-        ))
+    async fn fetch_submodule(&self, _path: &str) -> Result<()> {
+        let submodule_repo = utilities::repo_from_path(&std::path::PathBuf::from(_path))?;
+        let head = submodule_repo.head()?;
+        if let Some(reference) = head.referent_name() {
+        let (_upstream, remote) = submodule_repo.upstream_branch_and_remote_for_tracking_branch(reference)?
+            .ok_or_else(|| anyhow::anyhow!("Failed to find upstream branch for submodule at {}", _path))?;
+        let connection = remote.connect(gix::remote::Direction::Fetch)?.await?;
+            // Prepare fetch operation
+        let prepare = connection.prepare_fetch(gix::progress::Discard, gix::remote::ref_map::Options::default())?;
+            // Use a shared atomic bool for interrupt handling
+        let should_interrupt = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let progress = gix::progress::Discard;
+        let (_repo, outcome) = prepare.fetch_only(progress, &should_interrupt).await?;
+        match outcome.status {
+            gix::remote::fetch::Status::Change {..} => Ok(()),
+            gix::remote::fetch::Status::NoPackReceived {..} => Err(anyhow::anyhow!("Failed to fetch submodule: {}", outcome.error())),
+        }
+    } else {
+            Err(anyhow::anyhow!("Submodule at {} has no HEAD reference", _path))
+        }
     }
+
     fn reset_submodule(&self, _path: &str, _hard: bool) -> Result<()> {
         // gix doesn't support submodule reset yet
         Err(anyhow::anyhow!(
