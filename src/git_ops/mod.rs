@@ -1,9 +1,9 @@
 // SPDX-FileCopyrightText: 2025 Adam Poulemanos <89049923+bashandbone@users.noreply.github.com>
 //
 // SPDX-License-Identifier: LicenseRef-PlainMIT OR MIT
-
 pub mod gix_ops;
 pub mod git2_ops;
+pub mod simple_gix;
 pub use gix_ops::GixOperations;
 pub use git2_ops::Git2Operations;
 

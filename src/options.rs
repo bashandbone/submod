@@ -19,6 +19,8 @@ use gix_submodule::config::{Branch, FetchRecurse, Ignore, Update};
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 
+use crate::utilities::{repo_from_path, get_current_repository, get_current_branch};
+
 /// Configuration levels for git config operations
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ConfigLevel {
@@ -35,10 +37,20 @@ pub enum ConfigLevel {
 /// Trait for converting between git submodule configuration enums and their gitmodules representation
 pub trait  GitmodulesConvert {
     /// Get the git key for a submodule by the submodule's name (in git config)
-    fn gitmodules_key_path(&self, name: &str) -> String;
+    fn gitmodules_key_path(&self, name: &str) -> String {
+        format!("submodule.{name}.{}", self.gitmodules_key()).to_string()
+    }
 
     /// Get the git key for the enum setting
     fn gitmodules_key(&self) -> &str;
+
+    fn as_gitmodules_key_value(&self, name: &str) -> String {
+        format!("{}={}", self.gitmodules_key(), self.gitmodules_key_path(&name))
+    }
+
+    fn as_gitmodules_byte_key_value(&self, name: &str) -> Vec<u8> {
+        self.as_gitmodules_key_value(name).into_bytes()
+    }
 
     /// Convert to gitmodules string (what you would get from the .gitmodules or .git/config)
     fn to_gitmodules(&self) -> String;
@@ -65,30 +77,24 @@ pub trait OptionsChecks {
 
 }
 
-/// Trait for checking if an enum is unspecified or default
-pub trait IsUnspecified {
-    /// Check if the enum is unspecified
-    fn is_unspecified(&self) -> bool;
-}
-
-/// Trait for checking if an enum is the default value
-pub trait IsDefault {
-    /// Check if the enum is the default value
-    fn is_default(&self) -> bool;
-}
-
 /// Trait for converting between `git2` and `gix_submodule` types
 pub trait GixGit2Convert {
-    /// Convert from a `git2` type to a `gix_submodule` type
-    fn from_git2(git2: Git2SubmoduleIgnore) -> Result<Self, ()>
+    /// The git2 source type
+    type Git2Type;
+    /// The gix source type
+    type GixType;
+
+    /// Convert from a `git2` type to a `submod` type
+    fn from_git2(git2: Self::Git2Type) -> Result<Self, ()>
     where
         Self: Sized;
 
     /// Convert from a `gix_submodule` type to a `submod` type
-    fn from_gix(gix: gix_submodule::config::Ignore) -> Result<Self, ()>
+    fn from_gix(gix: Self::GixType) -> Result<Self, ()>
     where
         Self: Sized;
 }
+
 
 /// Serializable enum for [`Ignore`] config
 #[derive(
@@ -122,10 +128,6 @@ pub enum SerializableIgnore {
 }
 
 impl GitmodulesConvert for SerializableIgnore {
-    /// Get the git key for a submodule by the submodule's name (in git config)
-    fn gitmodules_key_path(&self, name: &str) -> String {
-        format!("submodule.{name}.{}", self.gitmodules_key())
-    }
 
     /// Get the git key for the ignore submodule setting
     fn gitmodules_key(&self) -> &str {
@@ -171,6 +173,22 @@ impl OptionsChecks for SerializableIgnore {
     /// Check if the enum is the default value
     fn is_default(&self) -> bool {
         matches!(self, SerializableIgnore::None)
+    }
+}
+
+impl GixGit2Convert for SerializableIgnore {
+    type Git2Type = Git2SubmoduleIgnore;
+    type GixType = gix_submodule::config::Ignore;
+    /// Convert from a `git2` type to a `gix_submodule` type
+    fn from_git2(git2: Self::Git2Type) -> Result<Self, ()> {
+        Self::try_from(git2)
+            .map_err(|_| ()) // Handle unsupported variants
+    }
+
+    /// Convert from a `gix_submodule` type to a `submod` type
+    fn from_gix(gix: Self::GixType) -> Result<Self, ()> {
+        Self::try_from(gix)
+            .map_err(|_| ()) // Handle unsupported variants
     }
 }
 
@@ -267,10 +285,6 @@ pub enum SerializableFetchRecurse {
 }
 
 impl GitmodulesConvert for SerializableFetchRecurse {
-    /// Get the git key for a submodule by the submodule's name (in git config)
-    fn gitmodules_key_path(&self, name: &str) -> String {
-        format!("submodule.{name}.{}", self.gitmodules_key())
-    }
 
     /// Get the git key for the fetch recurse submodule setting
     fn gitmodules_key(&self) -> &str {
@@ -317,6 +331,22 @@ impl OptionsChecks for SerializableFetchRecurse {
     }
 }
 
+impl GixGit2Convert for SerializableFetchRecurse {
+    type Git2Type = String; // git2 does not have a direct type for FetchRecurse, so we use str
+    type GixType = gix_submodule::config::FetchRecurse;
+    /// Convert from a `git2` type to a `gix_submodule` type
+    fn from_git2(git2: Self::Git2Type) -> Result<Self, ()> {
+        Self::from_gitmodules(git2.as_str())
+            .map_err(|_| ()) // Handle unsupported variants
+    }
+
+    /// Convert from a `gix_submodule` type to a `submod` type
+    fn from_gix(gix: Self::GixType) -> Result<Self, ()> {
+        Self::try_from(gix)
+            .map_err(|_| ()) // Handle unsupported variants
+    }
+}
+
 impl TryFrom<FetchRecurse> for SerializableFetchRecurse {
     type Error = ();
 
@@ -358,6 +388,58 @@ pub enum SerializableBranch {
     CurrentInSuperproject,
     /// Track a specific branch by name. (Usually what you want.). The default value is the remote branch's default branch if we can resolve it, else `main`.
     Name(String),
+}
+
+impl SerializableBranch {
+    /// Get the current branch name from the superproject repository.
+    pub fn current_in_superproject() -> Result<String, anyhow::Error> {
+        get_current_repository()
+            .map(|repo| {
+                get_current_branch(Some(&repo))
+                    .unwrap_or_else(|_| "current-in-super-project".to_string())
+            })
+            .map_err(|_| anyhow::anyhow!("Failed to get current branch in superproject"))
+    }
+}
+
+impl GitmodulesConvert for SerializableBranch {
+    /// Get the git key for the branch submodule setting
+    fn gitmodules_key(&self) -> &str {
+        "branch"
+    }
+
+    /// Convert to gitmodules string (what you would get from the .gitmodules or .git/config)
+    fn to_gitmodules(&self) -> String {
+        match self {
+            SerializableBranch::CurrentInSuperproject => get_current_repository()
+                .map(|repo| {
+                    let branch = get_current_branch(Some(&repo))
+                        .unwrap_or_else(|_| "current-in-super-project".to_string());
+                    if branch.is_empty() {
+                        "current-in-super-project".to_string()
+                    } else {
+                        branch
+                    }
+                })
+                .unwrap_or_else(|_| "current-in-super-project".to_string()),
+            SerializableBranch::Name(name) => name.to_string(),
+        }
+    }
+
+    /// Convert from gitmodules string (what you would get from the .gitmodules or .git/config)
+    fn from_gitmodules(options: &str) -> Result<Self, ()> {
+
+        if options == "." || options == "current" || options == "current-in-super-project" || options == "superproject" || options == "super" || options == SerializableBranch::current_in_superproject().unwrap_or_default() {
+            return Ok(SerializableBranch::CurrentInSuperproject);
+        }
+        Ok(SerializableBranch::Name(options.to_string()))
+    }
+
+    /// Convert from gitmodules bytes (what you would get from the .gitmodules or .git/config)
+    fn from_gitmodules_bytes(options: &[u8]) -> Result<Self, ()> {
+        let options_str = std::str::from_utf8(options).map_err(|_| ())?;
+        Self::from_gitmodules(options_str)
+    }
 }
 
 impl TryFrom<Branch> for SerializableBranch {
@@ -427,6 +509,22 @@ impl SerializableBranch {
     }
 }
 
+impl GixGit2Convert for SerializableBranch {
+    type Git2Type = String; // git2 does not have a direct type for Branch, so we use str
+    type GixType = gix_submodule::config::Branch;
+    /// Convert from a `git2` type to a `gix_submodule` type
+    fn from_git2(git2: Self::Git2Type) -> Result<Self, ()> {
+        Self::from_gitmodules(git2.as_str())
+            .map_err(|_| ()) // Handle unsupported variants
+    }
+
+    /// Convert from a `gix_submodule` type to a `submod` type
+    fn from_gix(gix: Self::GixType) -> Result<Self, ()> {
+        Self::try_from(gix)
+            .map_err(|_| ()) // Handle unsupported variants
+    }
+}
+
 /// Serializable enum for [`Update`] config
 #[derive(
     Debug, Clone, Default, Ord, PartialOrd, Eq, PartialEq, Hash, Serialize, Deserialize, ValueEnum,
@@ -460,11 +558,6 @@ impl OptionsChecks for SerializableUpdate {
 }
 
 impl GitmodulesConvert for SerializableUpdate {
-    /// Get the git key for a submodule by the submodule's name (in git config)
-    fn gitmodules_key_path(&self, name: &str) -> String {
-        format!("submodule.{name}.{}", self.gitmodules_key())
-    }
-
     /// Get the git key for the update submodule setting
     fn gitmodules_key(&self) -> &str {
         "update"
@@ -559,5 +652,21 @@ impl TryFrom<SerializableUpdate> for Update {
 impl std::fmt::Display for SerializableUpdate {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.to_gitmodules())
+    }
+}
+
+impl GixGit2Convert for SerializableUpdate {
+    type Git2Type = Git2SubmoduleUpdate;
+    type GixType = gix_submodule::config::Update;
+    /// Convert from a `git2` type to a `gix_submodule` type
+    fn from_git2(git2: Self::Git2Type) -> Result<Self, ()> {
+        Self::try_from(git2)
+            .map_err(|_| ()) // Handle unsupported variants
+    }
+
+    /// Convert from a `gix_submodule` type to a `submod` type
+    fn from_gix(gix: Self::GixType) -> Result<Self, ()> {
+        Self::try_from(gix)
+            .map_err(|_| ()) // Handle unsupported variants
     }
 }

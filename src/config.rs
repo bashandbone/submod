@@ -20,8 +20,10 @@ Features:
 - Manage submodule entries and defaults programmatically.
 "]
 
+use std::any;
 use std::path::PathBuf;
 use anyhow::Result;
+use bstr::BStr;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, path::Path};
 use crate::options::{
@@ -213,6 +215,50 @@ pub struct SubmoduleAddOptions {
     pub shallow: bool,
     /// Whether to skip initialization after adding
     pub no_init: bool,
+}
+
+impl SubmoduleAddOptions {
+    /// Create an add options from a SubmoduleEntry
+    pub fn into_submodule_entry(self) -> SubmoduleEntry {
+        SubmoduleEntry {
+            url: Some(self.url),
+            path: Some(self.path.to_string_lossy().to_string()),
+            branch: self.branch,
+            ignore: self.ignore,
+            update: self.update,
+            fetch_recurse: self.fetch_recurse,
+            shallow: Some(self.shallow),
+            active: Some(!self.no_init), // we're adding so unless we have a 'no_init" flag, we can assume active
+            no_init: Some(self.no_init),
+        }
+    }
+
+    /// Create an add options from a entries tuple (name and SubmoduleEntry)
+    pub fn from_submodule_entries_tuple(entry: (SubmoduleName, SubmoduleEntry)) -> Self {
+        let (name, submodule_entry) = entry;
+        Self {
+            name: name.clone(),
+            url: submodule_entry.url.map(|u| u.to_string())
+                .unwrap_or_else(|| submodule_entry.path.clone().unwrap_or_else(|| name.clone())),
+            path: submodule_entry.path
+                .map(PathBuf::from)
+                .unwrap_or_else(|| PathBuf::from(name.clone())),
+            branch: submodule_entry.branch,
+            ignore: submodule_entry.ignore,
+            update: submodule_entry.update,
+            fetch_recurse: submodule_entry.fetch_recurse,
+            shallow: submodule_entry.shallow.map_or(false, |s| s),
+            no_init: submodule_entry.no_init.map_or(false, |f| f),
+        }
+    }
+
+    /// Convert an AddOptions to a SubmoduleEntries tuple
+    pub fn into_entries_tuple(self) -> (SubmoduleName, SubmoduleEntry) {
+        (
+            self.name.to_owned(),
+            self.clone().into_submodule_entry()
+        )
+    }
 }
 
 /// Options for updating a submodule
@@ -433,6 +479,34 @@ impl SubmoduleEntry {
         )
     }
 
+    /// Create a new submodule entries from a gitmodules entry
+    pub fn from_gitmodules(name: &String, entries: std::collections::HashMap<String, String>) -> Self {
+        let url = entries.get("url").cloned();
+        let path = if let Some(path) = entries.get("path").cloned() {
+            Some(path)
+        } else {
+            name.to_string().into()
+        };
+        let branch = SerializableBranch::from_gitmodules(entries.get("branch").map_or("", |b| b.as_str())).ok();
+        let ignore = entries.get("ignore").and_then(|i| SerializableIgnore::from_gitmodules(i).ok());
+        let fetch_recurse = entries.get("fetchRecurse").and_then(|fr| SerializableFetchRecurse::from_gitmodules(fr).ok());
+        let update = entries.get("update").and_then(|u| SerializableUpdate::from_gitmodules(u).ok());
+        let active = entries.get("active").and_then(|a| a.parse::<bool>().ok()).unwrap_or(true);
+        let shallow = entries.get("shallow").and_then(|s| s.parse::<bool>().ok()).unwrap_or(false);
+        let no_init = false;
+        Self::new(
+            url,
+            path,
+            branch,
+            ignore,
+            update,
+            fetch_recurse,
+            Some(active),
+            Some(shallow),
+            Some(no_init),
+        )
+    }
+
     /// Get a new instance with updated options
     pub fn update_with_options(
         &self,
@@ -576,17 +650,35 @@ impl SubmoduleEntries {
     }
 
     /// Add a submodule entry
-    pub fn add_submodule(&mut self, name: SubmoduleName, entry: SubmoduleEntry) {
-        if let Some(submodules) = &mut self.submodules {
-            submodules.insert(name, entry);
+    pub fn add_submodule(self, name: SubmoduleName, entry: SubmoduleEntry) -> Self {
+        if self.submodules().is_some() {
+            let mut submodules = self.submodules.unwrap().clone();
+            submodules.insert(name.clone(), entry);
+            Self {
+                submodules: Some(submodules),
+                sparse_checkouts: self.sparse_checkouts,
+            }
+        } else {
+            let mut submodules = HashMap::new();
+            submodules.insert(name.clone(), entry);
+            Self {
+                submodules: Some(submodules),
+                sparse_checkouts: self.sparse_checkouts,
+            }
+
         }
     }
 
     /// Remove a submodule entry
-    pub fn remove_submodule(&mut self, name: &str) {
+    pub fn remove_submodule(&mut self, name: &str) -> Self {
         if let Some(submodules) = &mut self.submodules {
             submodules.remove(name);
         }
+        self.clone()
+    }
+
+    pub fn submodule_names(&self) -> Option<Vec<String>> {
+        self.submodules.as_ref().map(|s| s.keys().cloned().collect())
     }
 
     /// Get the submodules map
@@ -681,6 +773,19 @@ impl SubmoduleEntries {
                 .unwrap_or_else(Vec::new);
             (name, (entry, sparse))
         })
+    }
+
+    /// Create a new SubmoduleEntries from a HashMap of submodule entries
+    pub fn from_gitmodules(entries: std::collections::HashMap<String, std::collections::HashMap<String, String>>) -> Self {
+        let mut submodules = HashMap::new();
+        for (name, entry) in entries {
+            let submodule_entry = SubmoduleEntry::from_gitmodules(&name, entry);
+            submodules.insert(name, submodule_entry);
+        }
+        Self {
+            submodules: Some(submodules),
+            sparse_checkouts: Some(HashMap::new()),
+        }
     }
 }
 

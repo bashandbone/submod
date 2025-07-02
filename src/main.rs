@@ -20,7 +20,6 @@ and syncing submodules with features like sparse checkout.
 
 Exits with an error if any operation fails.
 "]
-mod simple_gix;
 mod long_abouts;
 mod shells;
 mod git_ops;
