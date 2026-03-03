@@ -35,6 +35,7 @@ use crate::options::SerializableBranch as Branch;
 use crate::git_manager::GitManager;
 use anyhow::Result;
 use clap::Parser;
+use clap_complete::generate;
 
 
 fn main() -> Result<()> {
@@ -141,7 +142,7 @@ fn main() -> Result<()> {
             }
         }
         Commands::Sync => {
-            let mut manager = GitManager::new(cli.config)
+            let mut manager = GitManager::new(config_path)
                 .map_err(|e| anyhow::anyhow!("Failed to create manager: {}", e))?;
 
             // Run check, init, and update in sequence
@@ -189,8 +190,10 @@ fn main() -> Result<()> {
         Commands::NukeItFromOrbit { .. } => {
             return Err(anyhow::anyhow!("NukeItFromOrbit command not yet implemented"));
         }
-        Commands::CompleteMe { .. } => {
-            return Err(anyhow::anyhow!("Completions command not yet implemented"));
+        Commands::CompleteMe { shell } => {
+            let mut cmd = <Cli as clap::CommandFactory>::command();
+            let name = cmd.get_name().to_string();
+            generate(shell, &mut cmd, name, &mut std::io::stdout());
         }
     }
 

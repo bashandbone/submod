@@ -33,13 +33,14 @@ Defines the CLI structure and commands using [`clap`] for managing git submodule
 # Usage Example
 
 ```sh
-submod add my-lib libs/my-lib https://github.com/example/my-lib.git --sparse-paths "src/,include/" --settings "ignore=all"
+submod add https://github.com/example/my-lib.git --name my-lib --path libs/my-lib --sparse-paths "src/,include/"
 submod change my-lib --branch "main" --sparse-paths "src/,include/" --fetch "always" --update "checkout"
 submod check
 submod init
 submod update
 submod reset --all
 submod sync
+submod completeme bash
 ```
 
 # Configuration
@@ -110,7 +111,7 @@ pub enum Commands {
         no_init: bool,
     },
     // TODO: Implement this command
-    #[command(name = "change", next_help_heading = "Change a Submodule's Settings", about = "Change the configuration of an existing submodule. Any field you provide will overwrite an existing value (unless both are defaults). If you change the path, it will nuke-it-from-orbit (delete it and re-clone it).")]
+    #[command(name = "change", hide = true, next_help_heading = "Change a Submodule's Settings", about = "Change the configuration of an existing submodule. Any field you provide will overwrite an existing value (unless both are defaults). If you change the path, it will nuke-it-from-orbit (delete it and re-clone it).")]
     Change {
         #[arg(required = true, value_parser = clap::value_parser!(String), value_hint = clap::ValueHint::CommandName, help = "The name of the submodule to change. Must match an existing submodule.", long_help = "The name of the submodule to change. Must match an existing submodule in your submod.toml. Because we use this value to lookup your config, you cannot change the name from the CLI. You must manually change it in your submod.toml. All other options can be changed here.")]
         name: String,
@@ -146,7 +147,7 @@ pub enum Commands {
         active: bool,
     },
     // TODO: Implement this command
-    #[command(name = "change-global", visible_aliases = ["cg", "chgl", "global"], next_help_heading = "Change Global Settings", about = "Add or change the global settings for submodules, affecting all submodules in the current repository. Any individual submodule settings will override these global settings.")]
+    #[command(name = "change-global", hide = true, visible_aliases = ["cg", "chgl", "global"], next_help_heading = "Change Global Settings", about = "Add or change the global settings for submodules, affecting all submodules in the current repository. Any individual submodule settings will override these global settings.")]
     ChangeGlobal {
 
         #[arg(short = 'i', long = "ignore", help = "Sets the default ignore behavior for all submodules in this repository. This will override any individual submodule settings.")]
@@ -163,7 +164,7 @@ pub enum Commands {
     Check,
 
     // TODO: Implement this command
-    #[command(name = "list", visible_aliases = ["ls", "l"], next_help_heading = "List Submodules", about = "Lists all submodules, optionally recursively.")]
+    #[command(name = "list", hide = true, visible_aliases = ["ls", "l"], next_help_heading = "List Submodules", about = "Lists all submodules, optionally recursively.")]
     List {
         /// Recursively list all submodules for the current repository.
         #[arg(short = 'r', long = "recursive", default_value = "false", action = clap::ArgAction::SetTrue, default_missing_value = "true", help = "If given, lists all submodules recursively (like, the submodules of the submodules).")]
@@ -174,11 +175,11 @@ pub enum Commands {
     Init,
 
     // TODO: Implement this command (use git2 + fs to delete files)
-    #[command(name = "delete", visible_alias = "del", next_help_heading = "Delete a Submodule", about = "Deletes a submodule by name; removes it from the configuration and the filesystem.")]
+    #[command(name = "delete", hide = true, visible_alias = "del", next_help_heading = "Delete a Submodule", about = "Deletes a submodule by name; removes it from the configuration and the filesystem.")]
     Delete,
 
     // TODO: Implement this command (use git2). Functionally this changes a module to `active = false` in our config and `.gitmodules`, but does not delete the submodule from the filesystem.
-    #[command(name = "disable", visible_alias = "d", next_help_heading = "Disable a Submodule", about = "Disables a submodule by name; sets its active status to false. Does not remove settings or files.")]
+    #[command(name = "disable", hide = true, visible_alias = "d", next_help_heading = "Disable a Submodule", about = "Disables a submodule by name; sets its active status to false. Does not remove settings or files.")]
     Disable,
 
     #[command(name = "update", visible_alias = "u", next_help_heading = "Update Submodules", about = "Updates all submodules to their configured state.")]
@@ -198,7 +199,7 @@ pub enum Commands {
     Sync,
 
     // TODO: Implement this command
-    #[command(name = "generate-config", visible_aliases = ["gc", "genconf"], next_help_heading = "Generate a Config File", about = "Generates a new configuration file.")]
+    #[command(name = "generate-config", hide = true, visible_aliases = ["gc", "genconf"], next_help_heading = "Generate a Config File", about = "Generates a new configuration file.")]
     GenerateConfig {
         /// Path to the new configuration file to generate.
         #[arg(short = 'o', long = "output", value_parser = clap::value_parser!(PathBuf), value_hint = clap::ValueHint::FilePath, default_value = "submod.toml", help = "Path to the output configuration file. Defaults to submod.toml in the current directory.")]
@@ -215,7 +216,7 @@ pub enum Commands {
     },
 
     // TODO: Implement this command (use git2) (not we can leverage this logic for `delete` because the `kill` option is the same.)
-    #[command(name = "nuke-it-from-orbit", visible_aliases = ["nuke-em", "nuke-it", "nuke-them"], next_help_heading = "Nuke It From Orbit", about = "Deletes all submodules or specific ones, removing them from the configuration and the filesystem. Optionally leaves them dead. 🚀💥👾💥💀.")]
+    #[command(name = "nuke-it-from-orbit", hide = true, visible_aliases = ["nuke-em", "nuke-it", "nuke-them"], next_help_heading = "Nuke It From Orbit", about = "Deletes all submodules or specific ones, removing them from the configuration and the filesystem. Optionally leaves them dead. 🚀💥👾💥💀.")]
     NukeItFromOrbit {
         #[arg(long = "all", default_value = "false", action = clap::ArgAction::SetTrue, default_missing_value = "true", help = "Nuke 'em all? 🤓")]
         all: bool,
@@ -226,8 +227,8 @@ pub enum Commands {
         kill: bool,
     },
 
-    // TODO: Implement this command (super simple with clap_complete/clap_complete_nushell. The latter is just another enum variant that implements the `Generator` trait like all of the other clap_complete shells.)
-    #[command(name = "completeme", visible_aliases = ["comp", "complete", "comp-me", "complete-me"], next_help_heading = "Generate Shell Completions", about = "Generates shell completions for the specified shell. Completions generated to stdout.", long_about = COMPLETE_ME, value_parser = clap::value_parser!(Shell))]
+    // Shell completions are implemented using clap_complete/clap_complete_nushell
+    #[command(name = "completeme", visible_aliases = ["comp", "complete", "comp-me", "complete-me"], next_help_heading = "Generate Shell Completions", about = "Generates shell completions for the specified shell. Completions generated to stdout.", long_about = COMPLETE_ME)]
     CompleteMe {
         #[arg(value_enum, action = clap::ArgAction::Set, help = "The shell to generate completions for. Supported shells: `bash`, `zsh`, `fish`, `powershell`, `elvish`, `nushell`.")]
         shell: Shell,

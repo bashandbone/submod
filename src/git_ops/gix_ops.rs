@@ -74,8 +74,8 @@ impl GixOperations {
     for section in as_config_file.sections() {
         // we need to convert everything to String and add to map
         let mut section_entries = std::collections::HashMap::new();
-        let name = if section.header().subsection_name().is_some() {
-            section.header().name().to_string()
+        let name = if let Some(subsection) = section.header().subsection_name() {
+            subsection.to_str_lossy().to_string()
         } else {
             section.header().name().to_string()
         };

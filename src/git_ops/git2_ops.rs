@@ -90,7 +90,8 @@ impl Git2Operations {
 
         match config.get_string(&key) {
             Ok(fetch_str) => match fetch_str.as_str() {
-                "true" | "on-demand" => Ok(Some(SerializableFetchRecurse::OnDemand)),
+                "true" => Ok(Some(SerializableFetchRecurse::Always)),
+                "on-demand" => Ok(Some(SerializableFetchRecurse::OnDemand)),
                 "false" | "no" => Ok(Some(SerializableFetchRecurse::Never)),
                 _ => Ok(None),
             },

@@ -1,4 +1,4 @@
-// SPDX-LicenseIdentifier: MIT OR Apache-2.0
+// SPDX-License-Identifier: MIT OR Apache-2.0
 //
 // SPDX-FileCopyrightText: 2018-2025 Sebastian Thiel and [contributors](https://github.com/byron/gitoxide/contributors)
 // SPDX-FileCopyrightText: 2025 Adam Poulemanos <89049923+bashandbone@users.noreply.github.com>
