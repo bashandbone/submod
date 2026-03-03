@@ -164,7 +164,9 @@ pub fn name_from_osstring(os_string: std::ffi::OsString) -> Result<String, anyho
             return Err(anyhow::anyhow!("Name cannot be empty"));
         }
         let sep = std::path::MAIN_SEPARATOR.to_string();
-        s.trim().split(&sep)
+        s.trim()
+            .split(&sep)
+            .filter(|segment| !segment.trim().is_empty())
             .last()
             .map(|name| name.to_string())
             .ok_or_else(|| anyhow::anyhow!("Failed to extract name from OsString"))
