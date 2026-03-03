@@ -492,7 +492,7 @@ impl SubmoduleEntry {
         };
         let branch = SerializableBranch::from_gitmodules(entries.get("branch").map_or("", |b| b.as_str())).ok();
         let ignore = entries.get("ignore").and_then(|i| SerializableIgnore::from_gitmodules(i).ok());
-        let fetch_recurse = entries.get("fetchRecurse").and_then(|fr| SerializableFetchRecurse::from_gitmodules(fr).ok());
+        let fetch_recurse = entries.get("fetchRecurseSubmodules").and_then(|fr| SerializableFetchRecurse::from_gitmodules(fr).ok());
         let update = entries.get("update").and_then(|u| SerializableUpdate::from_gitmodules(u).ok());
         let active = entries.get("active").and_then(|a| a.parse::<bool>().ok()).unwrap_or(true);
         let shallow = entries.get("shallow").and_then(|s| s.parse::<bool>().ok()).unwrap_or(false);

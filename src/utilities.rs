@@ -82,9 +82,13 @@ pub fn get_main_root(
 
 /// Get the current branch name from the repository.
 pub fn get_current_branch(repo: Option<&gix::Repository>) -> Result<String, anyhow::Error> {
+    let owned;
     let repo = match repo {
         Some(r) => r,
-        None => &get_current_repository()?,
+        None => {
+            owned = get_current_repository()?;
+            &owned
+        }
     };
     let head = repo.head()?;
     if let Some(reference) = head.referent_name() {
@@ -153,19 +157,19 @@ pub fn name_from_url(url: &str) -> Result<String, anyhow::Error> {
 /// Convert an `OsString` to a `String`, extracting the name from the path
 pub fn name_from_osstring(os_string: std::ffi::OsString) -> Result<String, anyhow::Error> {
     osstring_to_string(os_string).and_then(|s| {
-        if s.is_empty() {
-            if s.contains('\0') {
-                Err(anyhow::anyhow!("Name cannot contain null bytes"))
-            } else {
-                Ok(s)
-            }
-        } else {
-            let sep = std::path::MAIN_SEPARATOR.to_string();
-            s.trim().split(&sep)
-                .last()
-                .map(|name| name.to_string())
-                .ok_or_else(|| anyhow::anyhow!("Failed to extract name from OsString"))
+        if s.contains('\0') {
+            return Err(anyhow::anyhow!("Name cannot contain null bytes"));
         }
+        if s.trim().is_empty() {
+            return Err(anyhow::anyhow!("Name cannot be empty"));
+        }
+        let sep = std::path::MAIN_SEPARATOR.to_string();
+        s.trim()
+            .split(&sep)
+            .filter(|segment| !segment.trim().is_empty())
+            .last()
+            .map(|name| name.to_string())
+            .ok_or_else(|| anyhow::anyhow!("Failed to extract name from OsString"))
     })
 }
 

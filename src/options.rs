@@ -423,28 +423,21 @@ impl GitmodulesConvert for SerializableBranch {
     /// Convert to gitmodules string (what you would get from the .gitmodules or .git/config)
     fn to_gitmodules(&self) -> String {
         match self {
-            SerializableBranch::CurrentInSuperproject => get_current_repository()
-                .map(|repo| {
-                    let branch = get_current_branch(Some(&repo))
-                        .unwrap_or_else(|_| "current-in-super-project".to_string());
-                    if branch.is_empty() {
-                        "current-in-super-project".to_string()
-                    } else {
-                        branch
-                    }
-                })
-                .unwrap_or_else(|_| "current-in-super-project".to_string()),
+            SerializableBranch::CurrentInSuperproject => ".".to_string(),
             SerializableBranch::Name(name) => name.to_string(),
         }
     }
 
     /// Convert from gitmodules string (what you would get from the .gitmodules or .git/config)
     fn from_gitmodules(options: &str) -> Result<Self, ()> {
-
-        if options == "." || options == "current" || options == "current-in-super-project" || options == "superproject" || options == "super" || options == SerializableBranch::current_in_superproject().unwrap_or_default() {
+        let trimmed = options.trim();
+        if trimmed == "." {
             return Ok(SerializableBranch::CurrentInSuperproject);
         }
-        Ok(SerializableBranch::Name(options.to_string()))
+        if trimmed.is_empty() {
+            return Err(());
+        }
+        Ok(SerializableBranch::Name(trimmed.to_string()))
     }
 
     /// Convert from gitmodules bytes (what you would get from the .gitmodules or .git/config)

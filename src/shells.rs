@@ -49,7 +49,7 @@ impl clap::ValueEnum for Shell {
             Shell::Bash => PossibleValue::new("bash"),
             Shell::Elvish => PossibleValue::new("elvish"),
             Shell::Fish => PossibleValue::new("fish"),
-            Shell::PowerShell => PossibleValue::new("powershell"),
+            Shell::PowerShell => PossibleValue::new("powershell").alias("pwsh"),
             Shell::Zsh => PossibleValue::new("zsh"),
             Shell::Nushell => PossibleValue::new("nushell"),
         })
