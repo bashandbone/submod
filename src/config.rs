@@ -643,7 +643,7 @@ impl<'de> Deserialize<'de> for SubmoduleEntries {
     /// `submodules` map and the `sparse_checkouts` map from each entry's `sparse_paths`.
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         let map: HashMap<SubmoduleName, SubmoduleEntry> =
-            HashMap::deserialize(deserializer).unwrap_or_default();
+            HashMap::deserialize(deserializer)?;
         let mut sparse_checkouts: HashMap<SubmoduleName, Vec<String>> = HashMap::new();
         for (name, entry) in &map {
             if let Some(paths) = &entry.sparse_paths {
@@ -949,9 +949,11 @@ impl Config {
     }
 
     /// Load configuration from a file, merging with CLI options
-    pub fn load(&self, path: impl AsRef<Path>, _cli_options: Config) -> anyhow::Result<Self> {
+    pub fn load(&self, path: impl AsRef<Path>, cli_options: Config) -> anyhow::Result<Self> {
         let cfg: Config = Figment::new()
             .merge(Toml::file(path))
+            // CLI options should take precedence over file values
+            .merge(figment::providers::Serialized::defaults(cli_options))
             .extract()?;
         Ok(cfg.apply_defaults())
     }

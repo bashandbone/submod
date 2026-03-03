@@ -249,9 +249,14 @@ impl GitOperations for GitOpsManager {
             }
         }
         // CLI fallback: use git submodule add directly
-        let path_str = opts.path.to_string_lossy();
         let output = std::process::Command::new("git")
-            .args(["submodule", "add", "--name", &opts.name, "--", &opts.url, &path_str])
+            .arg("submodule")
+            .arg("add")
+            .arg("--name")
+            .arg(&opts.name)
+            .arg("--")
+            .arg(&opts.url)
+            .arg(&opts.path)
             .output()
             .context("Failed to run git submodule add")?;
         if output.status.success() {

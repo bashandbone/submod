@@ -448,7 +448,7 @@ impl GitManager {
         };
         match self.git_ops.add_submodule(&opts).map_err(Self::map_git_ops_error) {
             Ok(()) => {
-                // Configure after successful creation (git2's add_submodule handles clone/init)
+                // Configure after successful submodule creation (clone/init handled by the underlying backend, currently the git CLI)
                 self.configure_submodule_post_creation(&name, &path, sparse_paths.clone())?;
                 self.update_toml_config(
                     name.clone(),

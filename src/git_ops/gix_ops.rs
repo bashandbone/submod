@@ -257,10 +257,10 @@ impl GitOperations for GixOperations {
 
     /// Add a new submodule to the repository
     /// Note: gix does not yet support the full submodule add workflow (clone + register).
-    /// This falls back to git2 which handles the complete operation.
+    /// The caller should fall back to another Git backend (for example, the git CLI) to handle the complete operation.
     fn add_submodule(&mut self, _opts: &SubmoduleAddOptions) -> Result<()> {
         Err(anyhow::anyhow!(
-            "gix submodule add not fully implemented; falling back to git2"
+            "gix submodule add not fully implemented; caller must fall back to another Git backend (e.g. git CLI)"
         ))
     }
 
