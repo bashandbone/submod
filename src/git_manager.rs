@@ -194,12 +194,16 @@ impl GitManager {
 
         // Append any new submodule sections not already in the file
         for (name, entry) in self.config.get_submodules() {
-            let section_header = format!("[{name}]");
+            // Use a quoted TOML table header so that submodule names with
+            // special characters (e.g., '.', spaces, quotes, ']') are handled safely.
+            let escaped_name = name.replace('\\', "\\\\").replace('"', "\\\"");
+            let section_header = format!("[\"{}\"]", escaped_name);
             // Check at line boundaries to avoid false positives from comments/values
             let already_present = existing.lines().any(|line| line.trim() == section_header);
             if !already_present {
                 output.push('\n');
-                output.push_str(&format!("[{name}]\n"));
+                output.push_str(&section_header);
+                output.push('\n');
                 if let Some(path) = &entry.path {
                     output.push_str(&format!("path = \"{}\"\n", path.replace('\\', "\\\\").replace('"', "\\\"")));
                 }
@@ -381,6 +385,8 @@ impl GitManager {
                 },
                 sparse_paths.clone(),
             )?;
+            // When requested, only update configuration without touching repository state.
+            return Ok(());
         }
 
         // Clean up any existing submodule state using git commands
@@ -422,9 +428,14 @@ impl GitManager {
     /// Clean up existing submodule state using git commands only
     fn cleanup_existing_submodule(&mut self, path: &str) -> Result<(), SubmoduleError> {
         // Best-effort cleanup of any existing submodule state
-        // These operations may fail if the submodule doesn't exist yet, which is fine
-        let _ = self.git_ops.deinit_submodule(path, true);
-        let _ = self.git_ops.delete_submodule(path);
+        // These operations may fail if the submodule doesn't exist yet, which is fine,
+        // but other errors (permissions, corruption, etc.) should at least be visible.
+        if let Err(e) = self.git_ops.deinit_submodule(path, true) {
+            eprintln!("Warning: failed to deinit submodule at '{}': {:?}", path, e);
+        }
+        if let Err(e) = self.git_ops.delete_submodule(path) {
+            eprintln!("Warning: failed to delete submodule at '{}': {:?}", path, e);
+        }
         Ok(())
     }
 

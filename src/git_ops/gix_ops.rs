@@ -628,28 +628,15 @@ impl GitOperations for GixOperations {
     }
     /// Get the status of a submodule
     fn get_submodule_status(&self, path: &str) -> Result<DetailedSubmoduleStatus> {
-        let workdir = self.repo.workdir()
-            .ok_or_else(|| anyhow::anyhow!("Repository has no working directory"))?;
-        let submodule_path = workdir.join(path);
-        let is_initialized = submodule_path.join(".git").exists();
-        Ok(DetailedSubmoduleStatus {
-            path: path.to_string(),
-            name: path.to_string(),
-            url: None,
-            head_oid: None,
-            index_oid: None,
-            workdir_oid: None,
-            status_flags: SubmoduleStatusFlags::empty(),
-            ignore_rule: SerializableIgnore::Unspecified,
-            update_rule: SerializableUpdate::Unspecified,
-            fetch_recurse_rule: SerializableFetchRecurse::Unspecified,
-            branch: None,
-            is_initialized,
-            is_active: true,
-            has_modifications: false,
-            sparse_checkout_enabled: false,
-            sparse_patterns: vec![],
-        })
+        // The gix-backed implementation of detailed submodule status is not yet
+        // available. Returning an explicit error here allows higher-level code
+        // to fall back to the git2-based implementation, which provides more
+        // complete and accurate status information.
+        anyhow::bail!(
+            "gix-based get_submodule_status for '{}' is not yet implemented; \
+             falling back to alternate backend",
+            path
+        );
     }
     fn list_submodules(&self) -> Result<Vec<String>> {
         self.try_gix_operation(|repo| {
@@ -665,7 +652,7 @@ impl GitOperations for GixOperations {
     }
     fn fetch_submodule(&self, _path: &str) -> Result<()> {
         let submodule_repo = utilities::repo_from_path(&std::path::PathBuf::from(_path))?;
-        let remote_url = self.repo
+        let remote_url = submodule_repo
             .find_default_remote(gix::remote::Direction::Fetch)
             .and_then(|r| r.ok())
             .and_then(|remote| remote.url(gix::remote::Direction::Fetch).map(|url| url.to_string()));
