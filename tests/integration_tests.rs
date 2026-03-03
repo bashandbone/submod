@@ -61,7 +61,7 @@ mod tests {
 
         // Add a submodule
         let stdout = harness
-            .run_submod_success(&["add", "test-lib", "lib/test", &remote_url])
+            .run_submod_success(&["add", &remote_url, "--name", "test-lib", "--path", "lib/test"])
             .expect("Failed to add submodule");
 
         assert!(stdout.contains("Added submodule"));
@@ -92,9 +92,11 @@ mod tests {
         let stdout = harness
             .run_submod_success(&[
                 "add",
-                "sparse-lib",
-                "lib/sparse",
                 &remote_url,
+                "--name",
+                "sparse-lib",
+                "--path",
+                "lib/sparse",
                 "--sparse-paths",
                 "src,docs",
             ])
@@ -168,7 +170,7 @@ sparse_paths = ["src"]
 
         // Add and initialize submodule first
         harness
-            .run_submod_success(&["add", "update-lib", "lib/update", &remote_url])
+            .run_submod_success(&["add", &remote_url, "--name", "update-lib", "--path", "lib/update"])
             .expect("Failed to add submodule");
 
         // Run update command
@@ -191,7 +193,7 @@ sparse_paths = ["src"]
 
         // Add and initialize submodule
         harness
-            .run_submod_success(&["add", "reset-lib", "lib/reset", &remote_url])
+            .run_submod_success(&["add", &remote_url, "--name", "reset-lib", "--path", "lib/reset"])
             .expect("Failed to add submodule");
 
         // Make some changes in the submodule
@@ -229,11 +231,11 @@ sparse_paths = ["src"]
 
         // Add two submodules
         harness
-            .run_submod_success(&["add", "reset-lib1", "lib/reset1", &remote_url1])
+            .run_submod_success(&["add", &remote_url1, "--name", "reset-lib1", "--path", "lib/reset1"])
             .expect("Failed to add submodule 1");
 
         harness
-            .run_submod_success(&["add", "reset-lib2", "lib/reset2", &remote_url2])
+            .run_submod_success(&["add", &remote_url2, "--name", "reset-lib2", "--path", "lib/reset2"])
             .expect("Failed to add submodule 2");
 
         // Make changes in both submodules
@@ -369,7 +371,7 @@ active = true
 
         // Try to add submodule with invalid URL
         let output = harness
-            .run_submod(&["add", "invalid-lib", "lib/invalid", "not-a-valid-url"])
+            .run_submod(&["add", "not-a-valid-url", "--name", "invalid-lib", "--path", "lib/invalid"])
             .expect("Failed to run submod");
 
         assert!(!output.status.success());
@@ -391,9 +393,11 @@ active = true
         harness
             .run_submod_success(&[
                 "add",
-                "mismatch-lib",
-                "lib/mismatch",
                 &remote_url,
+                "--name",
+                "mismatch-lib",
+                "--path",
+                "lib/mismatch",
                 "--sparse-paths",
                 "src,docs",
             ])

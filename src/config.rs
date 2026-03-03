@@ -22,7 +22,7 @@ Features:
 
 use std::path::PathBuf;
 use anyhow::Result;
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 use std::{collections::HashMap, path::Path};
 use crate::options::{
     ConfigLevel, GitmodulesConvert, SerializableFetchRecurse, SerializableIgnore, SerializableUpdate
@@ -631,10 +631,32 @@ impl From<OtherSubmoduleSettings> for SubmoduleEntry {
 /// A collection of submodule entries, including sparse checkouts
 ///
 /// Revamped to better reflect git's structure so we can use the SubmoduleEntry types directly with gix/git2
-#[derive(Debug, Default, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Default, Clone, Serialize, PartialEq, Eq)]
 pub struct SubmoduleEntries {
     submodules: Option<HashMap<SubmoduleName, SubmoduleEntry>>,
     sparse_checkouts: Option<HashMap<SubmoduleName, Vec<String>>>,
+}
+
+impl<'de> Deserialize<'de> for SubmoduleEntries {
+    /// Deserialize from the flat TOML format where each top-level key is a submodule name.
+    /// Accepts a map where each key maps to a [`SubmoduleEntry`], building both the
+    /// `submodules` map and the `sparse_checkouts` map from each entry's `sparse_paths`.
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let map: HashMap<SubmoduleName, SubmoduleEntry> =
+            HashMap::deserialize(deserializer)?;
+        let mut sparse_checkouts: HashMap<SubmoduleName, Vec<String>> = HashMap::new();
+        for (name, entry) in &map {
+            if let Some(paths) = &entry.sparse_paths {
+                if !paths.is_empty() {
+                    sparse_checkouts.insert(name.clone(), paths.clone());
+                }
+            }
+        }
+        Ok(SubmoduleEntries {
+            submodules: Some(map),
+            sparse_checkouts: Some(sparse_checkouts),
+        })
+    }
 }
 
 impl SubmoduleEntries {
@@ -928,12 +950,13 @@ impl Config {
 
     /// Load configuration from a file, merging with CLI options
     pub fn load(&self, path: impl AsRef<Path>, cli_options: Config) -> anyhow::Result<Self> {
-        let fig = Figment::from(Self::default()) // 1) start from Rust-side defaults
-        .merge(Toml::file(path).nested())  // 2) file-based overrides
-        .merge(cli_options);      // 3) CLI overrides file
-
-        // 4) extract into Config, then post-process submodules
-        let cfg: Config = fig.extract()?;
+        let cfg: Config = Figment::new()
+            .merge(Toml::file(path))
+            // Merge only the defaults sub-field from CLI options so that the flat submodule
+            // entries (written as top-level TOML sections) are not corrupted by the
+            // SubmoduleEntries serialized field names ("submodules", "sparse_checkouts").
+            .merge(figment::providers::Serialized::defaults(cli_options.defaults).key("defaults"))
+            .extract()?;
         Ok(cfg.apply_defaults())
     }
 
@@ -943,10 +966,9 @@ impl Config {
             Some(ref p) => p,
             None => &".",
         };
-        let fig = Figment::from(Self::default())
-            .merge(Toml::file(p).nested());
-        // Extract the configuration from Figment
-        let cfg: Config = fig.extract()?;
+        let cfg: Config = Figment::new()
+            .merge(Toml::file(p))
+            .extract()?;
         Ok(cfg.apply_defaults())
     }
 

@@ -4,29 +4,13 @@
 // TODO: This module is very not-DRY...but it's low priority right now.
 use anyhow::{Context, Result};
 use std::collections::HashMap;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use gix::bstr::ByteSlice;
 
-use crate::git_ops::simple_gix::{clone_repo, fetch_repo};
+use crate::git_ops::simple_gix::fetch_repo;
 use crate::utilities::{repo_from_path};
 
-/// Simple glob pattern matching for sparse checkout patterns
-fn simple_glob_match(pattern: &str, text: &str) -> bool {
-    // Very basic glob matching - just handle * wildcard
-    if pattern.contains('*') {
-        let parts: Vec<&str> = pattern.split('*').collect();
-        if parts.len() == 2 {
-            let prefix = parts[0];
-            let suffix = parts[1];
-            text.starts_with(prefix) && text.ends_with(suffix)
-        } else {
-            false // More complex patterns not supported
-        }
-    } else {
-        text == pattern
-    }
-}
-
+/// Parse a gix config file from raw bytes
 fn gix_file_from_bytes(bytes: Vec<u8>) -> Result<gix::config::File<'static>> {
     let mut owned_bytes: Vec<u8> = bytes;
     gix::config::File::from_bytes_owned(
@@ -39,12 +23,12 @@ fn gix_file_from_bytes(bytes: Vec<u8>) -> Result<gix::config::File<'static>> {
 
 
 use super::{
-    DetailedSubmoduleStatus, GitConfig, GitOperations, SubmoduleStatusFlags,
+    DetailedSubmoduleStatus, GitConfig, GitOperations,
 };
 use crate::options::{
     ConfigLevel, GitmodulesConvert,
 };
-use crate::config::{SubmoduleAddOptions, SubmoduleEntries, SubmoduleEntry, SubmoduleUpdateOptions};
+use crate::config::{SubmoduleAddOptions, SubmoduleEntries, SubmoduleUpdateOptions};
 use crate::utilities;
 
 /// Primary implementation using gix (gitoxide)
@@ -62,41 +46,6 @@ impl GixOperations {
                 .with_context(|| "Failed to discover repository in current directory")?,
         };
         Ok(Self { repo })
-    }
-
-    /// Helper: Ensure the submodule directory exists (create if missing)
-    fn ensure_submodule_dir(&self, submodule_path: &std::path::Path) -> Result<()> {
-        if !submodule_path.exists() {
-            std::fs::create_dir_all(submodule_path)?;
-        }
-        Ok(())
-    }
-
-    /// Helper: Clone or fetch+checkout a repo/submodule at the given path
-    /// Used by add_submodule, init_submodule, update_submodule
-    fn clone_or_fetch_then_checkout(
-        &self,
-        name: &str,
-        entry: &SubmoduleEntry,
-        clone: &mut bool,
-    ) -> Result<()> {
-        let path: PathBuf = entry
-            .path
-            .as_ref()
-            .map(|p| PathBuf::from(p))
-            .unwrap_or_else(|| PathBuf::from(format!("./{}", name)));
-        let repo = repo_from_path(&path).unwrap();
-        if !path.exists() || repo.is_bare() {
-            self.ensure_submodule_dir(path.as_path())?;
-            *clone = true;
-        }
-        if *clone {
-            let url = entry.url.clone().unwrap_or(name.to_string());
-            clone_repo(&url, path.to_str(), entry.shallow.unwrap_or(false));
-        } else {
-            fetch_repo(repo, Some(name.to_string()), entry.shallow.unwrap_or(false))?;
-        }
-        Ok(())
     }
 
     /// Try to perform operation with gix, return error if not supported
@@ -140,18 +89,6 @@ impl GixOperations {
 
     Ok(submodule_entries)
 }
-    /// Convert gix submodule status to our status flags
-    fn convert_gix_status_to_flags(&self, status: &gix::submodule::Status) -> SubmoduleStatusFlags {
-        let mut flags = SubmoduleStatusFlags::empty();
-        // Map gix status to our flags
-        // Note: This is a simplified mapping as gix status structure may differ
-        if status.is_dirty() == Some(true) {
-            flags |= SubmoduleStatusFlags::WD_WD_MODIFIED;
-        }
-        // Add more mappings as needed based on gix::submodule::Status structure
-        flags
-    }
-
     /// Get the current branch name of the superproject repository
     fn get_superproject_branch(&self) -> Result<String> {
         let head = self.repo.head()?;
@@ -319,16 +256,12 @@ impl GitOperations for GixOperations {
     }
 
     /// Add a new submodule to the repository
-    fn add_submodule(&mut self, opts: &SubmoduleAddOptions) -> Result<()> {
-        // 2. Check if submodule already exists (do this before borrowing self mutably)
-        let entries = self.read_gitmodules()?;
-        let existing_names = &entries.submodule_names();
-        if existing_names.as_ref().map_or(false, |names| names.contains(&opts.name)) {
-            return Err(anyhow::anyhow!("Submodule '{}' already exists. Use 'submod update' if you want to change its options", opts.name));
-        }
-        let (name, entry) = opts.clone().into_entries_tuple();
-        let merged_entries = entries.add_submodule(name, entry);
-        self.write_gitmodules(&merged_entries)
+    /// Note: gix does not yet support the full submodule add workflow (clone + register).
+    /// The caller should fall back to another Git backend (for example, the git CLI) to handle the complete operation.
+    fn add_submodule(&mut self, _opts: &SubmoduleAddOptions) -> Result<()> {
+        Err(anyhow::anyhow!(
+            "gix submodule add not fully implemented; caller must fall back to another Git backend (e.g. git CLI)"
+        ))
     }
 
     /// Initialize a submodule by reading its configuration and setting it up
@@ -678,38 +611,22 @@ impl GitOperations for GixOperations {
         ))
     }
     fn enable_sparse_checkout(&self, _path: &str) -> Result<()> {
-        // Set core.sparseCheckout = true in repository config
-        self.set_config_value("core.sparseCheckout", "true", ConfigLevel::Local)?;
-
-        self.try_gix_operation(|repo| {
-            // Create sparse-checkout file if it doesn't exist
-            let sparse_checkout_path = repo.git_dir().join("info").join("sparse-checkout");
-            if !sparse_checkout_path.exists() {
-                std::fs::create_dir_all(sparse_checkout_path.parent().unwrap())?;
-                std::fs::write(&sparse_checkout_path, "/*\n")?; // Default to include everything
-            }
-
-            Ok(())
-        })
+        // Defer to git2 which correctly handles submodule paths
+        Err(anyhow::anyhow!(
+            "gix sparse checkout setup not implemented for submodule paths, falling back to git2"
+        ))
     }
-    fn set_sparse_patterns(&self, _path: &str, patterns: &[String]) -> Result<()> {
-        self.try_gix_operation(|repo| {
-            let sparse_checkout_path = repo.git_dir().join("info").join("sparse-checkout");
-            let content = patterns.join("\n") + "\n";
-            std::fs::write(&sparse_checkout_path, content)?;
-            Ok(())
-        })
+    fn set_sparse_patterns(&self, _path: &str, _patterns: &[String]) -> Result<()> {
+        // Defer to git2 which correctly handles submodule paths
+        Err(anyhow::anyhow!(
+            "gix sparse patterns not implemented for submodule paths, falling back to git2"
+        ))
     }
     fn get_sparse_patterns(&self, _path: &str) -> Result<Vec<String>> {
-        self.try_gix_operation(|repo| {
-            let sparse_checkout_path = repo.git_dir().join("info").join("sparse-checkout");
-            if !sparse_checkout_path.exists() {
-                return Ok(vec![]);
-            }
-
-            let content = std::fs::read_to_string(&sparse_checkout_path)?;
-            Ok(content.lines().map(|s| s.to_string()).collect())
-        })
+        // Defer to git2 which correctly handles submodule paths
+        Err(anyhow::anyhow!(
+            "gix get sparse patterns not implemented for submodule paths, falling back to git2"
+        ))
     }
     fn apply_sparse_checkout(&self, _path: &str) -> Result<()> {
         self.try_gix_operation(|repo| {
