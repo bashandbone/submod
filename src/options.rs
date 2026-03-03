@@ -16,7 +16,7 @@ use anyhow::Result;
 use clap::ValueEnum;
 use git2::{SubmoduleIgnore as Git2SubmoduleIgnore, SubmoduleUpdate as Git2SubmoduleUpdate};
 use gix_submodule::config::{Branch, FetchRecurse, Ignore, Update};
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 use std::str::FromStr;
 
 use crate::utilities::{get_current_repository, get_current_branch};
@@ -380,14 +380,26 @@ impl std::fmt::Display for SerializableFetchRecurse {
 }
 
 /// Serializable enum for [`Branch`] config
-#[derive(Debug, Clone, Ord, PartialOrd, Eq, PartialEq, Hash, Serialize, Deserialize)]
-#[serde(rename_all = "kebab-case")]
+#[derive(Debug, Clone, Ord, PartialOrd, Eq, PartialEq, Hash, Serialize)]
 pub enum SerializableBranch {
     /// Use the same name for remote's branch name as the name of the currently activate branch in the superproject.
     /// This is a special value in git's settings. In a .git/config or .gitmodules it's represented by a period: `.`.
     CurrentInSuperproject,
     /// Track a specific branch by name. (Usually what you want.). The default value is the remote branch's default branch if we can resolve it, else `main`.
     Name(String),
+}
+
+impl<'de> Deserialize<'de> for SerializableBranch {
+    /// Deserialize from a plain string using the same logic as [`FromStr`].
+    /// Accepts `"."`, `"current"`, `"current-in-super-project"`, `"superproject"`, or `"super"`
+    /// as [`CurrentInSuperproject`](SerializableBranch::CurrentInSuperproject); all other strings
+    /// become [`Name`](SerializableBranch::Name).
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let s = String::deserialize(deserializer)?;
+        SerializableBranch::from_str(&s).map_err(|_| {
+            serde::de::Error::custom(format!("invalid branch value: {s}"))
+        })
+    }
 }
 
 impl SerializableBranch {

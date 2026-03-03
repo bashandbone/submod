@@ -4,29 +4,13 @@
 // TODO: This module is very not-DRY...but it's low priority right now.
 use anyhow::{Context, Result};
 use std::collections::HashMap;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use gix::bstr::ByteSlice;
 
-use crate::git_ops::simple_gix::{clone_repo, fetch_repo};
+use crate::git_ops::simple_gix::fetch_repo;
 use crate::utilities::{repo_from_path};
 
-/// Simple glob pattern matching for sparse checkout patterns
-fn simple_glob_match(pattern: &str, text: &str) -> bool {
-    // Very basic glob matching - just handle * wildcard
-    if pattern.contains('*') {
-        let parts: Vec<&str> = pattern.split('*').collect();
-        if parts.len() == 2 {
-            let prefix = parts[0];
-            let suffix = parts[1];
-            text.starts_with(prefix) && text.ends_with(suffix)
-        } else {
-            false // More complex patterns not supported
-        }
-    } else {
-        text == pattern
-    }
-}
-
+/// Parse a gix config file from raw bytes
 fn gix_file_from_bytes(bytes: Vec<u8>) -> Result<gix::config::File<'static>> {
     let mut owned_bytes: Vec<u8> = bytes;
     gix::config::File::from_bytes_owned(
@@ -39,12 +23,12 @@ fn gix_file_from_bytes(bytes: Vec<u8>) -> Result<gix::config::File<'static>> {
 
 
 use super::{
-    DetailedSubmoduleStatus, GitConfig, GitOperations, SubmoduleStatusFlags,
+    DetailedSubmoduleStatus, GitConfig, GitOperations,
 };
 use crate::options::{
     ConfigLevel, GitmodulesConvert,
 };
-use crate::config::{SubmoduleAddOptions, SubmoduleEntries, SubmoduleEntry, SubmoduleUpdateOptions};
+use crate::config::{SubmoduleAddOptions, SubmoduleEntries, SubmoduleUpdateOptions};
 use crate::utilities;
 
 /// Primary implementation using gix (gitoxide)
@@ -62,41 +46,6 @@ impl GixOperations {
                 .with_context(|| "Failed to discover repository in current directory")?,
         };
         Ok(Self { repo })
-    }
-
-    /// Helper: Ensure the submodule directory exists (create if missing)
-    fn ensure_submodule_dir(&self, submodule_path: &std::path::Path) -> Result<()> {
-        if !submodule_path.exists() {
-            std::fs::create_dir_all(submodule_path)?;
-        }
-        Ok(())
-    }
-
-    /// Helper: Clone or fetch+checkout a repo/submodule at the given path
-    /// Used by add_submodule, init_submodule, update_submodule
-    fn clone_or_fetch_then_checkout(
-        &self,
-        name: &str,
-        entry: &SubmoduleEntry,
-        clone: &mut bool,
-    ) -> Result<()> {
-        let path: PathBuf = entry
-            .path
-            .as_ref()
-            .map(|p| PathBuf::from(p))
-            .unwrap_or_else(|| PathBuf::from(format!("./{}", name)));
-        let repo = repo_from_path(&path).unwrap();
-        if !path.exists() || repo.is_bare() {
-            self.ensure_submodule_dir(path.as_path())?;
-            *clone = true;
-        }
-        if *clone {
-            let url = entry.url.clone().unwrap_or(name.to_string());
-            clone_repo(&url, path.to_str(), entry.shallow.unwrap_or(false));
-        } else {
-            fetch_repo(repo, Some(name.to_string()), entry.shallow.unwrap_or(false))?;
-        }
-        Ok(())
     }
 
     /// Try to perform operation with gix, return error if not supported
@@ -140,18 +89,6 @@ impl GixOperations {
 
     Ok(submodule_entries)
 }
-    /// Convert gix submodule status to our status flags
-    fn convert_gix_status_to_flags(&self, status: &gix::submodule::Status) -> SubmoduleStatusFlags {
-        let mut flags = SubmoduleStatusFlags::empty();
-        // Map gix status to our flags
-        // Note: This is a simplified mapping as gix status structure may differ
-        if status.is_dirty() == Some(true) {
-            flags |= SubmoduleStatusFlags::WD_WD_MODIFIED;
-        }
-        // Add more mappings as needed based on gix::submodule::Status structure
-        flags
-    }
-
     /// Get the current branch name of the superproject repository
     fn get_superproject_branch(&self) -> Result<String> {
         let head = self.repo.head()?;
