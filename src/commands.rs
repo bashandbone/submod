@@ -139,7 +139,7 @@ pub enum Commands {
         #[arg(short = 's', long = "shallow", default_value = "false", default_missing_value = "true", help = "If true, sets the submodule as a shallow clone. Set false to disable shallow cloning.")]
         shallow: bool,
 
-        #[arg(short = 'u', long = "url", value_parser = clap::value_parser!(String), help = "Change the URL of the submodule. The submodule name from the url must match an existing submodule.")]
+        #[arg(short = 'U', long = "url", value_parser = clap::value_parser!(String), help = "Change the URL of the submodule. The submodule name from the url must match an existing submodule.")]
         url: Option<String>,
 
         #[arg(long = "active", default_value = "true", value_parser = clap::value_parser!(bool), default_missing_value = "true", help = "If true, the submodule will be considered active and included in operations. If false, will disable the submodule. For a shorter version of this command, use `submod disable <name>` instead.")]

@@ -43,9 +43,11 @@ mod tests {
             harness
                 .run_submod_success(&[
                     "add",
-                    &format!("perf-submodule-{i}"),
-                    &format!("lib/perf{i}"),
                     &remote_url,
+                    "--name",
+                    &format!("perf-submodule-{i}"),
+                    "--path",
+                    &format!("lib/perf{i}"),
                     "--sparse-paths",
                     "src,docs",
                 ])
@@ -159,7 +161,7 @@ ignore = "all"
         let start_time = Instant::now();
         for (i, deep_path) in deep_paths.iter().enumerate() {
             harness
-                .run_submod_success(&["add", &format!("deep-{i}"), deep_path, &remote_url])
+                .run_submod_success(&["add", &remote_url, "--name", &format!("deep-{i}"), "--path", deep_path])
                 .expect("Failed to add deep submodule");
         }
 
@@ -202,9 +204,11 @@ ignore = "all"
         harness
             .run_submod_success(&[
                 "add",
-                "many-patterns",
-                "lib/many-patterns",
                 &remote_url,
+                "--name",
+                "many-patterns",
+                "--path",
+                "lib/many-patterns",
                 "--sparse-paths",
                 &pattern_string,
             ])
@@ -251,9 +255,11 @@ ignore = "all"
             harness
                 .run_submod_success(&[
                     "add",
-                    &format!("serial-{i}"),
-                    &format!("lib/serial{i}"),
                     &remote_url,
+                    "--name",
+                    &format!("serial-{i}"),
+                    "--path",
+                    &format!("lib/serial{i}"),
                 ])
                 .expect("Failed to add submodule");
 
@@ -294,9 +300,11 @@ ignore = "all"
             harness
                 .run_submod_success(&[
                     "add",
-                    &format!("concurrent-{i}"),
-                    &format!("lib/concurrent{i}"),
                     &remote_url,
+                    "--name",
+                    &format!("concurrent-{i}"),
+                    "--path",
+                    &format!("lib/concurrent{i}"),
                 ])
                 .expect("Failed to add submodule");
         }
@@ -337,9 +345,11 @@ ignore = "all"
             harness
                 .run_submod_success(&[
                     "add",
-                    &format!("memory-test-{i}"),
-                    &format!("lib/memory{i}"),
                     &remote_url,
+                    "--name",
+                    &format!("memory-test-{i}"),
+                    "--path",
+                    &format!("lib/memory{i}"),
                     "--sparse-paths",
                     "src,docs,include,tests,examples",
                 ])
@@ -386,9 +396,11 @@ ignore = "all"
         harness
             .run_submod_success(&[
                 "add",
-                "fs-perf",
-                "lib/fs-perf",
                 &remote_url,
+                "--name",
+                "fs-perf",
+                "--path",
+                "lib/fs-perf",
                 "--sparse-paths",
                 "src,docs,tests,examples",
             ])
