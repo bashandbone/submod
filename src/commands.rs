@@ -110,8 +110,7 @@ pub enum Commands {
         #[arg(long = "no-init", default_value = "false", action = clap::ArgAction::SetTrue, default_missing_value = "true", help = "If given, we'll add the submodule to your submod.toml but not initialize it.")]
         no_init: bool,
     },
-    // TODO: Implement this command
-    #[command(name = "change", hide = true, next_help_heading = "Change a Submodule's Settings", about = "Change the configuration of an existing submodule. Any field you provide will overwrite an existing value (unless both are defaults). If you change the path, it will nuke-it-from-orbit (delete it and re-clone it).")]
+    #[command(name = "change", next_help_heading = "Change a Submodule's Settings", about = "Change the configuration of an existing submodule. Any field you provide will overwrite an existing value (unless both are defaults). If you change the path, it will nuke-it-from-orbit (delete it and re-clone it).")]
     Change {
         #[arg(required = true, value_parser = clap::value_parser!(String), value_hint = clap::ValueHint::CommandName, help = "The name of the submodule to change. Must match an existing submodule.", long_help = "The name of the submodule to change. Must match an existing submodule in your submod.toml. Because we use this value to lookup your config, you cannot change the name from the CLI. You must manually change it in your submod.toml. All other options can be changed here.")]
         name: String,
@@ -146,8 +145,7 @@ pub enum Commands {
         #[arg(long = "active", default_value = "true", value_parser = clap::value_parser!(bool), default_missing_value = "true", help = "If true, the submodule will be considered active and included in operations. If false, will disable the submodule. For a shorter version of this command, use `submod disable <name>` instead.")]
         active: bool,
     },
-    // TODO: Implement this command
-    #[command(name = "change-global", hide = true, visible_aliases = ["cg", "chgl", "global"], next_help_heading = "Change Global Settings", about = "Add or change the global settings for submodules, affecting all submodules in the current repository. Any individual submodule settings will override these global settings.")]
+    #[command(name = "change-global", visible_aliases = ["cg", "chgl", "global"], next_help_heading = "Change Global Settings", about = "Add or change the global settings for submodules, affecting all submodules in the current repository. Any individual submodule settings will override these global settings.")]
     ChangeGlobal {
 
         #[arg(short = 'i', long = "ignore", help = "Sets the default ignore behavior for all submodules in this repository. This will override any individual submodule settings.")]
@@ -163,8 +161,7 @@ pub enum Commands {
     #[command(name = "check", visible_alias = "c", next_help_heading = "Check Submodules", about = "Checks the status of submodules, ensuring they are initialized and up-to-date.")]
     Check,
 
-    // TODO: Implement this command
-    #[command(name = "list", hide = true, visible_aliases = ["ls", "l"], next_help_heading = "List Submodules", about = "Lists all submodules, optionally recursively.")]
+    #[command(name = "list", visible_aliases = ["ls", "l"], next_help_heading = "List Submodules", about = "Lists all submodules, optionally recursively.")]
     List {
         /// Recursively list all submodules for the current repository.
         #[arg(short = 'r', long = "recursive", default_value = "false", action = clap::ArgAction::SetTrue, default_missing_value = "true", help = "If given, lists all submodules recursively (like, the submodules of the submodules).")]
@@ -174,13 +171,17 @@ pub enum Commands {
     #[command(name = "init", visible_alias = "i", next_help_heading = "Initialize Submodules", about = "Initializes missing submodules based on the configuration file.")]
     Init,
 
-    // TODO: Implement this command (use git2 + fs to delete files)
-    #[command(name = "delete", hide = true, visible_alias = "del", next_help_heading = "Delete a Submodule", about = "Deletes a submodule by name; removes it from the configuration and the filesystem.")]
-    Delete,
+    #[command(name = "delete", visible_alias = "del", next_help_heading = "Delete a Submodule", about = "Deletes a submodule by name; removes it from the configuration and the filesystem.")]
+    Delete {
+        #[arg(required = true, value_parser = clap::value_parser!(String), help = "The name of the submodule to delete.")]
+        name: String,
+    },
 
-    // TODO: Implement this command (use git2). Functionally this changes a module to `active = false` in our config and `.gitmodules`, but does not delete the submodule from the filesystem.
-    #[command(name = "disable", hide = true, visible_alias = "d", next_help_heading = "Disable a Submodule", about = "Disables a submodule by name; sets its active status to false. Does not remove settings or files.")]
-    Disable,
+    #[command(name = "disable", visible_alias = "d", next_help_heading = "Disable a Submodule", about = "Disables a submodule by name; sets its active status to false. Does not remove settings or files.")]
+    Disable {
+        #[arg(required = true, value_parser = clap::value_parser!(String), help = "The name of the submodule to disable.")]
+        name: String,
+    },
 
     #[command(name = "update", visible_alias = "u", next_help_heading = "Update Submodules", about = "Updates all submodules to their configured state.")]
     Update,
@@ -198,15 +199,14 @@ pub enum Commands {
     #[command(name = "sync", visible_alias = "s", next_help_heading = "Sync Submodules", about = "Runs a full sync: check, init, update. Ensures all submodules are in sync with the configuration.")]
     Sync,
 
-    // TODO: Implement this command
-    #[command(name = "generate-config", hide = true, visible_aliases = ["gc", "genconf"], next_help_heading = "Generate a Config File", about = "Generates a new configuration file.")]
+    #[command(name = "generate-config", visible_aliases = ["gc", "genconf"], next_help_heading = "Generate a Config File", about = "Generates a new configuration file.")]
     GenerateConfig {
         /// Path to the new configuration file to generate.
         #[arg(short = 'o', long = "output", value_parser = clap::value_parser!(PathBuf), value_hint = clap::ValueHint::FilePath, default_value = "submod.toml", help = "Path to the output configuration file. Defaults to submod.toml in the current directory.")]
         output: PathBuf,
 
-        #[arg(short = 's', long = "from-setup", help = "Generates the config from your current repository's submodule settings.")]
-        from_setup: String,
+        #[arg(short = 's', long = "from-setup", default_value = "false", action = clap::ArgAction::SetTrue, default_missing_value = "true", help = "Generates the config from your current repository's submodule settings.")]
+        from_setup: bool,
 
         #[arg(short = 'f', long = "force", default_value = "false", action = clap::ArgAction::SetTrue, default_missing_value = "true", help = "If given, overwrites the existing configuration file without prompting.")]
         force: bool,
@@ -215,8 +215,7 @@ pub enum Commands {
         template: bool,
     },
 
-    // TODO: Implement this command (use git2) (not we can leverage this logic for `delete` because the `kill` option is the same.)
-    #[command(name = "nuke-it-from-orbit", hide = true, visible_aliases = ["nuke-em", "nuke-it", "nuke-them"], next_help_heading = "Nuke It From Orbit", about = "Deletes all submodules or specific ones, removing them from the configuration and the filesystem. Optionally leaves them dead. 🚀💥👾💥💀.")]
+    #[command(name = "nuke-it-from-orbit", visible_aliases = ["nuke-em", "nuke-it", "nuke-them"], next_help_heading = "Nuke It From Orbit", about = "Deletes all submodules or specific ones, removing them from the configuration and the filesystem. Optionally leaves them dead. 🚀💥👾💥💀.")]
     NukeItFromOrbit {
         #[arg(long = "all", default_value = "false", action = clap::ArgAction::SetTrue, default_missing_value = "true", help = "Nuke 'em all? 🤓")]
         all: bool,

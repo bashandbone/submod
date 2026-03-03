@@ -841,4 +841,505 @@ impl GitManager {
     pub fn config_clone(&self) -> Config {
         self.config.clone()
     }
+
+    /// Rewrite the entire config file from the in-memory config.
+    ///
+    /// Unlike `save_config` (which only appends new sections), this rewrites the file completely,
+    /// making it suitable for update/delete operations.
+    fn write_full_config(&self) -> Result<(), SubmoduleError> {
+        let mut output = String::new();
+
+        // Write [defaults] section if any defaults are set
+        let defaults = &self.config.defaults;
+        let has_defaults = defaults.ignore.is_some()
+            || defaults.fetch_recurse.is_some()
+            || defaults.update.is_some();
+        if has_defaults {
+            output.push_str("[defaults]\n");
+            if let Some(ignore) = &defaults.ignore {
+                let val = ignore.to_string();
+                if !val.is_empty() {
+                    output.push_str(&format!("ignore = \"{val}\"\n"));
+                }
+            }
+            if let Some(fetch_recurse) = &defaults.fetch_recurse {
+                let val = fetch_recurse.to_string();
+                if !val.is_empty() {
+                    output.push_str(&format!("fetch = \"{val}\"\n"));
+                }
+            }
+            if let Some(update) = &defaults.update {
+                let val = update.to_string();
+                if !val.is_empty() {
+                    output.push_str(&format!("update = \"{val}\"\n"));
+                }
+            }
+            output.push('\n');
+        }
+
+        // Write each submodule section
+        for (name, entry) in self.config.get_submodules() {
+            let needs_quoting =
+                name.chars().any(|c| !c.is_alphanumeric() && c != '-' && c != '_');
+            let escaped_name = name.replace('\\', "\\\\").replace('"', "\\\"");
+            let section_header = if needs_quoting {
+                format!("[\"{escaped_name}\"]")
+            } else {
+                format!("[{name}]")
+            };
+            output.push_str(&section_header);
+            output.push('\n');
+            if let Some(path) = &entry.path {
+                output.push_str(&format!(
+                    "path = \"{}\"\n",
+                    path.replace('\\', "\\\\").replace('"', "\\\"")
+                ));
+            }
+            if let Some(url) = &entry.url {
+                output.push_str(&format!(
+                    "url = \"{}\"\n",
+                    url.replace('\\', "\\\\").replace('"', "\\\"")
+                ));
+            }
+            if let Some(branch) = &entry.branch {
+                let val = branch.to_string();
+                if !val.is_empty() {
+                    output.push_str(&format!(
+                        "branch = \"{}\"\n",
+                        val.replace('\\', "\\\\").replace('"', "\\\"")
+                    ));
+                }
+            }
+            if let Some(ignore) = &entry.ignore {
+                let val = ignore.to_string();
+                if !val.is_empty() {
+                    output.push_str(&format!("ignore = \"{val}\"\n"));
+                }
+            }
+            if let Some(fetch_recurse) = &entry.fetch_recurse {
+                let val = fetch_recurse.to_string();
+                if !val.is_empty() {
+                    output.push_str(&format!("fetch = \"{val}\"\n"));
+                }
+            }
+            if let Some(update) = &entry.update {
+                let val = update.to_string();
+                if !val.is_empty() {
+                    output.push_str(&format!("update = \"{val}\"\n"));
+                }
+            }
+            if let Some(active) = entry.active {
+                output.push_str(&format!("active = {active}\n"));
+            }
+            if let Some(shallow) = entry.shallow {
+                if shallow {
+                    output.push_str("shallow = true\n");
+                }
+            }
+            if let Some(sparse_paths) = &entry.sparse_paths {
+                if !sparse_paths.is_empty() {
+                    let joined = sparse_paths
+                        .iter()
+                        .map(|p| {
+                            format!(
+                                "\"{}\"",
+                                p.replace('\\', "\\\\").replace('"', "\\\"")
+                            )
+                        })
+                        .collect::<Vec<_>>()
+                        .join(", ");
+                    output.push_str(&format!("sparse_paths = [{joined}]\n"));
+                }
+            }
+            output.push('\n');
+        }
+
+        std::fs::write(&self.config_path, &output)
+            .map_err(|e| SubmoduleError::ConfigError(format!("Failed to write config file: {e}")))?;
+        Ok(())
+    }
+
+    /// List all submodules from the config. If `recursive` is true, also lists
+    /// submodules found in the git repository (which may include nested ones).
+    pub fn list_submodules(&self, recursive: bool) -> Result<(), SubmoduleError> {
+        let submodules: Vec<_> = self.config.get_submodules().collect();
+
+        if submodules.is_empty() {
+            println!("No submodules configured.");
+            return Ok(());
+        }
+
+        println!("Submodules:");
+        for (name, entry) in &submodules {
+            let path = entry.path.as_deref().unwrap_or("<no path>");
+            let url = entry.url.as_deref().unwrap_or("<no url>");
+            let active = entry.active.unwrap_or(true);
+            let active_str = if active { "active" } else { "disabled" };
+            println!("  {name} [{active_str}]");
+            println!("    path: {path}");
+            println!("    url:  {url}");
+        }
+
+        if recursive {
+            // Also list submodules found in the git repository (may include nested ones)
+            match self.git_ops.list_submodules() {
+                Ok(git_submodules) => {
+                    let config_paths: std::collections::HashSet<String> = submodules
+                        .iter()
+                        .filter_map(|(_, e)| e.path.clone())
+                        .collect();
+                    let extra: Vec<_> = git_submodules
+                        .iter()
+                        .filter(|p| !config_paths.contains(*p))
+                        .collect();
+                    if !extra.is_empty() {
+                        println!("\nAdditional submodules found in git (not in config):");
+                        for path in extra {
+                            println!("  {path}");
+                        }
+                    }
+                }
+                Err(e) => {
+                    eprintln!("Warning: could not list git submodules: {e}");
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Update global default settings and save the config.
+    pub fn update_global_defaults(
+        &mut self,
+        ignore: Option<SerializableIgnore>,
+        fetch_recurse: Option<SerializableFetchRecurse>,
+        update: Option<SerializableUpdate>,
+    ) -> Result<(), SubmoduleError> {
+        if ignore.is_none() && fetch_recurse.is_none() && update.is_none() {
+            return Err(SubmoduleError::ConfigError(
+                "No settings provided to change.".to_string(),
+            ));
+        }
+        if let Some(i) = ignore {
+            self.config.defaults.ignore = Some(i);
+        }
+        if let Some(f) = fetch_recurse {
+            self.config.defaults.fetch_recurse = Some(f);
+        }
+        if let Some(u) = update {
+            self.config.defaults.update = Some(u);
+        }
+        self.write_full_config()
+    }
+
+    /// Disable a submodule by setting `active = false` in the config and deinitializing it.
+    pub fn disable_submodule(&mut self, name: &str) -> Result<(), SubmoduleError> {
+        let entry = self
+            .config
+            .get_submodule(name)
+            .ok_or_else(|| SubmoduleError::SubmoduleNotFound {
+                name: name.to_string(),
+            })?
+            .clone();
+
+        let path = entry.path.as_deref().unwrap_or(name).to_string();
+
+        // Deinit from git (best-effort; ignore errors if not initialized)
+        let _ = self.git_ops.deinit_submodule(&path, false);
+
+        // Update the entry in config
+        let mut updated = entry.clone();
+        updated.active = Some(false);
+        self.config.submodules.update_entry(name.to_string(), updated);
+
+        self.write_full_config()?;
+        println!("Disabled submodule '{name}'.");
+        Ok(())
+    }
+
+    /// Delete a submodule: deinit, remove from filesystem, and remove from config.
+    pub fn delete_submodule_by_name(&mut self, name: &str) -> Result<(), SubmoduleError> {
+        let entry = self
+            .config
+            .get_submodule(name)
+            .ok_or_else(|| SubmoduleError::SubmoduleNotFound {
+                name: name.to_string(),
+            })?
+            .clone();
+
+        let path = entry.path.as_deref().unwrap_or(name).to_string();
+
+        // Deinit then delete (best-effort for deinit)
+        let _ = self.git_ops.deinit_submodule(&path, true);
+        self.git_ops
+            .delete_submodule(&path)
+            .map_err(|e| SubmoduleError::ConfigError(format!("Failed to delete submodule: {e}")))?;
+
+        // Remove from config
+        self.config.submodules.remove_submodule(name);
+        self.write_full_config()?;
+        println!("Deleted submodule '{name}'.");
+        Ok(())
+    }
+
+    /// Change settings of an existing submodule. If `path` changes, the submodule is
+    /// deleted and re-cloned at the new location.
+    #[allow(clippy::too_many_arguments)]
+    pub fn change_submodule(
+        &mut self,
+        name: &str,
+        path: Option<std::ffi::OsString>,
+        branch: Option<String>,
+        sparse_paths: Option<Vec<std::ffi::OsString>>,
+        append_sparse: bool,
+        ignore: Option<SerializableIgnore>,
+        fetch: Option<SerializableFetchRecurse>,
+        update: Option<SerializableUpdate>,
+        shallow: bool,
+        url: Option<String>,
+        active: bool,
+    ) -> Result<(), SubmoduleError> {
+        let entry = self
+            .config
+            .get_submodule(name)
+            .ok_or_else(|| SubmoduleError::SubmoduleNotFound {
+                name: name.to_string(),
+            })?
+            .clone();
+
+        let new_path = path.as_ref().map(|p| {
+            p.to_string_lossy().to_string()
+        });
+
+        // If path is changing, delete and re-add
+        if let Some(ref np) = new_path {
+            let old_path = entry.path.as_deref().unwrap_or(name);
+            if np != old_path {
+                let sub_url = url.as_deref()
+                    .or(entry.url.as_deref())
+                    .ok_or_else(|| SubmoduleError::ConfigError(
+                        "Cannot re-clone submodule: no URL available.".to_string(),
+                    ))?
+                    .to_string();
+
+                // Delete old then re-add at new path
+                self.delete_submodule_by_name(name)?;
+
+                let set_branch = SerializableBranch::set_branch(branch.clone())
+                    .map_err(|e| SubmoduleError::ConfigError(e.to_string()))?;
+                let sparse: Vec<String> = sparse_paths
+                    .as_deref()
+                    .unwrap_or_default()
+                    .iter()
+                    .map(|p| p.to_string_lossy().to_string())
+                    .collect();
+                // Use entry's existing values as fallback when the caller didn't supply them
+                let effective_ignore = ignore.or(entry.ignore);
+                let effective_fetch = fetch.or(entry.fetch_recurse);
+                let effective_update = update.or(entry.update);
+
+                self.add_submodule(
+                    name.to_string(),
+                    np.clone().into(),
+                    sub_url,
+                    Some(sparse),
+                    Some(set_branch),
+                    effective_ignore,
+                    effective_fetch,
+                    effective_update,
+                    Some(shallow),
+                    false,
+                )?;
+                return Ok(());
+            }
+        }
+
+        // Otherwise update fields in place
+        {
+            let entry = self
+                .config
+                .get_submodule(name)
+                .ok_or_else(|| SubmoduleError::SubmoduleNotFound {
+                    name: name.to_string(),
+                })?
+                .clone();
+            let mut updated = entry;
+            if let Some(np) = new_path {
+                updated.path = Some(np);
+            }
+            if let Some(b) = branch {
+                updated.branch = SerializableBranch::set_branch(Some(b))
+                    .map(Some)
+                    .map_err(|err| SubmoduleError::ConfigError(err.to_string()))?;
+            }
+            if let Some(i) = ignore {
+                updated.ignore = Some(i);
+            }
+            if let Some(f) = fetch {
+                updated.fetch_recurse = Some(f);
+            }
+            if let Some(u) = update {
+                updated.update = Some(u);
+            }
+            if let Some(new_url) = url {
+                updated.url = Some(new_url);
+            }
+            updated.active = Some(active);
+            updated.shallow = Some(shallow);
+
+            // Update sparse paths
+            if let Some(new_sparse) = sparse_paths {
+                let new_paths: Vec<String> = new_sparse
+                    .iter()
+                    .map(|p| p.to_string_lossy().to_string())
+                    .collect();
+                if append_sparse {
+                    let existing = updated.sparse_paths.get_or_insert_with(Vec::new);
+                    existing.extend(new_paths);
+                } else {
+                    updated.sparse_paths = Some(new_paths);
+                }
+            }
+            self.config.submodules.update_entry(name.to_string(), updated);
+        }
+
+        self.write_full_config()?;
+        println!("Updated submodule '{name}'.");
+        Ok(())
+    }
+
+    /// Nuke (deinit + delete + remove from config) all or specific submodules.
+    /// If `kill` is false, reinitializes them after deletion.
+    pub fn nuke_submodules(
+        &mut self,
+        all: bool,
+        names: Option<Vec<String>>,
+        kill: bool,
+    ) -> Result<(), SubmoduleError> {
+        let targets: Vec<String> = if all {
+            self.config
+                .get_submodules()
+                .map(|(n, _)| n.clone())
+                .collect()
+        } else {
+            names.unwrap_or_default()
+        };
+
+        if targets.is_empty() {
+            return Err(SubmoduleError::ConfigError(
+                "No submodules specified. Use --all or provide names.".to_string(),
+            ));
+        }
+
+        // Snapshot entries before deleting (needed for reinit)
+        let snapshots: Vec<(String, SubmoduleEntry)> = targets
+            .iter()
+            .filter_map(|n| {
+                self.config
+                    .get_submodule(n)
+                    .map(|e| (n.clone(), e.clone()))
+            })
+            .collect();
+
+        // Validate all targets exist before starting
+        for name in &targets {
+            if self.config.get_submodule(name).is_none() {
+                return Err(SubmoduleError::SubmoduleNotFound {
+                    name: name.clone(),
+                });
+            }
+        }
+
+        for name in &targets {
+            println!("💥 Nuking submodule '{name}'...");
+            self.delete_submodule_by_name(name)?;
+        }
+
+        if !kill {
+            // Reinitialize each deleted submodule
+            for (name, entry) in snapshots {
+                println!("🔄 Reinitializing submodule '{name}'...");
+                let url = entry.url.clone().unwrap_or_default();
+                let path = entry
+                    .path
+                    .as_deref()
+                    .unwrap_or(&name)
+                    .to_string();
+                let sparse: Vec<String> = entry.sparse_paths.clone().unwrap_or_default();
+                self.add_submodule(
+                    name.clone(),
+                    path.into(),
+                    url,
+                    Some(sparse),
+                    entry.branch.clone(),
+                    entry.ignore,
+                    entry.fetch_recurse,
+                    entry.update,
+                    entry.shallow,
+                    false,
+                )?;
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Generate a config file. If `from_setup` is true, reads `.gitmodules` from the repo.
+    /// If `template` is true, writes an annotated sample config.
+    /// If the output file exists and `force` is false, returns an error.
+    pub fn generate_config(
+        output: &std::path::Path,
+        from_setup: bool,
+        template: bool,
+        force: bool,
+    ) -> Result<(), SubmoduleError> {
+        if output.exists() && !force {
+            return Err(SubmoduleError::ConfigError(format!(
+                "Output file '{}' already exists. Use --force to overwrite.",
+                output.display()
+            )));
+        }
+
+        if template {
+            // Write an annotated sample config
+            let sample = include_str!("../sample_config/submod.toml");
+            std::fs::write(output, sample).map_err(SubmoduleError::IoError)?;
+            println!("Generated template config at '{}'.", output.display());
+            return Ok(());
+        }
+
+        if from_setup {
+            // Read .gitmodules from the repo and convert to our config format
+            let git_ops = crate::git_ops::GitOpsManager::new(Some(std::path::Path::new(".")))
+                .map_err(|_| SubmoduleError::RepositoryError)?;
+            let entries = git_ops.read_gitmodules().map_err(|e| {
+                SubmoduleError::ConfigError(format!("Failed to read .gitmodules: {e}"))
+            })?;
+
+            // Build a Config from the SubmoduleEntries
+            let config = Config::new(
+                crate::config::SubmoduleDefaults::default(),
+                entries,
+            );
+
+            // Serialize using write_full_config logic but to the output path
+            let tmp_manager = GitManager {
+                git_ops,
+                config,
+                config_path: output.to_path_buf(),
+            };
+            tmp_manager.write_full_config()?;
+            println!(
+                "Generated config from .gitmodules at '{}'.",
+                output.display()
+            );
+            return Ok(());
+        }
+
+        // Neither template nor from-setup: write an empty config
+        let empty = "[defaults]\n";
+        std::fs::write(output, empty).map_err(SubmoduleError::IoError)?;
+        println!("Generated empty config at '{}'.", output.display());
+        Ok(())
+    }
 }

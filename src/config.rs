@@ -813,6 +813,16 @@ impl SubmoduleEntries {
             sparse_checkouts: Some(HashMap::new()),
         }
     }
+    /// Insert or replace a submodule entry by name.
+    pub fn update_entry(&mut self, name: SubmoduleName, entry: SubmoduleEntry) {
+        if let Some(submodules) = self.submodules.as_mut() {
+            submodules.insert(name, entry);
+        } else {
+            let mut map = HashMap::new();
+            map.insert(name, entry);
+            self.submodules = Some(map);
+        }
+    }
 }
 
 impl IntoIterator for SubmoduleEntries {
