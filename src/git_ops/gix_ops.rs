@@ -256,16 +256,12 @@ impl GitOperations for GixOperations {
     }
 
     /// Add a new submodule to the repository
-    fn add_submodule(&mut self, opts: &SubmoduleAddOptions) -> Result<()> {
-        // 2. Check if submodule already exists (do this before borrowing self mutably)
-        let entries = self.read_gitmodules()?;
-        let existing_names = &entries.submodule_names();
-        if existing_names.as_ref().map_or(false, |names| names.contains(&opts.name)) {
-            return Err(anyhow::anyhow!("Submodule '{}' already exists. Use 'submod update' if you want to change its options", opts.name));
-        }
-        let (name, entry) = opts.clone().into_entries_tuple();
-        let merged_entries = entries.add_submodule(name, entry);
-        self.write_gitmodules(&merged_entries)
+    /// Note: gix does not yet support the full submodule add workflow (clone + register).
+    /// This falls back to git2 which handles the complete operation.
+    fn add_submodule(&mut self, _opts: &SubmoduleAddOptions) -> Result<()> {
+        Err(anyhow::anyhow!(
+            "gix submodule add not fully implemented; falling back to git2"
+        ))
     }
 
     /// Initialize a submodule by reading its configuration and setting it up
@@ -615,38 +611,22 @@ impl GitOperations for GixOperations {
         ))
     }
     fn enable_sparse_checkout(&self, _path: &str) -> Result<()> {
-        // Set core.sparseCheckout = true in repository config
-        self.set_config_value("core.sparseCheckout", "true", ConfigLevel::Local)?;
-
-        self.try_gix_operation(|repo| {
-            // Create sparse-checkout file if it doesn't exist
-            let sparse_checkout_path = repo.git_dir().join("info").join("sparse-checkout");
-            if !sparse_checkout_path.exists() {
-                std::fs::create_dir_all(sparse_checkout_path.parent().unwrap())?;
-                std::fs::write(&sparse_checkout_path, "/*\n")?; // Default to include everything
-            }
-
-            Ok(())
-        })
+        // Defer to git2 which correctly handles submodule paths
+        Err(anyhow::anyhow!(
+            "gix sparse checkout setup not implemented for submodule paths, falling back to git2"
+        ))
     }
-    fn set_sparse_patterns(&self, _path: &str, patterns: &[String]) -> Result<()> {
-        self.try_gix_operation(|repo| {
-            let sparse_checkout_path = repo.git_dir().join("info").join("sparse-checkout");
-            let content = patterns.join("\n") + "\n";
-            std::fs::write(&sparse_checkout_path, content)?;
-            Ok(())
-        })
+    fn set_sparse_patterns(&self, _path: &str, _patterns: &[String]) -> Result<()> {
+        // Defer to git2 which correctly handles submodule paths
+        Err(anyhow::anyhow!(
+            "gix sparse patterns not implemented for submodule paths, falling back to git2"
+        ))
     }
     fn get_sparse_patterns(&self, _path: &str) -> Result<Vec<String>> {
-        self.try_gix_operation(|repo| {
-            let sparse_checkout_path = repo.git_dir().join("info").join("sparse-checkout");
-            if !sparse_checkout_path.exists() {
-                return Ok(vec![]);
-            }
-
-            let content = std::fs::read_to_string(&sparse_checkout_path)?;
-            Ok(content.lines().map(|s| s.to_string()).collect())
-        })
+        // Defer to git2 which correctly handles submodule paths
+        Err(anyhow::anyhow!(
+            "gix get sparse patterns not implemented for submodule paths, falling back to git2"
+        ))
     }
     fn apply_sparse_checkout(&self, _path: &str) -> Result<()> {
         self.try_gix_operation(|repo| {

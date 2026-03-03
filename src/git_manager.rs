@@ -448,11 +448,7 @@ impl GitManager {
         };
         match self.git_ops.add_submodule(&opts).map_err(Self::map_git_ops_error) {
             Ok(()) => {
-                // Ensure the submodule is initialized and cloned after registering in .gitmodules
-                let update_opts = crate::config::SubmoduleUpdateOptions::default();
-                self.git_ops.init_submodule(&path).map_err(Self::map_git_ops_error)?;
-                self.git_ops.update_submodule(&path, &update_opts).map_err(Self::map_git_ops_error)?;
-                // Configure after successful creation
+                // Configure after successful creation (git2's add_submodule handles clone/init)
                 self.configure_submodule_post_creation(&name, &path, sparse_paths.clone())?;
                 self.update_toml_config(
                     name.clone(),

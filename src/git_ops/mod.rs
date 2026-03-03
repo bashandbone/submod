@@ -239,10 +239,29 @@ impl GitOperations for GitOpsManager {
     }
 
     fn add_submodule(&mut self, opts: &SubmoduleAddOptions) -> Result<()> {
-        self.try_with_fallback_mut(
-            |gix| gix.add_submodule(opts),
-            |git2| git2.add_submodule(opts),
-        )
+        // Attempt gix first; if it fails, fall directly to the git CLI which is reliable
+        // for the full submodule add workflow (clone + register).
+        // Note: git2's submodule API partially writes state before failing which can corrupt
+        // the git index, so we skip it for this operation.
+        if let Some(ref mut gix_ops) = self.gix_ops {
+            if gix_ops.add_submodule(opts).is_ok() {
+                return Ok(());
+            }
+        }
+        // CLI fallback: use git submodule add directly
+        let path_str = opts.path.to_string_lossy();
+        let output = std::process::Command::new("git")
+            .args(["submodule", "add", "--name", &opts.name, "--", &opts.url, &path_str])
+            .output()
+            .context("Failed to run git submodule add")?;
+        if output.status.success() {
+            Ok(())
+        } else {
+            Err(anyhow::anyhow!(
+                "Failed to add submodule: {}",
+                String::from_utf8_lossy(&output.stderr).trim()
+            ))
+        }
     }
 
     fn init_submodule(&mut self, path: &str) -> Result<()> {
@@ -341,5 +360,20 @@ impl GitOperations for GitOpsManager {
             |gix| gix.apply_sparse_checkout(path),
             |git2| git2.apply_sparse_checkout(path),
         )
+        .or_else(|_| {
+            // CLI fallback: use git read-tree to apply sparse checkout
+            let output = std::process::Command::new("git")
+                .args(["-C", path, "read-tree", "-mu", "HEAD"])
+                .output()
+                .context("Failed to run git read-tree")?;
+            if output.status.success() {
+                Ok(())
+            } else {
+                Err(anyhow::anyhow!(
+                    "git read-tree failed: {}",
+                    String::from_utf8_lossy(&output.stderr).trim()
+                ))
+            }
+        })
     }
 }
