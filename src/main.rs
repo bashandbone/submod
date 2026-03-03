@@ -30,14 +30,12 @@ mod git_manager;
 mod utilities;
 
 use crate::commands::{Cli, Commands};
-use crate::utilities::{name_from_osstring, name_from_url, set_path, get_sparse_paths};
-use crate::options::{SerializableBranch as Branch, SerializableIgnore, SerializableFetchRecurse, SerializableUpdate};
+use crate::utilities::{set_path, get_sparse_paths, get_name};
+use crate::options::SerializableBranch as Branch;
 use crate::git_manager::GitManager;
 use anyhow::Result;
 use clap::Parser;
-use submod::options::SerializableBranch;
-use std::ffi::OsString;
-use std::str::FromStr;
+
 
 fn main() -> Result<()> {
     let cli = Cli::parse();
@@ -61,20 +59,22 @@ fn main() -> Result<()> {
             let sparse_paths_vec = get_sparse_paths(sparse_paths)
                 .map_err(|e| anyhow::anyhow!("Invalid sparse paths: {}", e))?;
 
-            let set_name = get_name(&name, &url, &path)
+            let set_name = get_name(name, Some(url.clone()), path.clone())
                 .map_err(|e| anyhow::anyhow!("Failed to get submodule name: {}", e))?;
 
-            let set_path = path.map(|p| set_path(p).map_err(|e| anyhow::anyhow!("Invalid path: {}", e))).transpose()?;
+            let set_path = path.map(|p| set_path(p).map_err(|e| anyhow::anyhow!("Invalid path: {}", e))).transpose()?
+                .unwrap_or_else(|| set_name.clone());
 
             let set_url = url.trim().to_string();
 
-            let set_branch = Branch::set_branch(branch.as_deref())
+            let set_branch = Branch::set_branch(branch)
                 .map_err(|e| anyhow::anyhow!("Failed to set branch: {}", e))?;
 
-            let mut manager = GitManager::new(config_path);
+            let mut manager = GitManager::new(config_path)
+                .map_err(|e| anyhow::anyhow!("Failed to create manager: {}", e))?;
 
             manager
-                .add_submodule(set_name, set_path, set_url, sparse_paths_vec, set_branch, ignore, fetch, update, shallow, no_init)
+                .add_submodule(set_name, set_path, set_url, sparse_paths_vec, Some(set_branch), Some(ignore), Some(fetch), Some(update), Some(shallow), no_init)
                 .map_err(|e| anyhow::anyhow!("Failed to add submodule: {}", e))?;
         }
         Commands::Check => {
@@ -85,38 +85,37 @@ fn main() -> Result<()> {
                 .map_err(|e| anyhow::anyhow!("Failed to check submodules: {}", e))?;
         }
         Commands::Init => {
-            let manager = GitManager::new(config_path)
+            let mut manager = GitManager::new(config_path)
                 .map_err(|e| anyhow::anyhow!("Failed to create manager: {}", e))?;
 
-            // Initialize all submodules from config
-            for (name, _) in manager.config().get_submodules() {
+            // Collect names first to avoid borrow conflict
+            let names: Vec<String> = manager.config().get_submodules().map(|(n, _)| n.clone()).collect();
+            for name in &names {
                 manager
                     .init_submodule(name)
                     .map_err(|e| anyhow::anyhow!("Failed to init submodule {}: {}", name, e))?;
             }
         }
         Commands::Update => {
-            let manager = GitManager::new(config_path)
+            let mut manager = GitManager::new(config_path)
                 .map_err(|e| anyhow::anyhow!("Failed to create manager: {}", e))?;
 
-            // Update all submodules from config
-            let submodules: Vec<_> = manager.config().get_submodules().collect();
-            if submodules.is_empty() {
+            // Collect names first to avoid borrow conflict
+            let names: Vec<String> = manager.config().get_submodules().map(|(n, _)| n.clone()).collect();
+            if names.is_empty() {
                 println!("No submodules configured");
             } else {
-                for (name, _) in submodules {
+                let count = names.len();
+                for name in &names {
                     manager.update_submodule(name).map_err(|e| {
                         anyhow::anyhow!("Failed to update submodule {}: {}", name, e)
                     })?;
                 }
-                println!(
-                    "Updated {} submodule(s)",
-                    manager.config().get_submodules().count()
-                );
+                println!("Updated {} submodule(s)", count);
             }
         }
         Commands::Reset { all, names } => {
-            let manager = GitManager::new(config_path)
+            let mut manager = GitManager::new(config_path)
                 .map_err(|e| anyhow::anyhow!("Failed to create manager: {}", e))?;
 
             let submodules_to_reset: Vec<String> = if all {
@@ -142,7 +141,7 @@ fn main() -> Result<()> {
             }
         }
         Commands::Sync => {
-            let manager = GitManager::new(cli.config)
+            let mut manager = GitManager::new(cli.config)
                 .map_err(|e| anyhow::anyhow!("Failed to create manager: {}", e))?;
 
             // Run check, init, and update in sequence
@@ -152,13 +151,15 @@ fn main() -> Result<()> {
                 .check_all_submodules()
                 .map_err(|e| anyhow::anyhow!("Failed to check submodules: {}", e))?;
 
-            for (name, _) in manager.config().get_submodules() {
+            // Collect names first to avoid borrow conflict
+            let names: Vec<String> = manager.config().get_submodules().map(|(n, _)| n.clone()).collect();
+            for name in &names {
                 manager
                     .init_submodule(name)
                     .map_err(|e| anyhow::anyhow!("Failed to init submodule {}: {}", name, e))?;
             }
 
-            for (name, _) in manager.config().get_submodules() {
+            for name in &names {
                 manager
                     .update_submodule(name)
                     .map_err(|e| anyhow::anyhow!("Failed to update submodule {}: {}", name, e))?;

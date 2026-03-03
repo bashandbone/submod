@@ -19,7 +19,7 @@ use gix_submodule::config::{Branch, FetchRecurse, Ignore, Update};
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 
-use crate::utilities::{repo_from_path, get_current_repository, get_current_branch};
+use crate::utilities::{get_current_repository, get_current_branch};
 
 /// Configuration levels for git config operations
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

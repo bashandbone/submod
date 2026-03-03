@@ -56,7 +56,7 @@ use crate::options::{
 };
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::process::Command;
+
 
 /// Custom error types for submodule operations
 #[derive(Debug, thiserror::Error)]
@@ -160,11 +160,117 @@ impl GitManager {
     fn update_toml_config(
         &mut self,
         name: String,
-        entry: crate::config::SubmoduleEntry,
-        _sparse_paths: Option<Vec<String>>,
+        mut entry: crate::config::SubmoduleEntry,
+        sparse_paths: Option<Vec<String>>,
     ) -> Result<(), SubmoduleError> {
+        if let Some(ref paths) = sparse_paths {
+            entry.sparse_paths = Some(paths.clone());
+            // Also populate sparse_checkouts so consumers using sparse_checkouts() see the paths
+            self.config.submodules.add_checkout(name.clone(), paths.clone(), true);
+        }
+        // Normalize: convert Unspecified variants to None so they serialize cleanly
+        if matches!(entry.ignore, Some(SerializableIgnore::Unspecified)) {
+            entry.ignore = None;
+        }
+        if matches!(entry.fetch_recurse, Some(SerializableFetchRecurse::Unspecified)) {
+            entry.fetch_recurse = None;
+        }
+        if matches!(entry.update, Some(SerializableUpdate::Unspecified)) {
+            entry.update = None;
+        }
         self.config.add_submodule(name, entry);
-        // No-op for sparse paths; handled elsewhere.
+        self.save_config()
+    }
+
+    /// Save the current in-memory configuration to the config file
+    fn save_config(&self) -> Result<(), SubmoduleError> {
+        // Read existing TOML to preserve content (defaults, comments, existing entries)
+        let existing = if self.config_path.exists() {
+            std::fs::read_to_string(&self.config_path)
+                .map_err(|e| SubmoduleError::ConfigError(format!("Failed to read config: {e}")))?
+        } else {
+            String::new()
+        };
+
+        let mut output = existing.clone();
+
+        // Append any new submodule sections not already in the file
+        for (name, entry) in self.config.get_submodules() {
+            // Determine whether this name needs quoting (contains TOML-special characters).
+            // Simple names (alphanumeric, hyphens, underscores) can use the bare [name] form.
+            let needs_quoting = name.chars().any(|c| !c.is_alphanumeric() && c != '-' && c != '_');
+            let escaped_name = name.replace('\\', "\\\\").replace('"', "\\\"");
+            let section_header = if needs_quoting {
+                format!("[\"{escaped_name}\"]")
+            } else {
+                format!("[{name}]")
+            };
+            // Check at line boundaries to avoid false positives from comments/values.
+            // Accept either quoted or unquoted form so existing files written before this
+            // change are recognised.
+            let already_present = existing.lines().any(|line| {
+                let trimmed = line.trim();
+                trimmed == section_header
+                    || trimmed == format!("[{name}]")
+                    || trimmed == format!("[\"{escaped_name}\"]")
+            });
+            if !already_present {
+                output.push('\n');
+                output.push_str(&section_header);
+                output.push('\n');
+                if let Some(path) = &entry.path {
+                    output.push_str(&format!("path = \"{}\"\n", path.replace('\\', "\\\\").replace('"', "\\\"")));
+                }
+                if let Some(url) = &entry.url {
+                    output.push_str(&format!("url = \"{}\"\n", url.replace('\\', "\\\\").replace('"', "\\\"")));
+                }
+                if let Some(branch) = &entry.branch {
+                    let val = branch.to_string();
+                    if !val.is_empty() {
+                        output.push_str(&format!("branch = \"{}\"\n", val.replace('\\', "\\\\").replace('"', "\\\"")));
+                    }
+                }
+                if let Some(ignore) = &entry.ignore {
+                    let val = ignore.to_string();
+                    if !val.is_empty() {
+                        output.push_str(&format!("ignore = \"{val}\"\n"));
+                    }
+                }
+                if let Some(fetch_recurse) = &entry.fetch_recurse {
+                    let val = fetch_recurse.to_string();
+                    if !val.is_empty() {
+                        output.push_str(&format!("fetch = \"{val}\"\n"));
+                    }
+                }
+                if let Some(update) = &entry.update {
+                    let val = update.to_string();
+                    if !val.is_empty() {
+                        output.push_str(&format!("update = \"{val}\"\n"));
+                    }
+                }
+                if let Some(active) = entry.active {
+                    output.push_str(&format!("active = {active}\n"));
+                }
+                if let Some(shallow) = entry.shallow {
+                    if shallow {
+                        output.push_str("shallow = true\n");
+                    }
+                }
+                if let Some(sparse_paths) = &entry.sparse_paths {
+                    if !sparse_paths.is_empty() {
+                        let joined = sparse_paths
+                            .iter()
+                            .map(|p| format!("\"{}\"", p.replace('\\', "\\\\").replace('"', "\\\"")))
+                            .collect::<Vec<_>>()
+                            .join(", ");
+                        output.push_str(&format!("sparse_paths = [{joined}]\n"));
+                    }
+                }
+            }
+        }
+
+        std::fs::write(&self.config_path, &output)
+            .map_err(|e| SubmoduleError::ConfigError(format!("Failed to write config file: {e}")))?;
         Ok(())
     }
 
@@ -318,9 +424,12 @@ impl GitManager {
                     active: Some(true),
                     shallow: _shallow,
                     no_init: Some(_no_init),
+                    sparse_paths: None,
                 },
                 sparse_paths.clone(),
             )?;
+            // When requested, only update configuration without touching repository state.
+            return Ok(());
         }
 
         // Clean up any existing submodule state using git commands
@@ -348,6 +457,7 @@ impl GitManager {
                         active: Some(true),
                         shallow: _shallow,
                         no_init: Some(_no_init),
+                        sparse_paths: None, // stored separately via configure_submodule_post_creation
                     },
                     sparse_paths,
                 )?;
@@ -360,17 +470,15 @@ impl GitManager {
 
     /// Clean up existing submodule state using git commands only
     fn cleanup_existing_submodule(&mut self, path: &str) -> Result<(), SubmoduleError> {
-        // Use GitOpsManager trait methods for cleanup
-        // 1. Deinitialize the submodule (force = true)
-        self.git_ops
-            .deinit_submodule(path, true)
-            .map_err(Self::map_git_ops_error)?;
-
-        // 2. Delete the submodule completely
-        self.git_ops
-            .delete_submodule(path)
-            .map_err(Self::map_git_ops_error)?;
-
+        // Best-effort cleanup of any existing submodule state
+        // These operations may fail if the submodule doesn't exist yet, which is fine,
+        // but other errors (permissions, corruption, etc.) should at least be visible.
+        if let Err(e) = self.git_ops.deinit_submodule(path, true) {
+            eprintln!("Warning: failed to deinit submodule at '{}': {:?}", path, e);
+        }
+        if let Err(e) = self.git_ops.delete_submodule(path) {
+            eprintln!("Warning: failed to delete submodule at '{}': {:?}", path, e);
+        }
         Ok(())
     }
 
@@ -447,14 +555,15 @@ impl GitManager {
         path: &str,
         sparse_paths: Option<Vec<String>>,
     ) -> Result<(), SubmoduleError> {
-        // Configure sparse checkout if specified
-        if let Some(patterns) = sparse_paths {
-            eprintln!("DEBUG: Configuring sparse checkout for {path} with patterns: {patterns:?}");
-            self.configure_sparse_checkout(path, &patterns)?;
-        } else {
-            eprintln!("DEBUG: No sparse paths provided for {path}");
+        // Only configure git-level sparse checkout if the submodule directory exists
+        // (it may not exist yet if --no-init was used)
+        let submodule_exists = std::path::Path::new(path).exists();
+        if submodule_exists {
+            if let Some(patterns) = sparse_paths {
+                eprintln!("DEBUG: Configuring sparse checkout for {path} with patterns: {patterns:?}");
+                self.configure_sparse_checkout(path, &patterns)?;
+            }
         }
-
         Ok(())
     }
 
