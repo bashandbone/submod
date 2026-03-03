@@ -8,7 +8,6 @@ use std::path::{Path, PathBuf};
 use gix::bstr::ByteSlice;
 
 use crate::git_ops::simple_gix::{clone_repo, fetch_repo};
-use crate::options::{SerializableFetchRecurse, SerializableUpdate, SerializableIgnore};
 use crate::utilities::{repo_from_path};
 
 /// Simple glob pattern matching for sparse checkout patterns

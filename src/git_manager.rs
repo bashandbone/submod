@@ -163,8 +163,10 @@ impl GitManager {
         mut entry: crate::config::SubmoduleEntry,
         sparse_paths: Option<Vec<String>>,
     ) -> Result<(), SubmoduleError> {
-        if sparse_paths.is_some() {
-            entry.sparse_paths = sparse_paths;
+        if let Some(ref paths) = sparse_paths {
+            entry.sparse_paths = Some(paths.clone());
+            // Also populate sparse_checkouts so consumers using sparse_checkouts() see the paths
+            self.config.submodules.add_checkout(name.clone(), paths.clone(), true);
         }
         // Normalize: convert Unspecified variants to None so they serialize cleanly
         if matches!(entry.ignore, Some(SerializableIgnore::Unspecified)) {
@@ -194,12 +196,24 @@ impl GitManager {
 
         // Append any new submodule sections not already in the file
         for (name, entry) in self.config.get_submodules() {
-            // Use a quoted TOML table header so that submodule names with
-            // special characters (e.g., '.', spaces, quotes, ']') are handled safely.
+            // Determine whether this name needs quoting (contains TOML-special characters).
+            // Simple names (alphanumeric, hyphens, underscores) can use the bare [name] form.
+            let needs_quoting = name.chars().any(|c| !c.is_alphanumeric() && c != '-' && c != '_');
             let escaped_name = name.replace('\\', "\\\\").replace('"', "\\\"");
-            let section_header = format!("[\"{}\"]", escaped_name);
-            // Check at line boundaries to avoid false positives from comments/values
-            let already_present = existing.lines().any(|line| line.trim() == section_header);
+            let section_header = if needs_quoting {
+                format!("[\"{escaped_name}\"]")
+            } else {
+                format!("[{name}]")
+            };
+            // Check at line boundaries to avoid false positives from comments/values.
+            // Accept either quoted or unquoted form so existing files written before this
+            // change are recognised.
+            let already_present = existing.lines().any(|line| {
+                let trimmed = line.trim();
+                trimmed == section_header
+                    || trimmed == format!("[{name}]")
+                    || trimmed == format!("[\"{escaped_name}\"]")
+            });
             if !already_present {
                 output.push('\n');
                 output.push_str(&section_header);
@@ -210,8 +224,37 @@ impl GitManager {
                 if let Some(url) = &entry.url {
                     output.push_str(&format!("url = \"{}\"\n", url.replace('\\', "\\\\").replace('"', "\\\"")));
                 }
+                if let Some(branch) = &entry.branch {
+                    let val = branch.to_string();
+                    if !val.is_empty() {
+                        output.push_str(&format!("branch = \"{}\"\n", val.replace('\\', "\\\\").replace('"', "\\\"")));
+                    }
+                }
+                if let Some(ignore) = &entry.ignore {
+                    let val = ignore.to_string();
+                    if !val.is_empty() {
+                        output.push_str(&format!("ignore = \"{val}\"\n"));
+                    }
+                }
+                if let Some(fetch_recurse) = &entry.fetch_recurse {
+                    let val = fetch_recurse.to_string();
+                    if !val.is_empty() {
+                        output.push_str(&format!("fetch = \"{val}\"\n"));
+                    }
+                }
+                if let Some(update) = &entry.update {
+                    let val = update.to_string();
+                    if !val.is_empty() {
+                        output.push_str(&format!("update = \"{val}\"\n"));
+                    }
+                }
                 if let Some(active) = entry.active {
                     output.push_str(&format!("active = {active}\n"));
+                }
+                if let Some(shallow) = entry.shallow {
+                    if shallow {
+                        output.push_str("shallow = true\n");
+                    }
                 }
                 if let Some(sparse_paths) = &entry.sparse_paths {
                     if !sparse_paths.is_empty() {
