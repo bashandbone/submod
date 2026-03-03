@@ -27,6 +27,11 @@ impl Git2Operations {
         };
         Ok(Self { repo })
     }
+
+    /// Return the working directory of the repository, if any.
+    pub(super) fn workdir(&self) -> Option<&std::path::Path> {
+        self.repo.workdir()
+    }
     /// Convert git2 submodule to our SubmoduleEntry format
     fn convert_git2_submodule_to_entry(&self, submodule: &git2::Submodule) -> Result<(String, SubmoduleEntry)> {
         let name = submodule.name().unwrap_or("").to_string();
@@ -268,57 +273,48 @@ impl GitOperations for Git2Operations {
         Ok(())
     }
     fn add_submodule(&mut self, opts: &SubmoduleAddOptions) -> Result<()> {
-        // Add the submodule
+        // Register the submodule, clone it, then finalize (writes .gitmodules and updates index).
+        // This is the correct git2 sequence for a fresh submodule add.
         {
-            let _submodule = self.repo.submodule(
+            let mut submodule = self.repo.submodule(
                 &opts.url,
                 &opts.path,
                 true, // use_gitlink
             )?;
-        } // submodule is dropped here
-        // Configure the submodule (after dropping the submodule reference)
-        if let Some(ignore) = &(*opts).ignore {
+            submodule.clone(None)?;
+            submodule.add_finalize()?;
+        } // submodule dropped here so we can borrow self.repo mutably below
+
+        // Apply any additional configuration after the submodule is registered
+        let path_lossy = opts.path.to_string_lossy();
+        if let Some(ignore) = &opts.ignore {
             let git2_ignore: git2::SubmoduleIgnore = ignore.clone().try_into()
                 .map_err(|_| anyhow::anyhow!("Failed to convert ignore setting"))?;
-            self.repo.submodule_set_ignore(&opts.path.to_string_lossy(), git2_ignore)?;
+            self.repo.submodule_set_ignore(&path_lossy, git2_ignore)?;
         }
         if let Some(update) = &opts.update {
             let git2_update: git2::SubmoduleUpdate = update.clone().try_into()
                 .map_err(|_| anyhow::anyhow!("Failed to convert update setting"))?;
-            self.repo.submodule_set_update(&opts.path.to_string_lossy(), git2_update)?;
+            self.repo.submodule_set_update(&path_lossy, git2_update)?;
         }
-        // Set branch if specified
         if let Some(branch) = &opts.branch {
             let branch_str = match branch {
                 SerializableBranch::CurrentInSuperproject => ".".to_string(),
                 SerializableBranch::Name(name) => name.clone(),
             };
-
             let mut config = self.repo.config()?;
-            let key = format!("submodule.{}.branch", opts.name);
-            config.set_str(&key, &branch_str)?;
+            config.set_str(&format!("submodule.{}.branch", opts.name), &branch_str)?;
         }
-        // Set fetch recurse if specified
         if let Some(fetch_recurse) = &opts.fetch_recurse {
             let fetch_str = match fetch_recurse {
                 SerializableFetchRecurse::OnDemand => "on-demand",
                 SerializableFetchRecurse::Always => "true",
                 SerializableFetchRecurse::Never => "false",
-                SerializableFetchRecurse::Unspecified => return Ok(()), // Skip setting
+                SerializableFetchRecurse::Unspecified => return Ok(()),
             };
-
             let mut config = self.repo.config()?;
-            let key = format!("submodule.{}.fetchRecurseSubmodules", opts.name);
-            config.set_str(&key, fetch_str)?;
+            config.set_str(&format!("submodule.{}.fetchRecurseSubmodules", opts.name), fetch_str)?;
         }
-        // Initialize the submodule if not skipped
-        if !opts.no_init {
-            let mut submodule = self.repo.find_submodule(opts.path.to_str().unwrap())?;
-            submodule.init(false)?; // false = don't overwrite existing config
-            submodule.update(true, None)?; // true = init, None = use default options
-        submodule.sync()?;
-        }
-        // Sync changes
         Ok(())
     }
     fn init_submodule(&mut self, path: &str) -> Result<()> {

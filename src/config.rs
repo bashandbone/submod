@@ -952,8 +952,10 @@ impl Config {
     pub fn load(&self, path: impl AsRef<Path>, cli_options: Config) -> anyhow::Result<Self> {
         let cfg: Config = Figment::new()
             .merge(Toml::file(path))
-            // CLI options should take precedence over file values
-            .merge(figment::providers::Serialized::defaults(cli_options))
+            // Merge only the defaults sub-field from CLI options so that the flat submodule
+            // entries (written as top-level TOML sections) are not corrupted by the
+            // SubmoduleEntries serialized field names ("submodules", "sparse_checkouts").
+            .merge(figment::providers::Serialized::defaults(cli_options.defaults).key("defaults"))
             .extract()?;
         Ok(cfg.apply_defaults())
     }

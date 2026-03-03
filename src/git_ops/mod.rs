@@ -239,34 +239,37 @@ impl GitOperations for GitOpsManager {
     }
 
     fn add_submodule(&mut self, opts: &SubmoduleAddOptions) -> Result<()> {
-        // Attempt gix first; if it fails, fall directly to the git CLI which is reliable
-        // for the full submodule add workflow (clone + register).
-        // Note: git2's submodule API partially writes state before failing which can corrupt
-        // the git index, so we skip it for this operation.
-        if let Some(ref mut gix_ops) = self.gix_ops {
-            if gix_ops.add_submodule(opts).is_ok() {
-                return Ok(());
+        // Try gix first (not yet implemented → falls through), then git2 which now uses
+        // the correct `submodule.clone() + add_finalize()` sequence.
+        // CLI is kept as a last-resort safety net and sets current_dir to the superproject
+        // workdir so it works regardless of the process's CWD.
+        self.try_with_fallback_mut(
+            |gix| gix.add_submodule(opts),
+            |git2| git2.add_submodule(opts),
+        )
+        .or_else(|_| {
+            let workdir = self.git2_ops.workdir()
+                .ok_or_else(|| anyhow::anyhow!("Repository has no working directory"))?;
+            let output = std::process::Command::new("git")
+                .current_dir(workdir)
+                .arg("submodule")
+                .arg("add")
+                .arg("--name")
+                .arg(&opts.name)
+                .arg("--")
+                .arg(&opts.url)
+                .arg(&opts.path)
+                .output()
+                .context("Failed to run git submodule add")?;
+            if output.status.success() {
+                Ok(())
+            } else {
+                Err(anyhow::anyhow!(
+                    "Failed to add submodule: {}",
+                    String::from_utf8_lossy(&output.stderr).trim()
+                ))
             }
-        }
-        // CLI fallback: use git submodule add directly
-        let output = std::process::Command::new("git")
-            .arg("submodule")
-            .arg("add")
-            .arg("--name")
-            .arg(&opts.name)
-            .arg("--")
-            .arg(&opts.url)
-            .arg(&opts.path)
-            .output()
-            .context("Failed to run git submodule add")?;
-        if output.status.success() {
-            Ok(())
-        } else {
-            Err(anyhow::anyhow!(
-                "Failed to add submodule: {}",
-                String::from_utf8_lossy(&output.stderr).trim()
-            ))
-        }
+        })
     }
 
     fn init_submodule(&mut self, path: &str) -> Result<()> {
