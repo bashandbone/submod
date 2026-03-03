@@ -20,10 +20,8 @@ Features:
 - Manage submodule entries and defaults programmatically.
 "]
 
-use std::any;
 use std::path::PathBuf;
 use anyhow::Result;
-use bstr::BStr;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, path::Path};
 use crate::options::{
@@ -230,6 +228,7 @@ impl SubmoduleAddOptions {
             shallow: Some(self.shallow),
             active: Some(!self.no_init), // we're adding so unless we have a 'no_init" flag, we can assume active
             no_init: Some(self.no_init),
+            sparse_paths: None,
         }
     }
 
@@ -433,6 +432,9 @@ pub struct SubmoduleEntry {
     /// Whether to skip initialization after adding
     #[serde(skip)] // never write, we use this for stateful decisions
     pub no_init: Option<bool>,
+    /// Sparse checkout paths for this submodule (optional)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sparse_paths: Option<Vec<String>>,
 }
 
 impl SubmoduleEntry {
@@ -458,6 +460,7 @@ impl SubmoduleEntry {
             active: active,
             shallow: shallow,
             no_init: no_init,
+            sparse_paths: None,
         }
     }
 
@@ -619,6 +622,7 @@ impl From<OtherSubmoduleSettings> for SubmoduleEntry {
             branch: default_git_options.branch,
             update: default_git_options.update,
             no_init: Some(other.no_init),
+            sparse_paths: None,
         }
     }
 }
@@ -871,7 +875,7 @@ impl Config {
 
     /// Add a submodule configuration
     pub fn add_submodule(&mut self, name: String, submodule: SubmoduleEntry) {
-        self.submodules.add_submodule(name, submodule);
+        self.submodules = std::mem::take(&mut self.submodules).add_submodule(name, submodule);
     }
 
     /// Get an iterator over all submodule configurations

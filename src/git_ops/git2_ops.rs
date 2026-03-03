@@ -58,6 +58,7 @@ impl Git2Operations {
             active: Some(active),
             shallow: Some(shallow),
             no_init: Some(false), // not used here
+            sparse_paths: None,
         };
         Ok((name, entry))
     }

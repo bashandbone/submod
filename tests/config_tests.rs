@@ -192,7 +192,9 @@ active = true
         harness
             .run_submod_success(&[
                 "add",
+                "--name",
                 "new-submodule",
+                "--path",
                 "lib/new",
                 &remote_url,
                 "--sparse-paths",
