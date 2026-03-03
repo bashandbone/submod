@@ -430,10 +430,14 @@ impl GitmodulesConvert for SerializableBranch {
 
     /// Convert from gitmodules string (what you would get from the .gitmodules or .git/config)
     fn from_gitmodules(options: &str) -> Result<Self, ()> {
-        if options == "." {
+        let trimmed = options.trim();
+        if trimmed == "." {
             return Ok(SerializableBranch::CurrentInSuperproject);
         }
-        Ok(SerializableBranch::Name(options.to_string()))
+        if trimmed.is_empty() {
+            return Err(());
+        }
+        Ok(SerializableBranch::Name(trimmed.to_string()))
     }
 
     /// Convert from gitmodules bytes (what you would get from the .gitmodules or .git/config)
