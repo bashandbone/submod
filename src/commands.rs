@@ -136,14 +136,14 @@ pub enum Commands {
         #[arg(short = 'u', long = "update", help = "Change the update settings for the submodule.")]
         update: Option<Update>,
 
-        #[arg(short = 's', long = "shallow", default_value = "false", default_missing_value = "true", help = "If true, sets the submodule as a shallow clone. Set false to disable shallow cloning.")]
-        shallow: bool,
+        #[arg(short = 's', long = "shallow", num_args = 0..=1, value_parser = clap::value_parser!(bool), default_missing_value = "true", help = "Set to true/false to enable or disable shallow clone. Omit to leave unchanged.")]
+        shallow: Option<bool>,
 
         #[arg(short = 'U', long = "url", value_parser = clap::value_parser!(String), help = "Change the URL of the submodule. The submodule name from the url must match an existing submodule.")]
         url: Option<String>,
 
-        #[arg(long = "active", default_value = "true", value_parser = clap::value_parser!(bool), default_missing_value = "true", help = "If true, the submodule will be considered active and included in operations. If false, will disable the submodule. For a shorter version of this command, use `submod disable <name>` instead.")]
-        active: bool,
+        #[arg(long = "active", num_args = 0..=1, value_parser = clap::value_parser!(bool), default_missing_value = "true", help = "Set to true/false to enable or disable the submodule. Omit to leave unchanged. For a quick disable, use `submod disable <name>` instead.")]
+        active: Option<bool>,
     },
     #[command(name = "change-global", visible_aliases = ["cg", "chgl", "global"], next_help_heading = "Change Global Settings", about = "Add or change the global settings for submodules, affecting all submodules in the current repository. Any individual submodule settings will override these global settings.")]
     ChangeGlobal {
