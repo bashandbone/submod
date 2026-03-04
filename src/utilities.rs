@@ -89,24 +89,20 @@ pub(crate) fn get_main_root(repo: Option<&gix::Repository>) -> Result<PathBuf, a
 
 /// Get the current branch name from the repository.
 pub(crate) fn get_current_branch(repo: Option<&gix::Repository>) -> Result<String, anyhow::Error> {
-    let repo = match repo {
-        Some(r) => r,
+    fn branch_from_repo(repo: &gix::Repository) -> Result<String, anyhow::Error> {
+        let head = repo.head()?;
+        if let Some(reference) = head.referent_name() {
+            return Ok(reference.as_bstr().to_string());
+        }
+        Err(anyhow::anyhow!("Failed to get current branch name"))
+    }
+    match repo {
+        Some(r) => branch_from_repo(r),
         None => {
             let owned = get_current_repository()?;
-            let head = owned.head()?;
-            if let Some(reference) = head.referent_name() {
-                let ref_bstr = reference.as_bstr();
-                return Ok(ref_bstr.to_string());
-            }
-            return Err(anyhow::anyhow!("Failed to get current branch name"));
+            branch_from_repo(&owned)
         }
-    };
-    let head = repo.head()?;
-    if let Some(reference) = head.referent_name() {
-        let ref_bstr = reference.as_bstr();
-        return Ok(ref_bstr.to_string());
     }
-    Err(anyhow::anyhow!("Failed to get current branch name"))
 }
 
 /*=========================================================================
