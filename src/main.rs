@@ -169,26 +169,84 @@ fn main() -> Result<()> {
             println!("✅ Sync complete");
         }
         // TODO: Implement missing commands
-        Commands::Change { .. } => {
-            return Err(anyhow::anyhow!("Change command not yet implemented"));
+        Commands::Change {
+            name,
+            path,
+            branch,
+            sparse_paths,
+            append,
+            ignore,
+            fetch,
+            update,
+            shallow,
+            url,
+            active,
+        } => {
+            let mut manager = GitManager::new(config_path)
+                .map_err(|e| anyhow::anyhow!("Failed to create manager: {}", e))?;
+            manager
+                .change_submodule(
+                    &name,
+                    path,
+                    branch,
+                    sparse_paths,
+                    append,
+                    ignore,
+                    fetch,
+                    update,
+                    shallow,
+                    url,
+                    active,
+                )
+                .map_err(|e| anyhow::anyhow!("Failed to change submodule: {}", e))?;
         }
-        Commands::ChangeGlobal { .. } => {
-            return Err(anyhow::anyhow!("ChangeGlobal command not yet implemented"));
+        Commands::ChangeGlobal {
+            ignore,
+            fetch,
+            update,
+        } => {
+            let mut manager = GitManager::new(config_path)
+                .map_err(|e| anyhow::anyhow!("Failed to create manager: {}", e))?;
+            manager
+                .update_global_defaults(ignore, fetch, update)
+                .map_err(|e| anyhow::anyhow!("Failed to update global settings: {}", e))?;
         }
-        Commands::List { .. } => {
-            return Err(anyhow::anyhow!("List command not yet implemented"));
+        Commands::List { recursive } => {
+            let manager = GitManager::new(config_path)
+                .map_err(|e| anyhow::anyhow!("Failed to create manager: {}", e))?;
+            manager
+                .list_submodules(recursive)
+                .map_err(|e| anyhow::anyhow!("Failed to list submodules: {}", e))?;
         }
-        Commands::Delete => {
-            return Err(anyhow::anyhow!("Delete command not yet implemented"));
+        Commands::Delete { name } => {
+            let mut manager = GitManager::new(config_path)
+                .map_err(|e| anyhow::anyhow!("Failed to create manager: {}", e))?;
+            manager
+                .delete_submodule_by_name(&name)
+                .map_err(|e| anyhow::anyhow!("Failed to delete submodule: {}", e))?;
         }
-        Commands::Disable => {
-            return Err(anyhow::anyhow!("Disable command not yet implemented"));
+        Commands::Disable { name } => {
+            let mut manager = GitManager::new(config_path)
+                .map_err(|e| anyhow::anyhow!("Failed to create manager: {}", e))?;
+            manager
+                .disable_submodule(&name)
+                .map_err(|e| anyhow::anyhow!("Failed to disable submodule: {}", e))?;
         }
-        Commands::GenerateConfig { .. } => {
-            return Err(anyhow::anyhow!("GenerateConfig command not yet implemented"));
+        Commands::GenerateConfig {
+            output,
+            from_setup,
+            force,
+            template,
+        } => {
+            GitManager::generate_config(&output, from_setup, template, force)
+                .map_err(|e| anyhow::anyhow!("Failed to generate config: {}", e))?;
         }
-        Commands::NukeItFromOrbit { .. } => {
-            return Err(anyhow::anyhow!("NukeItFromOrbit command not yet implemented"));
+        Commands::NukeItFromOrbit { all, names, kill: nuke_kill } => {
+            let mut manager = GitManager::new(config_path)
+                .map_err(|e| anyhow::anyhow!("Failed to create manager: {}", e))?;
+            manager
+                .nuke_submodules(all, names, nuke_kill)
+                .map_err(|e| anyhow::anyhow!("Failed to nuke submodules: {}", e))?;
         }
         Commands::CompleteMe { shell } => {
             let mut cmd = <Cli as clap::CommandFactory>::command();

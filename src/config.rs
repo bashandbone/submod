@@ -813,6 +813,25 @@ impl SubmoduleEntries {
             sparse_checkouts: Some(HashMap::new()),
         }
     }
+    /// Insert or replace a submodule entry by name.
+    pub fn update_entry(&mut self, name: SubmoduleName, entry: SubmoduleEntry) {
+        // Ensure the submodules map exists and update/insert the entry.
+        let submodules = self.submodules.get_or_insert_with(HashMap::new);
+        submodules.insert(name.clone(), entry.clone());
+
+        // Keep sparse_checkouts in sync with the entry's sparse paths.
+        match entry.sparse_paths {
+            Some(ref paths) if !paths.is_empty() => {
+                let sparse_map = self.sparse_checkouts.get_or_insert_with(HashMap::new);
+                sparse_map.insert(name, paths.clone());
+            }
+            _ => {
+                if let Some(sparse_map) = self.sparse_checkouts.as_mut() {
+                    sparse_map.remove(&name);
+                }
+            }
+        }
+    }
 }
 
 impl IntoIterator for SubmoduleEntries {
