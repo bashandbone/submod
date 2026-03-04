@@ -1,43 +1,28 @@
+#:tombi schema.strict = false
+
 [package]
 name = "submod"
 version = "0.1.2"
 edition = "2024"
-rust-version = "1.85"
+rust-version = "1.87"
+publish = true
 description = "A headache-free submodule management tool, built on top of gitoxide. Manage sparse checkouts, submodule updates, and adding/removing submodules with ease."
-authors = ["Adam Poulemanos <89049923+bashandbone@users.noreply.github.com>"]
-license = "MIT" # Plain MIT license: plainlicense.org/licenses/permissive/mit/
-repository = "https://github.com/bashandbone/submod"
-homepage = "https://github.com/bashandbone/submod"
 documentation = "https://docs.rs/submod"
 readme = "README.md"
-keywords = ["git", "submodule", "gitoxide", "cli", "sparse-checkout"]
+homepage = "https://github.com/bashandbone/submod"
+repository = "https://github.com/bashandbone/submod"
+license = "MIT"  # Plain MIT license
+license-file = "LICENSE.md"
+keywords = ["cli", "git", "gitoxide", "sparse-checkout", "submodule"]
 categories = ["command-line-utilities", "development-tools"]
 
 resolver = "3"
 
-[dependencies]
-# Gitoxide ops
-gix = { version = "0.72.1", features = ["max-performance"] }
-gix-config = { version = "0.45.1", features = ["serde"] }
-gix-submodule = "0.19.1"
-bstr = { version = "1.12.0", default-features = false }
+[package.metadata]
 
-# CLI
-clap = { version = "4.5.40", features = ["derive"] }
-
-# TOML config
-toml = "0.8.23"
-toml_edit = "0.22.27"
-serde = { version = "1.0.219", features = ["derive"] }
-serde_json = "1.0.140"
-
-# errors
-anyhow = "1.0.98"
-thiserror = "2.0.12"
-
-# optional for better low-level ops; falls back to using `git` directly if not available
-git2 = { version = "0.20.2", optional = true }
-
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
 
 [lib]
 name = "submod"
@@ -47,48 +32,68 @@ path = "src/lib.rs"
 name = "submod"
 path = "src/main.rs"
 
+[dependencies]
+bstr = { version = "1.12.1", default-features = false }
+# Gitoxide ops
+gix = { version = "0.80.0", features = ["max-performance"] }
+gix-config = { version = "0.53.0", features = ["serde"] }
+gix-submodule = "0.27.0"
+
+# CLI
+clap = { version = "4.5.60", features = ["derive"] }
+
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = "1.0.149"
+# TOML config
+toml = "0.9.8"
+toml_edit = "0.23.9"
+
+# errors
+anyhow = "1.0.102"
+thiserror = "2.0.18"
+
+# optional for better low-level ops; falls back to using `git` directly if not available
+git2 = { version = "0.20.4", optional = true }
+
+[dev-dependencies]
+serde_json = "1.0.149"
+tempfile = "3.26.0"
+
 [features]
 default = ["git2-support"]
 git2-support = ["git2"]
 
-[dev-dependencies]
-tempfile = "3.14.0"
-serde_json = "1.0.140"
-
-[lints.rust]
-# Deny unsafe code unless explicitly allowed
-unsafe_code = "forbid"
-# Warn about unused items
-unused = { level = "warn", priority = -1 }
-# Warn about missing documentation
-missing_docs = "warn"
-# Warn about unreachable code
-unreachable_code = "warn"
-
 [lints.clippy]
-# Pedantic lints for high code quality
-pedantic = { level = "warn", priority = -1 }
-# Nursery lints for cutting-edge suggestions
-nursery = { level = "warn", priority = -1 }
-# Performance lints
-perf = { level = "warn", priority = -1 }
 # Cargo-specific lints
 cargo = { level = "warn", priority = -1 }
 # Complexity lints
 complexity = { level = "warn", priority = -1 }
 # Correctness lints (deny these as they indicate bugs)
 correctness = { level = "deny", priority = -1 }
+# Nursery lints for cutting-edge suggestions
+nursery = { level = "warn", priority = -1 }
+# Pedantic lints for high code quality
+pedantic = { level = "warn", priority = -1 }
+# Performance lints
+perf = { level = "warn", priority = -1 }
 # Style lints
 style = { level = "warn", priority = -1 }
 # Suspicious constructs
 suspicious = { level = "warn", priority = -1 }
 
-# Allow some pedantic lints that can be overly strict for CLI tools
-too_many_lines = "allow"
-module_name_repetitions = "allow"
 missing_errors_doc = "allow"
 missing_panics_doc = "allow"
+module_name_repetitions = "allow"
+# Allow some pedantic lints that can be overly strict for CLI tools
+too_many_lines = "allow"
 
-[package.metadata.docs.rs]
-all-features = true
-rustdoc-args = ["--cfg", "docsrs"]
+[lints.rust]
+# Warn about missing documentation
+missing_docs = "warn"
+# Warn about unreachable code
+unreachable_code = "warn"
+# Deny unsafe code unless explicitly allowed
+unsafe_code = "forbid"
+# Warn about unused items
+unused = { level = "warn", priority = -1 }
+
