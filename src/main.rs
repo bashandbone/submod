@@ -81,9 +81,9 @@ fn main() -> Result<()> {
                     set_url,
                     sparse_paths_vec,
                     Some(set_branch),
-                    Some(ignore),
-                    Some(fetch),
-                    Some(update),
+                    ignore,
+                    fetch,
+                    update,
                     Some(shallow),
                     no_init,
                 )

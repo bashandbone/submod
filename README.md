@@ -245,7 +245,7 @@ submod list --recursive
 Delete a submodule from configuration and filesystem:
 
 ```bash
-submod delete
+submod delete my-lib
 ```
 
 ### `submod disable`
@@ -253,7 +253,7 @@ submod delete
 Disable a submodule without deleting files (sets `active = false`):
 
 ```bash
-submod disable
+submod disable my-lib
 ```
 
 ### `submod nuke-it-from-orbit`

@@ -256,17 +256,20 @@ impl GitOperations for GitOpsManager {
         .or_else(|_| {
             let workdir = self.git2_ops.workdir()
                 .ok_or_else(|| anyhow::anyhow!("Repository has no working directory"))?;
-            let output = std::process::Command::new("git")
-                .current_dir(workdir)
+            let mut cmd = std::process::Command::new("git");
+            cmd.current_dir(workdir)
                 .arg("submodule")
                 .arg("add")
                 .arg("--name")
-                .arg(&opts.name)
-                .arg("--")
-                .arg(&opts.url)
-                .arg(&opts.path)
-                .output()
-                .context("Failed to run git submodule add")?;
+                .arg(&opts.name);
+            if let Some(branch) = &opts.branch {
+                cmd.arg("--branch").arg(branch.to_string());
+            }
+            if opts.shallow {
+                cmd.arg("--depth").arg("1");
+            }
+            cmd.arg("--").arg(&opts.url).arg(&opts.path);
+            let output = cmd.output().context("Failed to run git submodule add")?;
             if output.status.success() {
                 Ok(())
             } else {

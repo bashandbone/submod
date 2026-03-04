@@ -288,12 +288,40 @@ impl GitOperations for Git2Operations {
         Ok(())
     }
     fn add_submodule(&mut self, opts: &SubmoduleAddOptions) -> Result<()> {
-        // git2 submodule cloning requires remote callbacks that are complex to configure.
-        // Fall through to the CLI fallback which handles this reliably.
-        Err(anyhow::anyhow!(
-            "Unable to add submodule '{}' using the library API; it will be added using the Git CLI instead",
-            opts.name
-        ))
+        // 1. Create submodule entry in .gitmodules and index
+        let mut sub = self
+            .repo
+            .submodule(&opts.url, opts.path.as_path(), true)
+            .with_context(|| {
+                format!(
+                    "Failed to create submodule entry for '{}' from '{}'",
+                    opts.name, opts.url
+                )
+            })?;
+
+        // 2. Configure clone options
+        let mut update_opts = git2::SubmoduleUpdateOptions::new();
+        let mut fetch_opts = git2::FetchOptions::new();
+        if opts.shallow {
+            fetch_opts.depth(1);
+        }
+        update_opts.fetch(fetch_opts);
+
+        // 3. Clone the submodule repository
+        sub.clone(Some(&mut update_opts)).with_context(|| {
+            format!(
+                "Failed to clone submodule '{}' from '{}'",
+                opts.name, opts.url
+            )
+        })?;
+
+        // 4. Add to index and finalize
+        sub.add_to_index(true)
+            .with_context(|| format!("Failed to add submodule '{}' to index", opts.name))?;
+        sub.add_finalize()
+            .with_context(|| format!("Failed to finalize submodule '{}'", opts.name))?;
+
+        Ok(())
     }
     fn init_submodule(&mut self, path: &str) -> Result<()> {
         let mut submodule = self

@@ -101,8 +101,8 @@ pub enum Commands {
         )]
         branch: Option<String>,
 
-        #[arg(short = 'i', long = "ignore", default_value = "unspecified", help = "What changes in the submodule git should ignore.")]
-        ignore: Ignore,
+        #[arg(short = 'i', long = "ignore", help = "What changes in the submodule git should ignore.")]
+        ignore: Option<Ignore>,
 
         #[arg(
             short = 'x',
@@ -112,11 +112,11 @@ pub enum Commands {
         )]
         sparse_paths: Option<Vec<String>>,
 
-        #[arg(short = 'f', long = "fetch", default_value = "unspecified", help = "Sets the recursive fetch behavior for the submodule (like, if we should fetch its submodules).")]
-        fetch: FetchRecurse,
+        #[arg(short = 'f', long = "fetch", help = "Sets the recursive fetch behavior for the submodule (like, if we should fetch its submodules).")]
+        fetch: Option<FetchRecurse>,
 
-        #[arg(short = 'u', long = "update", default_value = "unspecified", help = "How git should update the submodule when you run `git submodule update`.")]
-        update: Update,
+        #[arg(short = 'u', long = "update", help = "How git should update the submodule when you run `git submodule update`.")]
+        update: Option<Update>,
 
         // TODO: Implement this arg
         #[arg(short = 's', long = "shallow", default_value = "false", action = clap::ArgAction::SetTrue, default_missing_value = "true", help = "If given, sets the submodule as a shallow clone. It will only fetch the last commit of the branch, not the full history.")]

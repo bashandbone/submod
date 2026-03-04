@@ -59,7 +59,7 @@ ignore = "dirty" # Override default ignore setting for all submodules
 #
 # ## `shallow`
 #
-# If `true`, performs a shallow clone of the submodule, which means it only fetchest the most recent commit. Defaults to `false`. This is useful for large repositories where you only need the latest commit.
+# If `true`, performs a shallow clone of the submodule, which means it only fetches the most recent commit. Defaults to `false`. This is useful for large repositories where you only need the latest commit.
 #
 
 # NAMES (the part between "[" and "]" below).
