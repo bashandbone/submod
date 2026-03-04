@@ -304,6 +304,8 @@ pub enum Commands {
         #[arg(
             short = 's',
             long = "from-setup",
+            num_args = 0,
+            default_missing_value = "true",
             help = "Generates the config from your current repository's submodule settings."
         )]
         from_setup: Option<String>,
