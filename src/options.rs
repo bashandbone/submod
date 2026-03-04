@@ -125,6 +125,7 @@ pub enum SerializableIgnore {
     None,
     /// Used as a sentinel value internally; do not use in a submod.toml or submod CLI command.
     #[serde(skip)]
+    #[value(skip)]
     Unspecified,
 }
 
@@ -279,6 +280,7 @@ pub enum SerializableFetchRecurse {
     Never,
     /// Used as a sentinel value internally; do not use in a submod.toml or submod CLI command.
     #[serde(skip)]
+    #[value(skip)]
     Unspecified,
 }
 
@@ -557,6 +559,7 @@ pub enum SerializableUpdate {
     None,
     /// Used as a sentinel value internally; do not use in a submod.toml or submod CLI command.
     #[serde(skip)]
+    #[value(skip)]
     Unspecified,
 }
 

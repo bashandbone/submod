@@ -8,7 +8,6 @@ version = "0.2.0"
 edition = "2024"
 rust-version = "1.87"
 description = "A headache-free submodule management tool, built on top of gitoxide. Manage sparse checkouts, submodule updates, and adding/removing submodules with ease."
-license = "MIT" # Plain MIT license: plainlicense.org/licenses/permissive/mit/
 license-file = "LICENSE.md"
 repository = "https://github.com/bashandbone/submod"
 homepage = "https://github.com/bashandbone/submod"
@@ -20,15 +19,6 @@ keywords = [
   "gitoxide",
   "cli",
   "sparse-checkout",
-  "git2",
-  "gitmodules",
-  "repository",
-  "management",
-  "command-line",
-  "tool",
-  "development",
-  "utilities",
-  "development-tools",
 ]
 categories = ["command-line-utilities", "development-tools"]
 

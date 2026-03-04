@@ -3,11 +3,10 @@
 // SPDX-License-Identifier: LicenseRef-PlainMIT OR MIT
 //! Utility functions for working with `Gitoxide` APIs commonly used across the codebase.
 
-use anyhow::Ok;
+use anyhow::Result;
 use git2::Repository as Git2Repository;
 use gix::open::Options;
 use std::path::PathBuf;
-use std::result::Result;
 
 /// Get the current repository using git2, with an optional provided repository. If no repository is provided, it will attempt to discover one in the current directory.
 pub(crate) fn get_current_git2_repository(
@@ -164,20 +163,18 @@ pub(crate) fn name_from_url(url: &str) -> Result<String, anyhow::Error> {
 /// Convert an `OsString` to a `String`, extracting the name from the path
 pub(crate) fn name_from_osstring(os_string: std::ffi::OsString) -> Result<String, anyhow::Error> {
     osstring_to_string(os_string).and_then(|s| {
-        if s.is_empty() {
-            if s.contains('\0') {
-                Err(anyhow::anyhow!("Name cannot contain null bytes"))
-            } else {
-                Ok(s)
-            }
-        } else {
-            let sep = std::path::MAIN_SEPARATOR.to_string();
-            s.trim()
-                .split(&sep)
-                .last()
-                .map(|name| name.to_string())
-                .ok_or_else(|| anyhow::anyhow!("Failed to extract name from OsString"))
+        if s.contains('\0') {
+            return Err(anyhow::anyhow!("Name cannot contain null bytes"));
         }
+        if s.trim().is_empty() {
+            return Err(anyhow::anyhow!("Name cannot be empty or whitespace-only"));
+        }
+        let sep = std::path::MAIN_SEPARATOR.to_string();
+        s.trim()
+            .split(&sep)
+            .last()
+            .map(|name| name.to_string())
+            .ok_or_else(|| anyhow::anyhow!("Failed to extract name from OsString"))
     })
 }
 

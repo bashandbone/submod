@@ -288,12 +288,92 @@ impl GitOperations for Git2Operations {
         Ok(())
     }
     fn add_submodule(&mut self, opts: &SubmoduleAddOptions) -> Result<()> {
-        // git2 submodule cloning requires remote callbacks that are complex to configure.
-        // Fall through to the CLI fallback which handles this reliably.
-        Err(anyhow::anyhow!(
-            "Unable to add submodule '{}' using the library API; it will be added using the Git CLI instead",
-            opts.name
-        ))
+        // 1. Create submodule entry in .gitmodules and index
+        let mut sub = self
+            .repo
+            .submodule(&opts.url, opts.path.as_path(), true)
+            .with_context(|| {
+                format!(
+                    "Failed to create submodule entry for '{}' from '{}'",
+                    opts.name, opts.url
+                )
+            })?;
+
+        // 2. Configure clone options
+        let mut update_opts = git2::SubmoduleUpdateOptions::new();
+        let mut fetch_opts = git2::FetchOptions::new();
+        if opts.shallow {
+            fetch_opts.depth(1);
+        }
+        update_opts.fetch(fetch_opts);
+
+        // 3. Clone the submodule repository
+        sub.clone(Some(&mut update_opts)).with_context(|| {
+            format!(
+                "Failed to clone submodule '{}' from '{}'",
+                opts.name, opts.url
+            )
+        })?;
+
+        // 4. Add to index and finalize
+        sub.add_to_index(true)
+            .with_context(|| format!("Failed to add submodule '{}' to index", opts.name))?;
+        sub.add_finalize()
+            .with_context(|| format!("Failed to finalize submodule '{}'", opts.name))?;
+
+        // 5. Apply optional configuration via git config.
+        // git2's submodule() keys the submodule by path; use the path as the config key.
+        let path_str = opts.path.to_string_lossy();
+        let mut config = self
+            .repo
+            .config()
+            .with_context(|| "Failed to open git config")?;
+
+        // Set branch if specified
+        if let Some(branch) = &opts.branch {
+            let branch_key = format!("submodule.{}.branch", path_str);
+            config
+                .set_str(&branch_key, &branch.to_string())
+                .with_context(|| format!("Failed to set branch for submodule '{}'", opts.name))?;
+        }
+
+        // Set ignore rule if specified and not the sentinel Unspecified value
+        if let Some(ignore) = &opts.ignore {
+            if !matches!(ignore, SerializableIgnore::Unspecified) {
+                let ignore_key = format!("submodule.{}.ignore", path_str);
+                config
+                    .set_str(&ignore_key, &ignore.to_string())
+                    .with_context(|| {
+                        format!("Failed to set ignore for submodule '{}'", opts.name)
+                    })?;
+            }
+        }
+
+        // Set fetch recurse if specified and not the sentinel Unspecified value
+        if let Some(fetch_recurse) = &opts.fetch_recurse {
+            if !matches!(fetch_recurse, SerializableFetchRecurse::Unspecified) {
+                let fetch_key = format!("submodule.{}.fetchRecurseSubmodules", path_str);
+                config
+                    .set_str(&fetch_key, &fetch_recurse.to_string())
+                    .with_context(|| {
+                        format!("Failed to set fetchRecurse for submodule '{}'", opts.name)
+                    })?;
+            }
+        }
+
+        // Set update strategy if specified and not the sentinel Unspecified value
+        if let Some(update) = &opts.update {
+            if !matches!(update, SerializableUpdate::Unspecified) {
+                let update_key = format!("submodule.{}.update", path_str);
+                config
+                    .set_str(&update_key, &update.to_string())
+                    .with_context(|| {
+                        format!("Failed to set update for submodule '{}'", opts.name)
+                    })?;
+            }
+        }
+
+        Ok(())
     }
     fn init_submodule(&mut self, path: &str) -> Result<()> {
         let mut submodule = self
