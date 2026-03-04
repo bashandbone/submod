@@ -1,28 +1,79 @@
-#:tombi schema.strict = false
+# SPDX-FileCopyrightText: 2025 Adam Poulemanos <89049923+bashandbone@users.noreply.github.com>
+#
+# SPDX-License-Identifier: LicenseRef-PlainMIT OR MIT
 
 [package]
 name = "submod"
-version = "0.1.2"
+version = "0.2.0"
 edition = "2024"
 rust-version = "1.87"
-publish = true
 description = "A headache-free submodule management tool, built on top of gitoxide. Manage sparse checkouts, submodule updates, and adding/removing submodules with ease."
+license-file = "LICENSE.md"
+repository = "https://github.com/bashandbone/submod"
+homepage = "https://github.com/bashandbone/submod"
 documentation = "https://docs.rs/submod"
 readme = "README.md"
-homepage = "https://github.com/bashandbone/submod"
-repository = "https://github.com/bashandbone/submod"
-license = "MIT"  # Plain MIT license
-license-file = "LICENSE.md"
-keywords = ["cli", "git", "gitoxide", "sparse-checkout", "submodule"]
+keywords = [
+  "git",
+  "submodule",
+  "gitoxide",
+  "cli",
+  "sparse-checkout",
+]
 categories = ["command-line-utilities", "development-tools"]
 
 resolver = "3"
 
-[package.metadata]
-
 [package.metadata.docs.rs]
 all-features = true
 rustdoc-args = ["--cfg", "docsrs"]
+
+
+[dependencies]
+bstr = { version = "1.12.1", default-features = false }
+# Gitoxide ops
+gix = { version = "0.80.0", default-features = false, features = [
+  "attributes",
+  "blocking-network-client",
+  "excludes",
+  "command",
+  "parallel",
+  "serde",
+  "status",
+  "worktree-mutation"
+] }
+gitoxide-core = { version = "0.54.0", default-features = false, features = ["blocking-client", "organize", "clean", "serde"]}
+gix-config = { version = "0.53.0", features = ["serde"] }
+gix-submodule = "0.27.0"
+gix-pathspec = "0.16.0"
+gix-glob = "0.24.0"
+
+# CLI
+clap = { version = "4.5.60", features = [
+  "derive",
+  "cargo",
+  "unicode",
+  "wrap_help",
+] }
+clap_complete = "4.5.66"
+clap_complete_nushell = "4.5.10"
+prodash = { version = "31.0.0", features = ["render-line-crossterm", "render-line-autoconfigure", "render-line"] }
+
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = "1.0.149"
+# TOML config
+figment = { version = "0.10.19", default-features = false, features = ["toml"] }
+
+# errors
+anyhow = "1.0.102"
+thiserror = "2.0.18"
+
+# bitflags for status flags
+bitflags = "2.11.0"
+
+# As of submod v0.2.0, git2 no longer optional
+# gix_submodule just isn't mature enough to realistically provide our functionality without falling back to git2
+git2 = { version = "0.20.4" }
 
 [lib]
 name = "submod"
@@ -32,36 +83,23 @@ path = "src/lib.rs"
 name = "submod"
 path = "src/main.rs"
 
-[dependencies]
-bstr = { version = "1.12.1", default-features = false }
-# Gitoxide ops
-gix = { version = "0.80.0", features = ["max-performance"] }
-gix-config = { version = "0.53.0", features = ["serde"] }
-gix-submodule = "0.27.0"
-
-# CLI
-clap = { version = "4.5.60", features = ["derive"] }
-
-serde = { version = "1.0.228", features = ["derive"] }
-serde_json = "1.0.149"
-# TOML config
-toml = "0.9.8"
-toml_edit = "0.23.9"
-
-# errors
-anyhow = "1.0.102"
-thiserror = "2.0.18"
-
-# optional for better low-level ops; falls back to using `git` directly if not available
-git2 = { version = "0.20.4", optional = true }
-
 [dev-dependencies]
-serde_json = "1.0.149"
-tempfile = "3.26.0"
+figment = { version = "0.10.19", default-features = false, features = [
+  "test",
+  "toml",
+] }
+tempfile = "3.14.0"
+serde_json = "1.0.140"
 
-[features]
-default = ["git2-support"]
-git2-support = ["git2"]
+[lints.rust]
+# Deny unsafe code unless explicitly allowed
+unsafe_code = "forbid"
+# Warn about unused items
+unused = { level = "warn", priority = -1 }
+# Warn about missing documentation
+missing_docs = "warn"
+# Warn about unreachable code
+unreachable_code = "warn"
 
 [lints.clippy]
 # Cargo-specific lints
@@ -86,14 +124,4 @@ missing_panics_doc = "allow"
 module_name_repetitions = "allow"
 # Allow some pedantic lints that can be overly strict for CLI tools
 too_many_lines = "allow"
-
-[lints.rust]
-# Warn about missing documentation
-missing_docs = "warn"
-# Warn about unreachable code
-unreachable_code = "warn"
-# Deny unsafe code unless explicitly allowed
-unsafe_code = "forbid"
-# Warn about unused items
-unused = { level = "warn", priority = -1 }
 

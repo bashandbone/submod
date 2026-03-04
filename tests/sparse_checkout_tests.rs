@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2025 Adam Poulemanos <89049923+bashandbone@users.noreply.github.com>
+//
+// SPDX-License-Identifier: LicenseRef-PlainMIT OR MIT
+
 //! Integration tests focused on sparse checkout functionality
 //!
 //! These tests verify sparse checkout configuration, detection of mismatches,
@@ -26,9 +30,11 @@ mod tests {
         harness
             .run_submod_success(&[
                 "add",
-                "sparse-basic",
-                "lib/sparse-basic",
                 &remote_url,
+                "--name",
+                "sparse-basic",
+                "--path",
+                "lib/sparse-basic",
                 "--sparse-paths",
                 "src,docs",
             ])
@@ -74,9 +80,11 @@ mod tests {
         harness
             .run_submod_success(&[
                 "add",
-                "sparse-patterns",
-                "lib/sparse-patterns",
                 &remote_url,
+                "--name",
+                "sparse-patterns",
+                "--path",
+                "lib/sparse-patterns",
                 "--sparse-paths",
                 "src/,*.md,Cargo.toml",
             ])
@@ -109,9 +117,11 @@ mod tests {
         harness
             .run_submod_success(&[
                 "add",
-                "sparse-mismatch",
-                "lib/sparse-mismatch",
                 &remote_url,
+                "--name",
+                "sparse-mismatch",
+                "--path",
+                "lib/sparse-mismatch",
                 "--sparse-paths",
                 "src,docs",
             ])
@@ -143,7 +153,7 @@ mod tests {
 
         // Add submodule normally first
         harness
-            .run_submod_success(&["add", "sparse-disabled", "lib/sparse-disabled", &remote_url])
+            .run_submod_success(&["add", &remote_url, "--name", "sparse-disabled", "--path", "lib/sparse-disabled"])
             .expect("Failed to add submodule");
 
         // Update config to include sparse paths
@@ -186,9 +196,11 @@ sparse_paths = ["src", "docs"]
         harness
             .run_submod_success(&[
                 "add",
-                "sparse-complex",
-                "lib/sparse-complex",
                 &remote_url,
+                "--name",
+                "sparse-complex",
+                "--path",
+                "lib/sparse-complex",
                 "--sparse-paths",
                 "src/,docs/,*.md,!tests/,!examples/",
             ])
@@ -259,16 +271,18 @@ sparse_paths = ["src", "docs", "*.md"]
 
         // Add submodule without sparse checkout
         harness
-            .run_submod_success(&["add", "no-sparse", "lib/no-sparse", &remote_url])
+            .run_submod_success(&["add", &remote_url, "--name", "no-sparse", "--path", "lib/no-sparse"])
             .expect("Failed to add submodule");
 
         // Add submodule with sparse checkout
         harness
             .run_submod_success(&[
                 "add",
-                "with-sparse",
-                "lib/with-sparse",
                 &remote_url,
+                "--name",
+                "with-sparse",
+                "--path",
+                "lib/with-sparse",
                 "--sparse-paths",
                 "src,docs",
             ])
@@ -298,9 +312,11 @@ sparse_paths = ["src", "docs", "*.md"]
         // Try to add with empty sparse paths - should handle gracefully
         let output = harness.run_submod(&[
             "add",
-            "sparse-empty",
-            "lib/sparse-empty",
             &remote_url,
+            "--name",
+            "sparse-empty",
+            "--path",
+            "lib/sparse-empty",
             "--sparse-paths",
             "",
         ]);

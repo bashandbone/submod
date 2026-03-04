@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2025 Adam Poulemanos <89049923+bashandbone@users.noreply.github.com>
+#
+# SPDX-License-Identifier: LicenseRef-PlainMIT OR MIT
+
 # Set default behavior to automatically normalize line endings
 * text=auto
 
@@ -13,6 +17,7 @@
 *.js text eol=lf
 *.json text eol=lf
 *.jsx text eol=lf
+*.license text eol=lf
 *.md text eol=lf
 *.mdx text eol=lf
 *.mts text eol=lf
@@ -20,6 +25,7 @@
 *.py text eol=lf
 *.rs text eol=lf
 *.sh text eol=lf
+*.spdx text eol=lf
 *.svelte text eol=lf
 *.svg text eol=lf
 *.toml text eol=lf

@@ -1,0 +1,36 @@
+{
+    "configurations": [
+        {
+            "cwd": "${workspaceFolder}",
+            "internalConsoleOptions": "neverOpen",
+            "name": "Debug File",
+            "program": "${file}",
+            "request": "launch",
+            "stopOnEntry": false,
+            "type": "bun",
+            "watchMode": false
+        },
+        {
+            "cwd": "${workspaceFolder}",
+            "internalConsoleOptions": "neverOpen",
+            "name": "Run File",
+            "noDebug": true,
+            "program": "${file}",
+            "request": "launch",
+            "type": "bun",
+            "watchMode": false
+        },
+        {
+            "internalConsoleOptions": "neverOpen",
+            "name": "Attach Bun",
+            "request": "attach",
+            "stopOnEntry": false,
+            "type": "bun",
+            "url": "ws://localhost:6499/"
+        }
+    ],
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0"
+}

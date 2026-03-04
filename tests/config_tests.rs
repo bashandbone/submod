@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2025 Adam Poulemanos <89049923+bashandbone@users.noreply.github.com>
+//
+// SPDX-License-Identifier: LicenseRef-PlainMIT OR MIT
+
 //! Integration tests focused on configuration management
 //!
 //! These tests verify TOML configuration parsing, serialization,
@@ -188,9 +192,11 @@ active = true
         harness
             .run_submod_success(&[
                 "add",
-                "new-submodule",
-                "lib/new",
                 &remote_url,
+                "--name",
+                "new-submodule",
+                "--path",
+                "lib/new",
                 "--sparse-paths",
                 "src,docs",
             ])

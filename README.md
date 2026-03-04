@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: 2025 Adam Poulemanos <89049923+bashandbone@users.noreply.github.com>
+
+SPDX-License-Identifier: LicenseRef-PlainMIT OR MIT
+-->
+
 # `submod`
 
 [![Crates.io](https://img.shields.io/crates/v/submod.svg)](https://crates.io/crates/submod)
@@ -5,6 +11,7 @@
 [![Static Badge](https://img.shields.io/badge/Plain-MIT-15db95?style=flat-square&labelColor=0d19a3&cacheSeconds=86400&link=https%3A%2F%2Fplainlicense.org%2Flicenses%2Fpermissive%2Fmit%2Fmit%2F)](https://plainlicense.org/licenses/permissive/mit/)
 [![Rust](https://img.shields.io/badge/rust-1.87%2B-blue.svg)](https://www.rust-lang.org)
 [![codecov](https://codecov.io/gh/bashandbone/submod/branch/main/graph/badge.svg?token=MOW92KKK0G)](https://codecov.io/gh/bashandbone/submod)
+![Crates.io Downloads (latest version)](https://img.shields.io/crates/dv/submod)
 
 A lightweight, fast CLI tool for managing git submodules with advanced sparse checkout support. Built on top of `gitoxide` and `git2` libraries for maximum performance and reliability.
 
@@ -136,10 +143,33 @@ branch = "develop"       # track specific branch
 Add a new submodule to your configuration and repository:
 
 ```bash
-submod add my-lib libs/my-lib https://github.com/example/my-lib.git \
+# Basic add
+submod add https://github.com/example/my-lib.git --name my-lib --path libs/my-lib
+
+# With sparse checkout paths and extra options
+submod add https://github.com/example/my-lib.git \
+  --name my-lib \
+  --path libs/my-lib \
   --sparse-paths "src/,include/" \
-  --settings "ignore=all"
+  --branch main \
+  --ignore all \
+  --fetch on-demand
 ```
+
+**Options:**
+
+| Flag | Short | Description |
+|------|-------|-------------|
+| `<URL>` | | *(required)* URL or local path of the submodule repository |
+| `--name` | `-n` | Nickname for the submodule used in your config and commands |
+| `--path` | `-p` | Local directory path where the submodule should be placed |
+| `--branch` | `-b` | Branch to track |
+| `--ignore` | `-i` | Dirty-state ignore level (`all`, `dirty`, `untracked`, `none`) |
+| `--sparse-paths` | `-x` | Comma-separated sparse checkout paths or globs |
+| `--fetch` | `-f` | Recursive fetch behavior (`always`, `on-demand`, `never`) |
+| `--update` | `-u` | Update strategy (`checkout`, `rebase`, `merge`, `none`) |
+| `--shallow` | `-s` | Shallow clone (last commit only) |
+| `--no-init` | | Add to config only; do not clone/initialize |
 
 ### `submod check`
 
@@ -173,8 +203,8 @@ Hard reset submodules (stash changes, reset --hard, clean):
 # Reset all submodules
 submod reset --all
 
-# Reset specific submodules
-submod reset my-lib vendor-utils
+# Reset specific submodules (comma-separated)
+submod reset my-lib,vendor-utils
 ```
 
 ### `submod sync`
@@ -183,6 +213,79 @@ Run a complete sync (check + init + update):
 
 ```bash
 submod sync
+```
+
+### `submod change`
+
+Change the configuration of an existing submodule:
+
+```bash
+submod change my-lib --branch main --sparse-paths "src/,include/" --fetch always
+```
+
+### `submod change-global`
+
+Change global defaults for all submodules:
+
+```bash
+submod change-global --ignore dirty --update checkout
+```
+
+### `submod list`
+
+List all configured submodules:
+
+```bash
+submod list
+submod list --recursive
+```
+
+### `submod delete`
+
+Delete a submodule from configuration and filesystem:
+
+```bash
+submod delete my-lib
+```
+
+### `submod disable`
+
+Disable a submodule without deleting files (sets `active = false`):
+
+```bash
+submod disable my-lib
+```
+
+### `submod nuke-it-from-orbit`
+
+Delete all or specific submodules from config and filesystem, with optional reinit:
+
+```bash
+# Nuke all submodules (re-initializes by default)
+submod nuke-it-from-orbit --all
+
+# Nuke specific submodules permanently
+submod nuke-it-from-orbit --kill my-lib,old-dep
+```
+
+### `submod generate-config`
+
+Generate a new configuration file:
+
+```bash
+# From current git submodule setup
+submod generate-config --from-setup .
+
+# As a template with defaults
+submod generate-config --template --output my-config.toml
+```
+
+### `submod completeme`
+
+Generate shell completion scripts:
+
+```bash
+submod completeme bash   # or: zsh, fish, powershell, elvish, nushell
 ```
 
 ## 💻 Usage Examples
@@ -207,7 +310,9 @@ submod sync
 
 ```bash
 # Add a submodule that only checks out specific directories
-submod add react-components src/components https://github.com/company/react-components.git \
+submod add https://github.com/company/react-components.git \
+  --name react-components \
+  --path src/components \
   --sparse-paths "src/Button/,src/Input/,README.md"
 ```
 
@@ -367,9 +472,13 @@ cargo test --test integration_tests  # Integration tests only
 submod/
 ├── src/
 │   ├── main.rs              # CLI entry point
-│   ├── commands.rs          # Command definitions
+│   ├── commands.rs          # Command definitions (clap)
 │   ├── config.rs            # TOML configuration handling
-│   └── gitoxide_manager.rs  # Core submodule operations
+│   ├── git_manager.rs       # High-level submodule operations
+│   └── git_ops/             # Git backend abstraction
+│       ├── mod.rs           # GitOpsManager (gix→git2→CLI fallback)
+│       ├── gix_ops.rs       # gitoxide backend
+│       └── git2_ops.rs      # libgit2 backend
 ├── tests/                   # Integration tests
 ├── sample_config/           # Example configurations
 ├── scripts/                 # Development scripts
