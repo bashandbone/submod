@@ -26,9 +26,9 @@ pub(crate) fn get_current_git2_repository(
     }
 }
 
-/**========================================================================
- **                          Gix Utilities
- *========================================================================**/
+/*=========================================================================
+ *                           Gix Utilities
+ *========================================================================*/
 
 /// Get a repository from a given path. The returned repository is isolated (has very limited access to the working tree and environment).
 pub(crate) fn repo_from_path(path: &PathBuf) -> Result<gix::Repository, anyhow::Error> {
@@ -92,8 +92,13 @@ pub(crate) fn get_current_branch(repo: Option<&gix::Repository>) -> Result<Strin
     let repo = match repo {
         Some(r) => r,
         None => {
-            owned = get_current_repository()?;
-            &owned
+            let owned = get_current_repository()?;
+            let head = owned.head()?;
+            if let Some(reference) = head.referent_name() {
+                let ref_bstr = reference.as_bstr();
+                return Ok(ref_bstr.to_string());
+            }
+            return Err(anyhow::anyhow!("Failed to get current branch name"));
         }
     };
     let head = repo.head()?;
@@ -104,9 +109,9 @@ pub(crate) fn get_current_branch(repo: Option<&gix::Repository>) -> Result<Strin
     Err(anyhow::anyhow!("Failed to get current branch name"))
 }
 
-/**========================================================================
- **                            General Utilities
- *========================================================================**/
+/*=========================================================================
+ *                           General Utilities
+ *========================================================================*/
 
 /// Get the current working directory.
 pub(crate) fn get_current_working_directory() -> Result<PathBuf, anyhow::Error> {
