@@ -26,9 +26,9 @@ pub(crate) fn get_current_git2_repository(
     }
 }
 
-/**========================================================================
- **                          Gix Utilities
- *========================================================================**/
+/*=========================================================================
+ *                           Gix Utilities
+ *========================================================================*/
 
 /// Get a repository from a given path. The returned repository is isolated (has very limited access to the working tree and environment).
 pub(crate) fn repo_from_path(path: &PathBuf) -> Result<gix::Repository, anyhow::Error> {
@@ -89,24 +89,25 @@ pub(crate) fn get_main_root(repo: Option<&gix::Repository>) -> Result<PathBuf, a
 
 /// Get the current branch name from the repository.
 pub(crate) fn get_current_branch(repo: Option<&gix::Repository>) -> Result<String, anyhow::Error> {
-    let repo = match repo {
-        Some(r) => r,
-        None => {
-            owned = get_current_repository()?;
-            &owned
+    fn branch_from_repo(repo: &gix::Repository) -> Result<String, anyhow::Error> {
+        let head = repo.head()?;
+        if let Some(reference) = head.referent_name() {
+            return Ok(reference.as_bstr().to_string());
         }
-    };
-    let head = repo.head()?;
-    if let Some(reference) = head.referent_name() {
-        let ref_bstr = reference.as_bstr();
-        return Ok(ref_bstr.to_string());
+        Err(anyhow::anyhow!("Failed to get current branch name"))
     }
-    Err(anyhow::anyhow!("Failed to get current branch name"))
+    match repo {
+        Some(r) => branch_from_repo(r),
+        None => {
+            let owned = get_current_repository()?;
+            branch_from_repo(&owned)
+        }
+    }
 }
 
-/**========================================================================
- **                            General Utilities
- *========================================================================**/
+/*=========================================================================
+ *                           General Utilities
+ *========================================================================*/
 
 /// Get the current working directory.
 pub(crate) fn get_current_working_directory() -> Result<PathBuf, anyhow::Error> {

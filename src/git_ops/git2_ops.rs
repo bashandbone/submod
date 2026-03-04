@@ -288,57 +288,12 @@ impl GitOperations for Git2Operations {
         Ok(())
     }
     fn add_submodule(&mut self, opts: &SubmoduleAddOptions) -> Result<()> {
-        // Register the submodule, clone it, then finalize (writes .gitmodules and updates index).
-        // This is the correct git2 sequence for a fresh submodule add.
-        {
-            let _submodule = self.repo.submodule(
-                &opts.url, &opts.path, true, // use_gitlink
-            )?;
-        } // submodule is dropped here
-        // Configure the submodule (after dropping the submodule reference)
-        if let Some(ignore) = &(*opts).ignore {
-            let git2_ignore: git2::SubmoduleIgnore = ignore
-                .clone()
-                .try_into()
-                .map_err(|_| anyhow::anyhow!("Failed to convert ignore setting"))?;
-            self.repo
-                .submodule_set_ignore(&opts.path.to_string_lossy(), git2_ignore)?;
-        }
-        if let Some(update) = &opts.update {
-            let git2_update: git2::SubmoduleUpdate = update
-                .clone()
-                .try_into()
-                .map_err(|_| anyhow::anyhow!("Failed to convert update setting"))?;
-            self.repo
-                .submodule_set_update(&opts.path.to_string_lossy(), git2_update)?;
-        }
-        if let Some(branch) = &opts.branch {
-            let branch_str = match branch {
-                SerializableBranch::CurrentInSuperproject => ".".to_string(),
-                SerializableBranch::Name(name) => name.clone(),
-            };
-            let mut config = self.repo.config()?;
-            config.set_str(&format!("submodule.{}.branch", opts.name), &branch_str)?;
-        }
-        if let Some(fetch_recurse) = &opts.fetch_recurse {
-            let fetch_str = match fetch_recurse {
-                SerializableFetchRecurse::OnDemand => "on-demand",
-                SerializableFetchRecurse::Always => "true",
-                SerializableFetchRecurse::Never => "false",
-                SerializableFetchRecurse::Unspecified => return Ok(()),
-            };
-            let mut config = self.repo.config()?;
-            config.set_str(&format!("submodule.{}.fetchRecurseSubmodules", opts.name), fetch_str)?;
-        }
-        // Initialize the submodule if not skipped
-        if !opts.no_init {
-            let mut submodule = self.repo.find_submodule(opts.path.to_str().unwrap())?;
-            submodule.init(false)?; // false = don't overwrite existing config
-            submodule.update(true, None)?; // true = init, None = use default options
-            submodule.sync()?;
-        }
-        // Sync changes
-        Ok(())
+        // git2 submodule cloning requires remote callbacks that are complex to configure.
+        // Fall through to the CLI fallback which handles this reliably.
+        Err(anyhow::anyhow!(
+            "Unable to add submodule '{}' using the library API; it will be added using the Git CLI instead",
+            opts.name
+        ))
     }
     fn init_submodule(&mut self, path: &str) -> Result<()> {
         let mut submodule = self

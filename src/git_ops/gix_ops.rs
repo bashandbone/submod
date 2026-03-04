@@ -308,21 +308,11 @@ impl GitOperations for GixOperations {
 
     /// Add a new submodule to the repository
     fn add_submodule(&mut self, opts: &SubmoduleAddOptions) -> Result<()> {
-        // 2. Check if submodule already exists (do this before borrowing self mutably)
-        let entries = self.read_gitmodules()?;
-        let existing_names = &entries.submodule_names();
-        if existing_names
-            .as_ref()
-            .map_or(false, |names| names.contains(&opts.name))
-        {
-            return Err(anyhow::anyhow!(
-                "Submodule '{}' already exists. Use 'submod update' if you want to change its options",
-                opts.name
-            ));
-        }
-        let (name, entry) = opts.clone().into_entries_tuple();
-        let merged_entries = entries.add_submodule(name, entry);
-        self.write_gitmodules(&merged_entries)
+        // gix does not support cloning in add_submodule; fall through to git2/CLI.
+        Err(anyhow::anyhow!(
+            "gix add_submodule not implemented: use git2 or CLI fallback for '{}'",
+            opts.name
+        ))
     }
 
     /// Initialize a submodule by reading its configuration and setting it up

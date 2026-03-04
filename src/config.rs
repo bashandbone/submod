@@ -27,7 +27,9 @@ use crate::options::{
     SerializableUpdate,
 };
 use anyhow::Result;
-use serde::{Deserialize, Serialize};
+use serde::de::Deserializer;
+use serde::ser::SerializeMap;
+use serde::{Deserialize, Serialize, Serializer};
 use std::path::PathBuf;
 use std::{collections::HashMap, path::Path};
 // TODO: Implement figment::Profile for modular configs
@@ -657,7 +659,7 @@ impl From<OtherSubmoduleSettings> for SubmoduleEntry {
 /// A collection of submodule entries, including sparse checkouts
 ///
 /// Revamped to better reflect git's structure so we can use the SubmoduleEntry types directly with gix/git2
-#[derive(Debug, Default, Clone, Serialize, PartialEq, Eq)]
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct SubmoduleEntries {
     submodules: Option<HashMap<SubmoduleName, SubmoduleEntry>>,
     sparse_checkouts: Option<HashMap<SubmoduleName, Vec<String>>>,
@@ -682,6 +684,22 @@ impl<'de> Deserialize<'de> for SubmoduleEntries {
             submodules: Some(map),
             sparse_checkouts: Some(sparse_checkouts),
         })
+    }
+}
+
+impl Serialize for SubmoduleEntries {
+    /// Serialize as a flat map of submodule name → entry, so the round-trip
+    /// through `Deserialize` (which also expects a flat map) is consistent.
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        let submodules = self.submodules.as_ref();
+        let len = submodules.map_or(0, HashMap::len);
+        let mut map = serializer.serialize_map(Some(len))?;
+        if let Some(subs) = submodules {
+            for (name, entry) in subs {
+                map.serialize_entry(name, entry)?;
+            }
+        }
+        map.end()
     }
 }
 
@@ -1008,7 +1026,7 @@ impl Config {
     /// Load configuration from a file, merging with CLI options
     pub fn load(&self, path: impl AsRef<Path>, cli_options: Config) -> anyhow::Result<Self> {
         let fig = Figment::from(Self::default()) // 1) start from Rust-side defaults
-            .merge(Toml::file(path).nested()) // 2) file-based overrides
+            .merge(Toml::file(path)) // 2) file-based overrides
             .merge(cli_options); // 3) CLI overrides file
 
         // 4) extract into Config, then post-process submodules
@@ -1022,7 +1040,7 @@ impl Config {
             Some(ref p) => p,
             None => &".",
         };
-        let fig = Figment::from(Self::default()).merge(Toml::file(p).nested());
+        let fig = Figment::from(Self::default()).merge(Toml::file(p));
         // Extract the configuration from Figment
         let cfg: Config = fig.extract()?;
         Ok(cfg.apply_defaults())

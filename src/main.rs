@@ -31,16 +31,11 @@ mod utilities;
 
 use crate::commands::{Cli, Commands};
 use crate::git_manager::GitManager;
-use crate::options::{
-    SerializableBranch as Branch, SerializableFetchRecurse, SerializableIgnore, SerializableUpdate,
-};
-use crate::utilities::{get_name, get_sparse_paths, name_from_osstring, name_from_url, set_path};
+use crate::options::SerializableBranch as Branch;
+use crate::utilities::{get_name, get_sparse_paths, set_path};
 use anyhow::Result;
 use clap::Parser;
-use std::ffi::OsString;
-use std::str::FromStr;
-use submod::options::SerializableBranch;
-
+use clap_complete::generate;
 fn main() -> Result<()> {
     let cli = Cli::parse();
     // config-path is always set because it has a default value, "submod.toml"
@@ -64,21 +59,18 @@ fn main() -> Result<()> {
                 .map_err(|e| anyhow::anyhow!("Invalid sparse paths: {}", e))?;
 
             let set_name = get_name(name, Some(url.clone()), path.clone())
-            let set_name = get_name(name, Some(url.clone()), path.clone())
                 .map_err(|e| anyhow::anyhow!("Failed to get submodule name: {}", e))?;
 
             let set_path = path
                 .map(|p| set_path(p).map_err(|e| anyhow::anyhow!("Invalid path: {}", e)))
-                .transpose()?;
+                .transpose()?
+                .unwrap_or_else(|| set_name.clone());
 
             let set_url = url.trim().to_string();
 
             let set_branch = Branch::set_branch(branch)
-            let set_branch = Branch::set_branch(branch)
                 .map_err(|e| anyhow::anyhow!("Failed to set branch: {}", e))?;
 
-            let mut manager = GitManager::new(config_path)
-                .map_err(|e| anyhow::anyhow!("Failed to create manager: {}", e))?;
             let mut manager = GitManager::new(config_path)
                 .map_err(|e| anyhow::anyhow!("Failed to create manager: {}", e))?;
 
@@ -88,11 +80,11 @@ fn main() -> Result<()> {
                     set_path,
                     set_url,
                     sparse_paths_vec,
-                    set_branch,
-                    ignore,
-                    fetch,
-                    update,
-                    shallow,
+                    Some(set_branch),
+                    Some(ignore),
+                    Some(fetch),
+                    Some(update),
+                    Some(shallow),
                     no_init,
                 )
                 .map_err(|e| anyhow::anyhow!("Failed to add submodule: {}", e))?;
@@ -213,7 +205,7 @@ fn main() -> Result<()> {
                     ignore,
                     fetch,
                     update,
-                    shallow,
+                    Some(shallow),
                     url,
                     active,
                 )
@@ -251,15 +243,21 @@ fn main() -> Result<()> {
                 .disable_submodule(&name)
                 .map_err(|e| anyhow::anyhow!("Failed to disable submodule: {}", e))?;
         }
-        Commands::GenerateConfig { .. } => {
-            return Err(anyhow::anyhow!(
-                "GenerateConfig command not yet implemented"
-            ));
+        Commands::GenerateConfig {
+            output,
+            from_setup,
+            force,
+            template,
+        } => {
+            GitManager::generate_config(&output, from_setup.is_some(), template, force)
+                .map_err(|e| anyhow::anyhow!("Failed to generate config: {}", e))?;
         }
-        Commands::NukeItFromOrbit { .. } => {
-            return Err(anyhow::anyhow!(
-                "NukeItFromOrbit command not yet implemented"
-            ));
+        Commands::NukeItFromOrbit { all, names, kill } => {
+            let mut manager = GitManager::new(config_path)
+                .map_err(|e| anyhow::anyhow!("Failed to create manager: {}", e))?;
+            manager
+                .nuke_submodules(all, names, kill)
+                .map_err(|e| anyhow::anyhow!("Failed to nuke submodules: {}", e))?;
         }
         Commands::CompleteMe { shell } => {
             let mut cmd = <Cli as clap::CommandFactory>::command();

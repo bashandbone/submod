@@ -242,7 +242,11 @@ pub enum Commands {
         next_help_heading = "Delete a Submodule",
         about = "Deletes a submodule by name; removes it from the configuration and the filesystem."
     )]
-    Delete,
+    Delete {
+        /// Name of the submodule to delete.
+        #[arg(help = "Name of the submodule to delete.")]
+        name: String,
+    },
 
     // TODO: Implement this command (use git2). Functionally this changes a module to `active = false` in our config and `.gitmodules`, but does not delete the submodule from the filesystem.
     #[command(
@@ -251,7 +255,11 @@ pub enum Commands {
         next_help_heading = "Disable a Submodule",
         about = "Disables a submodule by name; sets its active status to false. Does not remove settings or files."
     )]
-    Disable,
+    Disable {
+        /// Name of the submodule to disable.
+        #[arg(help = "Name of the submodule to disable.")]
+        name: String,
+    },
 
     #[command(
         name = "update",
@@ -268,7 +276,7 @@ pub enum Commands {
         about = "Hard resets submodules, stashing changes, resetting to the configured state, and cleaning untracked files."
     )]
     Reset {
-        #[arg(short = 'a', long = "all", default_value = "false", action = clap::ArgAction::SetTrue, default_missing_value = "true", value_hint = clap::ValueHint::CommandName, help = "If given, resets all submodules. If not given, you must specify specific submodules to reset.")]
+        #[arg(short = 'a', long = "all", default_value = "false", action = clap::ArgAction::SetTrue, default_missing_value = "true", help = "If given, resets all submodules. If not given, you must specify specific submodules to reset.")]
         all: bool,
 
         #[arg(
@@ -296,9 +304,11 @@ pub enum Commands {
         #[arg(
             short = 's',
             long = "from-setup",
+            num_args = 0,
+            default_missing_value = "true",
             help = "Generates the config from your current repository's submodule settings."
         )]
-        from_setup: String,
+        from_setup: Option<String>,
 
         #[arg(short = 'f', long = "force", default_value = "false", action = clap::ArgAction::SetTrue, default_missing_value = "true", help = "If given, overwrites the existing configuration file without prompting.")]
         force: bool,
