@@ -1184,8 +1184,12 @@ impl GitManager {
             if let Some(new_url) = url {
                 updated.url = Some(new_url);
             }
-            updated.active = Some(active);
-            updated.shallow = Some(shallow);
+            if let Some(a) = active {
+                updated.active = Some(a);
+            }
+            if let Some(s) = shallow {
+                updated.shallow = Some(s);
+            }
 
             // Update sparse paths
             if let Some(new_sparse) = sparse_paths {
@@ -1195,10 +1199,16 @@ impl GitManager {
                     .collect();
                 if append_sparse {
                     let existing = updated.sparse_paths.get_or_insert_with(Vec::new);
-                    existing.extend(new_paths);
+                    existing.extend(new_paths.clone());
                 } else {
-                    updated.sparse_paths = Some(new_paths);
+                    updated.sparse_paths = Some(new_paths.clone());
                 }
+
+                // Keep SubmoduleEntries.sparse_checkouts in sync with sparse_paths
+                let replace = !append_sparse;
+                self.config
+                    .submodules
+                    .add_checkout(name.to_string(), new_paths, replace);
             }
             self.config.submodules.update_entry(name.to_string(), updated);
         }
@@ -1265,12 +1275,15 @@ impl GitManager {
                     .as_deref()
                     .unwrap_or(&name)
                     .to_string();
-                let sparse: Vec<String> = entry.sparse_paths.clone().unwrap_or_default();
+                let sparse = entry
+                    .sparse_paths
+                    .clone()
+                    .filter(|paths| !paths.is_empty());
                 self.add_submodule(
                     name.clone(),
                     path.into(),
                     url,
-                    Some(sparse),
+                    sparse,
                     entry.branch.clone(),
                     entry.ignore,
                     entry.fetch_recurse,
