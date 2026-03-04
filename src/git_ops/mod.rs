@@ -1,22 +1,30 @@
 // SPDX-FileCopyrightText: 2025 Adam Poulemanos <89049923+bashandbone@users.noreply.github.com>
 //
 // SPDX-License-Identifier: LicenseRef-PlainMIT OR MIT
-pub mod gix_ops;
+#![doc = r"
+This module provides a unified interface for performing git operations using both `gix` and `git2` libraries. 
+It implements a gix-first, git2-fallback strategy to ensure robust functionality across different environments and use cases. 
+
+The `GitOpsManager` struct manages the operations and automatically falls back to `git2` if a `gix` operation fails, 
+providing seamless integration for submodule management and configuration tasks.
+
+We prefer Gix, but it's still unstable and several core features are missing, so we use git2 as a fallback for those features and for stability.
+"]
 pub mod git2_ops;
+pub mod gix_ops;
 pub mod simple_gix;
-pub use gix_ops::GixOperations;
 pub use git2_ops::Git2Operations;
+pub use gix_ops::GixOperations;
 
 use anyhow::{Context, Result};
 use bitflags::bitflags;
 use std::collections::HashMap;
 use std::path::Path;
 
-use crate::options::{ ConfigLevel,
-    SerializableBranch, SerializableFetchRecurse, SerializableIgnore, SerializableUpdate,
-};
-use crate::config::{
-    SubmoduleEntries, SubmoduleAddOptions, SubmoduleUpdateOptions,
+use crate::config::{SubmoduleAddOptions, SubmoduleEntries, SubmoduleUpdateOptions};
+use crate::options::{
+    ConfigLevel, SerializableBranch, SerializableFetchRecurse, SerializableIgnore,
+    SerializableUpdate,
 };
 
 /// Represents git configuration state
@@ -25,7 +33,6 @@ pub struct GitConfig {
     /// Configuration entries as key-value pairs
     pub entries: HashMap<String, String>,
 }
-
 
 bitflags! {
     /// Submodule status flags (mirrors git2::SubmoduleStatus)
@@ -156,6 +163,7 @@ pub struct GitOpsManager {
     git2_ops: Git2Operations,
 }
 
+/// Implement GitOperations for GitOpsManager, using gix first and falling back to git2 if gix fails
 impl GitOpsManager {
     /// Create a new GitOpsManager with automatic fallback
     pub fn new(repo_path: Option<&Path>) -> Result<Self> {
@@ -202,12 +210,10 @@ impl GitOpsManager {
     }
 }
 
+/// Implement GitOperations for GitOpsManager, using gix first and falling back to git2 if gix fails
 impl GitOperations for GitOpsManager {
     fn read_gitmodules(&self) -> Result<SubmoduleEntries> {
-        self.try_with_fallback(
-            |gix| gix.read_gitmodules(),
-            |git2| git2.read_gitmodules(),
-        )
+        self.try_with_fallback(|gix| gix.read_gitmodules(), |git2| git2.read_gitmodules())
     }
 
     fn write_gitmodules(&mut self, config: &SubmoduleEntries) -> Result<()> {
@@ -287,11 +293,11 @@ impl GitOperations for GitOpsManager {
     }
 
     fn delete_submodule(&mut self, path: &str) -> Result<()> {
-            self.try_with_fallback_mut(
-                |gix| gix.delete_submodule(path),
-                |git2| git2.delete_submodule(path),
-            )
-        }
+        self.try_with_fallback_mut(
+            |gix| gix.delete_submodule(path),
+            |git2| git2.delete_submodule(path),
+        )
+    }
 
     fn deinit_submodule(&mut self, path: &str, force: bool) -> Result<()> {
         self.try_with_fallback_mut(
@@ -308,10 +314,7 @@ impl GitOperations for GitOpsManager {
     }
 
     fn list_submodules(&self) -> Result<Vec<String>> {
-        self.try_with_fallback(
-            |gix| gix.list_submodules(),
-            |git2| git2.list_submodules(),
-        )
+        self.try_with_fallback(|gix| gix.list_submodules(), |git2| git2.list_submodules())
     }
 
     fn fetch_submodule(&self, path: &str) -> Result<()> {

@@ -3,12 +3,12 @@
 // SPDX-License-Identifier: LicenseRef-PlainMIT OR MIT
 // TODO: This module is very not-DRY...but it's low priority right now.
 use anyhow::{Context, Result};
-use std::collections::HashMap;
-use std::path::Path;
 use gix::bstr::ByteSlice;
+use std::collections::HashMap;
+use std::path::{Path, PathBuf};
 
-use crate::git_ops::simple_gix::fetch_repo;
-use crate::utilities::{repo_from_path};
+use crate::git_ops::simple_gix::{clone_repo, fetch_repo};
+use crate::utilities::repo_from_path;
 
 /// Parse a gix config file from raw bytes
 fn gix_file_from_bytes(bytes: Vec<u8>) -> Result<gix::config::File<'static>> {
@@ -21,14 +21,11 @@ fn gix_file_from_bytes(bytes: Vec<u8>) -> Result<gix::config::File<'static>> {
     .map_err(|e| anyhow::anyhow!("Failed to parse gix config file: {}", e))
 }
 
-
-use super::{
-    DetailedSubmoduleStatus, GitConfig, GitOperations,
+use super::{DetailedSubmoduleStatus, GitConfig, GitOperations, SubmoduleStatusFlags};
+use crate::config::{
+    SubmoduleAddOptions, SubmoduleEntries, SubmoduleEntry, SubmoduleUpdateOptions,
 };
-use crate::options::{
-    ConfigLevel, GitmodulesConvert,
-};
-use crate::config::{SubmoduleAddOptions, SubmoduleEntries, SubmoduleUpdateOptions};
+use crate::options::{ConfigLevel, GitmodulesConvert};
 use crate::utilities;
 
 /// Primary implementation using gix (gitoxide)
@@ -71,48 +68,57 @@ impl GixOperations {
     ) -> Result<SubmoduleEntries> {
         let as_config_file = gitmodules.into_config();
         let mut sections_map = std::collections::HashMap::new();
-    for section in as_config_file.sections() {
-        // we need to convert everything to String and add to map
-        let mut section_entries = std::collections::HashMap::new();
-        let name = if let Some(subsection) = section.header().subsection_name() {
-            subsection.to_str_lossy().to_string()
-        } else {
-            section.header().name().to_string()
-        };
-        let body_entries = section.body().clone().into_iter().collect::<HashMap<_, _>>();
-        for (key, value) in body_entries {
-            section_entries.insert(key.to_string().to_owned(), value.to_string().to_owned());
-        }
-        sections_map.insert(name, section_entries);
-    }
-    let submodule_entries = crate::config::SubmoduleEntries::from_gitmodules(sections_map);
-
-    Ok(submodule_entries)
-}
-    /// Get the current branch name of the superproject repository
-    fn get_superproject_branch(&self) -> Result<String> {
-        let head = self.repo.head()?;
-        match head.referent_name() {
-            Some(name) => {
-                let full_name = name.as_bstr().to_str_lossy();
-                let branch = full_name
-                    .strip_prefix("refs/heads/")
-                    .unwrap_or(full_name.as_ref())
-                    .to_string();
-                Ok(branch)
+        for section in as_config_file.sections() {
+            // we need to convert everything to String and add to map
+            let mut section_entries = std::collections::HashMap::new();
+            let name = if section.header().subsection_name().is_some() {
+                section.header().name().to_string()
+            } else {
+                section.header().name().to_string()
+            };
+            let body_entries = section
+                .body()
+                .clone()
+                .into_iter()
+                .collect::<HashMap<_, _>>();
+            for (key, value) in body_entries {
+                section_entries.insert(key.to_string().to_owned(), value.to_string().to_owned());
             }
-            None => Err(anyhow::anyhow!("Repository HEAD is detached, cannot determine branch")),
+            sections_map.insert(name, section_entries);
         }
+        let submodule_entries = crate::config::SubmoduleEntries::from_gitmodules(sections_map);
+
+        Ok(submodule_entries)
+    }
+    /// Get the name of the current branch in the superproject
+    fn get_superproject_branch(&self) -> Result<String> {
+        self.repo
+            .head_ref()
+            .map_err(|e| anyhow::anyhow!("Failed to get HEAD reference: {}", e))?
+            .map(|r| r.name().shorten().to_string())
+            .ok_or_else(|| anyhow::anyhow!("HEAD is detached, not on a branch"))
+    }
+
+    /// Convert gix submodule status to our status flags
+    fn convert_gix_status_to_flags(&self, status: &gix::submodule::Status) -> SubmoduleStatusFlags {
+        let mut flags = SubmoduleStatusFlags::empty();
+        // Map gix status to our flags
+        // Note: This is a simplified mapping as gix status structure may differ
+        if status.is_dirty() == Some(true) {
+            flags |= SubmoduleStatusFlags::WD_WD_MODIFIED;
+        }
+        // Add more mappings as needed based on gix::submodule::Status structure
+        flags
     }
 }
 
 impl GitOperations for GixOperations {
-
     /// Read the .gitmodules file and convert it to SubmoduleEntries
     fn read_gitmodules(&self) -> Result<SubmoduleEntries> {
         let mutable_self = self.clone();
         mutable_self.try_gix_operation(|repo| {
-            let gitmodules_path = repo.workdir()
+            let gitmodules_path = repo
+                .workdir()
                 .ok_or_else(|| anyhow::anyhow!("Repository has no working directory"))?
                 .join(".gitmodules");
 
@@ -122,7 +128,8 @@ impl GitOperations for GixOperations {
 
             let content = std::fs::read(&gitmodules_path)?;
             let config = repo.config_snapshot();
-            let submodule_file = gix_submodule::File::from_bytes(&content, Some(gitmodules_path), &config)?;
+            let submodule_file =
+                gix_submodule::File::from_bytes(&content, Some(gitmodules_path), &config)?;
 
             mutable_self.convert_gitmodules_to_entries(submodule_file)
         })
@@ -138,31 +145,62 @@ impl GitOperations for GixOperations {
                 let subsection_name = name.as_bytes().as_bstr();
 
                 if let Some(path) = &entry.path {
-                    git_config.set_raw_value_by("submodule", Some(subsection_name), "path", path.as_bytes().as_bstr())?;
+                    git_config.set_raw_value_by(
+                        "submodule",
+                        Some(subsection_name),
+                        "path",
+                        path.as_bytes().as_bstr(),
+                    )?;
                 }
                 if let Some(url) = &entry.url {
-                    git_config.set_raw_value_by("submodule", Some(subsection_name), "url", url.as_bytes().as_bstr())?;
+                    git_config.set_raw_value_by(
+                        "submodule",
+                        Some(subsection_name),
+                        "url",
+                        url.as_bytes().as_bstr(),
+                    )?;
                 }
                 if let Some(branch) = &entry.branch {
                     let value = branch.to_string();
-                    git_config.set_raw_value_by("submodule", Some(subsection_name), "branch", value.as_bytes().as_bstr())?;
+                    git_config.set_raw_value_by(
+                        "submodule",
+                        Some(subsection_name),
+                        "branch",
+                        value.as_bytes().as_bstr(),
+                    )?;
                 }
                 if let Some(update) = &entry.update {
                     let value = update.to_gitmodules();
-                    git_config.set_raw_value_by("submodule", Some(subsection_name), "update", value.as_bytes().as_bstr())?;
+                    git_config.set_raw_value_by(
+                        "submodule",
+                        Some(subsection_name),
+                        "update",
+                        value.as_bytes().as_bstr(),
+                    )?;
                 }
                 if let Some(ignore) = &entry.ignore {
                     let value = ignore.to_gitmodules();
-                    git_config.set_raw_value_by("submodule", Some(subsection_name), "ignore", value.as_bytes().as_bstr())?;
+                    git_config.set_raw_value_by(
+                        "submodule",
+                        Some(subsection_name),
+                        "ignore",
+                        value.as_bytes().as_bstr(),
+                    )?;
                 }
                 if let Some(fetch_recurse) = &entry.fetch_recurse {
                     let value = fetch_recurse.to_gitmodules();
-                    git_config.set_raw_value_by("submodule", Some(subsection_name), "fetchRecurseSubmodules", value.as_bytes().as_bstr())?;
+                    git_config.set_raw_value_by(
+                        "submodule",
+                        Some(subsection_name),
+                        "fetchRecurseSubmodules",
+                        value.as_bytes().as_bstr(),
+                    )?;
                 }
             }
 
             // Write to .gitmodules file
-            let gitmodules_path = repo.workdir()
+            let gitmodules_path = repo
+                .workdir()
                 .ok_or_else(|| anyhow::anyhow!("Repository has no working directory"))?
                 .join(".gitmodules");
 
@@ -203,39 +241,52 @@ impl GitOperations for GixOperations {
 
     /// Write the Git configuration to the repository
     fn write_git_config(&self, config: &GitConfig, level: ConfigLevel) -> Result<()> {
-        // Extract entries as owned data before entering the closure to avoid lifetime issues
-        let entries: Vec<(String, String)> = config.entries.iter()
-            .map(|(k, v)| (k.clone(), v.clone()))
+        // gix::config::File<'static> requires 'static lifetimes for all string arguments
+        // passed to set_raw_value_by (Key: TryFrom<&'static str>, subsection: &'static BStr).
+        // We use Box::leak to produce 'static references. Memory leaked is minimal
+        // (a few bytes per key) and acceptable in this WIP implementation.
+        // TODO: Replace with a gix API that accepts owned data when available.
+        let parsed: Vec<(
+            &'static str,
+            Option<&'static gix::bstr::BStr>,
+            &'static str,
+            Vec<u8>,
+        )> = config
+            .entries
+            .iter()
+            .map(|(key, value)| {
+                let mut parts = key.splitn(3, '.');
+                let section: &'static str =
+                    Box::leak(parts.next().unwrap_or("").to_owned().into_boxed_str());
+                let subsection: Option<&'static gix::bstr::BStr> = parts.next().map(|s| {
+                    let bytes: &'static [u8] = Box::leak(s.as_bytes().to_vec().into_boxed_slice());
+                    bytes.as_bstr()
+                });
+                let name: &'static str =
+                    Box::leak(parts.next().unwrap_or("").to_owned().into_boxed_str());
+                (section, subsection, name, value.as_bytes().to_vec())
+            })
             .collect();
+
         self.try_gix_operation(|repo| {
             let config_path = match level {
                 ConfigLevel::Local | ConfigLevel::Worktree => repo.git_dir().join("config"),
-                _ => return Err(anyhow::anyhow!("Only local config writing is supported with gix")),
+                _ => {
+                    return Err(anyhow::anyhow!(
+                        "Only local config writing is supported with gix"
+                    ));
+                }
             };
             let bytes = if config_path.exists() {
                 std::fs::read(&config_path)?
             } else {
                 Vec::new()
             };
-            let mut config_file = gix_file_from_bytes(bytes)
-                .with_context(|| format!("Failed to read config file at {}", config_path.display()))?;
-            for (key, value) in &entries {
-                let parts: Vec<&str> = key.splitn(3, '.').collect();
-                let (section, subsection_owned, name) = match parts.len() {
-                    2 => (parts[0].to_string(), None, parts[1].to_string()),
-                    3 => (
-                        parts[0].to_string(),
-                        Some(gix::bstr::BString::from(parts[1].as_bytes())),
-                        parts[2].to_string(),
-                    ),
-                    _ => continue, // skip malformed keys
-                };
-                config_file.set_raw_value_by(
-                    section.as_str(),
-                    subsection_owned.as_ref().map(|s| s.as_bstr()),
-                    name,
-                    value.as_bytes().as_bstr(),
-                )?;
+            let mut config_file = gix_file_from_bytes(bytes).with_context(|| {
+                format!("Failed to read config file at {}", config_path.display())
+            })?;
+            for (section, subsection, name, value) in &parsed {
+                config_file.set_raw_value_by(*section, *subsection, *name, value.as_bstr())?;
             }
             let mut output = std::fs::File::create(&config_path)?;
             config_file.write_to(&mut output)?;
@@ -256,12 +307,22 @@ impl GitOperations for GixOperations {
     }
 
     /// Add a new submodule to the repository
-    /// Note: gix does not yet support the full submodule add workflow (clone + register).
-    /// The caller should fall back to another Git backend (for example, the git CLI) to handle the complete operation.
-    fn add_submodule(&mut self, _opts: &SubmoduleAddOptions) -> Result<()> {
-        Err(anyhow::anyhow!(
-            "gix submodule add not fully implemented; caller must fall back to another Git backend (e.g. git CLI)"
-        ))
+    fn add_submodule(&mut self, opts: &SubmoduleAddOptions) -> Result<()> {
+        // 2. Check if submodule already exists (do this before borrowing self mutably)
+        let entries = self.read_gitmodules()?;
+        let existing_names = &entries.submodule_names();
+        if existing_names
+            .as_ref()
+            .map_or(false, |names| names.contains(&opts.name))
+        {
+            return Err(anyhow::anyhow!(
+                "Submodule '{}' already exists. Use 'submod update' if you want to change its options",
+                opts.name
+            ));
+        }
+        let (name, entry) = opts.clone().into_entries_tuple();
+        let merged_entries = entries.add_submodule(name, entry);
+        self.write_gitmodules(&merged_entries)
     }
 
     /// Initialize a submodule by reading its configuration and setting it up
@@ -270,12 +331,15 @@ impl GitOperations for GixOperations {
         let entries = self.read_gitmodules()?;
 
         // 2. Find the submodule entry by path
-        let submodule_entry = entries.submodule_iter()
+        let submodule_entry = entries
+            .submodule_iter()
             .find(|(_, entry)| entry.path.as_ref() == Some(&path.to_string()))
             .ok_or_else(|| anyhow::anyhow!("Submodule '{}' not found in .gitmodules", path))?;
 
         let (name, entry) = submodule_entry;
-        let url = entry.url.as_ref()
+        let url = entry
+            .url
+            .as_ref()
             .ok_or_else(|| anyhow::anyhow!("Submodule '{}' has no URL configured", name))?;
 
         self.try_gix_operation(|repo| {
@@ -285,14 +349,25 @@ impl GitOperations for GixOperations {
 
             // Set submodule URL in local config
             let _url_key = format!("submodule.{}.url", name);
-            config_file.set_raw_value_by("submodule", Some(name.as_bytes().as_bstr()), "url", url.as_bytes().as_bstr())?;
+            config_file.set_raw_value_by(
+                "submodule",
+                Some(name.as_bytes().as_bstr()),
+                "url",
+                url.as_bytes().as_bstr(),
+            )?;
 
             // Set submodule active flag
             let _active_key = format!("submodule.{}.active", name);
-            config_file.set_raw_value_by("submodule", Some(name.as_bytes().as_bstr()), "active", "true".as_bytes().as_bstr())?;
+            config_file.set_raw_value_by(
+                "submodule",
+                Some(name.as_bytes().as_bstr()),
+                "active",
+                "true".as_bytes().as_bstr(),
+            )?;
 
             // 4. Check if submodule directory exists and is empty
-            let workdir = repo.workdir()
+            let workdir = repo
+                .workdir()
                 .ok_or_else(|| anyhow::anyhow!("Repository has no working directory"))?;
             let submodule_path = workdir.join(path);
 
@@ -308,12 +383,14 @@ impl GitOperations for GixOperations {
                 // Clone the submodule repository using gix
                 let mut prepare = gix::prepare_clone(url.clone(), &submodule_path)?;
                 if entry.shallow == Some(true) {
-                    prepare = prepare.with_shallow(gix::remote::fetch::Shallow::DepthAtRemote(1.try_into()?));
+                    prepare = prepare
+                        .with_shallow(gix::remote::fetch::Shallow::DepthAtRemote(1.try_into()?));
                 }
-                let should_interrupt = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+                let should_interrupt =
+                    std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
                 let progress = gix::progress::Discard;
-                let (_checkout, _outcome) = prepare
-                    .fetch_then_checkout(progress, &should_interrupt)?;
+                let (_checkout, _outcome) =
+                    prepare.fetch_then_checkout(progress, &should_interrupt)?;
             }
 
             Ok(())
@@ -323,13 +400,18 @@ impl GitOperations for GixOperations {
     /// Update a submodule to the latest commit in its remote repository
     fn update_submodule(&mut self, path: &str, opts: &SubmoduleUpdateOptions) -> Result<()> {
         let entries = self.read_gitmodules()?;
-        let submodule_entry = entries.submodule_iter()
+        let submodule_entry = entries
+            .submodule_iter()
             .find(|(_, entry)| entry.path.as_ref() == Some(&path.to_string()))
             .ok_or_else(|| anyhow::anyhow!("Submodule '{}' not found in .gitmodules", path))?;
         let (name, entry) = submodule_entry;
-        let url = entry.url.as_ref()
+        let url = entry
+            .url
+            .as_ref()
             .ok_or_else(|| anyhow::anyhow!("Submodule '{}' has no URL configured", name))?;
-        let workdir = self.repo.workdir()
+        let workdir = self
+            .repo
+            .workdir()
             .ok_or_else(|| anyhow::anyhow!("Repository has no working directory"))?;
         let submodule_path = workdir.join(path);
 
@@ -337,48 +419,75 @@ impl GitOperations for GixOperations {
             // Use gix::prepare_clone for proper remote operations
             let mut prepare = gix::prepare_clone(url.clone(), &submodule_path)?;
             if entry.shallow == Some(true) {
-                prepare = prepare.with_shallow(gix::remote::fetch::Shallow::DepthAtRemote(1.try_into()?));
+                prepare =
+                    prepare.with_shallow(gix::remote::fetch::Shallow::DepthAtRemote(1.try_into()?));
             }
             let should_interrupt = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
             let progress = gix::progress::Discard;
-            let (checkout, _outcome) = prepare
-                .fetch_then_checkout(progress, &should_interrupt)?;
+            let (checkout, _outcome) = prepare.fetch_then_checkout(progress, &should_interrupt)?;
             if let Some(branch) = &entry.branch {
-                let repo = checkout.repo();
-                let config = repo.config_snapshot();
-                let mut config_file = config.to_owned();
-                let branch_name = match branch {
-                    crate::options::SerializableBranch::Name(branch_name) => branch_name.clone(),
-                    crate::options::SerializableBranch::CurrentInSuperproject => {
-                        self.get_superproject_branch()?
+                let mut config_file = checkout.repo().config_snapshot().to_owned();
+                match branch {
+                    crate::options::SerializableBranch::Name(branch_name) => {
+                        config_file.set_raw_value_by(
+                            "branch",
+                            Some(branch_name.as_bytes().as_bstr()),
+                            "remote",
+                            "origin".as_bytes().as_bstr(),
+                        )?;
+                        config_file.set_raw_value_by(
+                            "branch",
+                            Some(branch_name.as_bytes().as_bstr()),
+                            "merge",
+                            format!("refs/heads/{}", branch_name).as_bytes().as_bstr(),
+                        )?;
                     }
-                };
-                config_file.set_raw_value_by(
-                    "branch",
-                    Some(branch_name.as_bytes().as_bstr()),
-                    "remote",
-                    "origin".as_bytes().as_bstr()
-                )?;
-                config_file.set_raw_value_by(
-                    "branch",
-                    Some(branch_name.as_bytes().as_bstr()),
-                    "merge",
-                    format!("refs/heads/{}", branch_name).as_bytes().as_bstr()
-                )?;
+                    crate::options::SerializableBranch::CurrentInSuperproject => {
+                        // Set branch to current branch in superproject
+                        let superproject_branch = self.get_superproject_branch()?;
+                        config_file.set_raw_value_by(
+                            "branch",
+                            Some(superproject_branch.as_bytes().as_bstr()),
+                            "remote",
+                            "origin".as_bytes().as_bstr(),
+                        )?;
+                        config_file.set_raw_value_by(
+                            "branch",
+                            Some(superproject_branch.as_bytes().as_bstr()),
+                            "merge",
+                            format!("refs/heads/{}", superproject_branch)
+                                .as_bytes()
+                                .as_bstr(),
+                        )?;
+                    }
+                }
             }
         } else {
-            // Submodule exists, fetch latest changes using simple_gix helper
-            let submodule_repo = repo_from_path(&submodule_path)?;
+            // Submodule exists — fetch updates using sync fetch_repo
+            let submodule_repo = gix::open(&submodule_path)?;
+            let remote_url = {
+                submodule_repo
+                    .find_default_remote(gix::remote::Direction::Fetch)
+                    .and_then(|r| r.ok())
+                    .and_then(|r| r.url(gix::remote::Direction::Fetch).map(|u| u.to_string()))
+            };
+            fetch_repo(submodule_repo, remote_url, entry.shallow == Some(true))
+                .map_err(|e| anyhow::anyhow!("Failed to fetch submodule: {}", e))?;
             match opts.strategy {
-                crate::options::SerializableUpdate::Checkout | crate::options::SerializableUpdate::Unspecified => {
-                    fetch_repo(submodule_repo, Some(url.clone()), entry.shallow.unwrap_or(false))?;
-                },
+                crate::options::SerializableUpdate::Checkout
+                | crate::options::SerializableUpdate::Unspecified => {
+                    // Fetch complete above
+                }
                 crate::options::SerializableUpdate::Merge => {
-                    return Err(anyhow::anyhow!("Merge strategy not yet implemented with gix"));
-                },
+                    return Err(anyhow::anyhow!(
+                        "Merge strategy not yet implemented with gix"
+                    ));
+                }
                 crate::options::SerializableUpdate::Rebase => {
-                    return Err(anyhow::anyhow!("Rebase strategy not yet implemented with gix"));
-                },
+                    return Err(anyhow::anyhow!(
+                        "Rebase strategy not yet implemented with gix"
+                    ));
+                }
                 crate::options::SerializableUpdate::None => {
                     // No update
                 }
@@ -393,7 +502,8 @@ impl GitOperations for GixOperations {
         let mut entries = self.read_gitmodules()?;
 
         // 2. Find the submodule entry by path
-        let submodule_name = entries.submodule_iter()
+        let submodule_name = entries
+            .submodule_iter()
             .find(|(_, entry)| entry.path.as_ref() == Some(&path.to_string()))
             .map(|(name, _)| name.to_string())
             .ok_or_else(|| anyhow::anyhow!("Submodule '{}' not found in .gitmodules", path))?;
@@ -410,7 +520,7 @@ impl GitOperations for GixOperations {
                     &index_path,
                     gix::hash::Kind::Sha1,
                     false,
-                    gix::index::decode::Options::default()
+                    gix::index::decode::Options::default(),
                 )?;
                 // Remove all entries matching the submodule path prefix
                 let remove_prefix = path;
@@ -422,45 +532,50 @@ impl GitOperations for GixOperations {
                     .write(true)
                     .truncate(true)
                     .open(&index_path)?;
-                index.write_to(
-                    &mut index_file,
-                    gix::index::write::Options::default(),
-                )?;
+                index.write_to(&mut index_file, gix::index::write::Options::default())?;
                 let mut index_file = std::fs::OpenOptions::new()
                     .write(true)
                     .truncate(true)
                     .open(&index_path)?;
-                index.write_to(
-                    &mut index_file,
-                    gix::index::write::Options::default(),
-                )?;
+                index.write_to(&mut index_file, gix::index::write::Options::default())?;
             }
 
             // 5. Remove submodule configuration from .git/config
             let config_snapshot = repo.config_snapshot();
             let _config_file = config_snapshot.to_owned();
+            let _config_file = config_snapshot.to_owned();
 
             // Remove all submodule.{name}.* entries
+            let _section_name = format!("submodule.{}", submodule_name);
             let _section_name = format!("submodule.{}", submodule_name);
             // Note: gix config API for removing sections is complex
             // For now, we'll fall back to manual removal or git2 for this part
             // This is acceptable as it's a less common operation
 
             // 6. Remove the submodule directory from working tree
-            let workdir = repo.workdir()
+            let workdir = repo
+                .workdir()
                 .ok_or_else(|| anyhow::anyhow!("Repository has no working directory"))?;
             let submodule_path = workdir.join(path);
 
             if submodule_path.exists() {
-                std::fs::remove_dir_all(&submodule_path)
-                    .with_context(|| format!("Failed to remove submodule directory at {}", submodule_path.display()))?;
+                std::fs::remove_dir_all(&submodule_path).with_context(|| {
+                    format!(
+                        "Failed to remove submodule directory at {}",
+                        submodule_path.display()
+                    )
+                })?;
             }
 
             // 7. Remove .git/modules/{name} directory if it exists
             let modules_path = repo.git_dir().join("modules").join(&submodule_name);
             if modules_path.exists() {
-                std::fs::remove_dir_all(&modules_path)
-                    .with_context(|| format!("Failed to remove submodule git directory at {}", modules_path.display()))?;
+                std::fs::remove_dir_all(&modules_path).with_context(|| {
+                    format!(
+                        "Failed to remove submodule git directory at {}",
+                        modules_path.display()
+                    )
+                })?;
             }
 
             Ok(())
@@ -505,6 +620,7 @@ impl GitOperations for GixOperations {
 
             // 4. Remove submodule configuration from .git/config
             let config_snapshot = repo.config_snapshot();
+            let _config_file = config_snapshot.to_owned();
             let _config_file = config_snapshot.to_owned();
 
             // Remove submodule.{name}.url and submodule.{name}.active
@@ -559,16 +675,10 @@ impl GitOperations for GixOperations {
         })
     }
     /// Get the status of a submodule
-    fn get_submodule_status(&self, path: &str) -> Result<DetailedSubmoduleStatus> {
-        // The gix-backed implementation of detailed submodule status is not yet
-        // available. Returning an explicit error here allows higher-level code
-        // to fall back to the git2-based implementation, which provides more
-        // complete and accurate status information.
-        anyhow::bail!(
-            "gix-based get_submodule_status for '{}' is not yet implemented; \
-             falling back to alternate backend",
-            path
-        );
+    fn get_submodule_status(&self, _path: &str) -> Result<DetailedSubmoduleStatus> {
+        Err(anyhow::anyhow!(
+            "get_submodule_status not yet implemented with gix"
+        ))
     }
     fn list_submodules(&self) -> Result<Vec<String>> {
         self.try_gix_operation(|repo| {
@@ -584,10 +694,12 @@ impl GitOperations for GixOperations {
     }
     fn fetch_submodule(&self, _path: &str) -> Result<()> {
         let submodule_repo = utilities::repo_from_path(&std::path::PathBuf::from(_path))?;
-        let remote_url = submodule_repo
-            .find_default_remote(gix::remote::Direction::Fetch)
-            .and_then(|r| r.ok())
-            .and_then(|remote| remote.url(gix::remote::Direction::Fetch).map(|url| url.to_string()));
+        let remote_url = {
+            submodule_repo
+                .find_default_remote(gix::remote::Direction::Fetch)
+                .and_then(|r| r.ok())
+                .and_then(|r| r.url(gix::remote::Direction::Fetch).map(|u| u.to_string()))
+        };
         fetch_repo(submodule_repo, remote_url, false)
             .map_err(|e| anyhow::anyhow!("Failed to fetch submodule: {}", e))
     }
@@ -656,7 +768,9 @@ impl GitOperations for GixOperations {
 
 impl From<super::GitOpsManager> for GixOperations {
     fn from(git_ops: super::GitOpsManager) -> Self {
-        git_ops.gix_ops.clone()
+        git_ops
+            .gix_ops
+            .clone()
             .expect("GixOperations should always be initialized")
     }
 }

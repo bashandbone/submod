@@ -6,9 +6,8 @@
 name = "submod"
 version = "0.2.0"
 edition = "2024"
-rust-version = "1.85"
+rust-version = "1.87"
 description = "A headache-free submodule management tool, built on top of gitoxide. Manage sparse checkouts, submodule updates, and adding/removing submodules with ease."
-authors = ["Adam Poulemanos <89049923+bashandbone@users.noreply.github.com>"]
 license = "MIT" # Plain MIT license: plainlicense.org/licenses/permissive/mit/
 license-file = "LICENSE.md"
 repository = "https://github.com/bashandbone/submod"
@@ -35,52 +34,56 @@ categories = ["command-line-utilities", "development-tools"]
 
 resolver = "3"
 
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
+
+
 [dependencies]
 # Gitoxide ops
-gix = { version = "0.72.1", default-features = false, features = [
+gix = { version = "0.80.0", default-features = false, features = [
   "attributes",
   "blocking-network-client",
   "excludes",
-  "status",
   "command",
   "parallel",
   "serde",
   "status",
   "worktree-mutation"
 ] }
-gitoxide-core = { version = "0.47.1", default-features = false, features = ["blocking-client", "organize", "clean", "serde"]}
-gix-config = { version = "0.45.1", features = ["serde"] }
-gix-submodule = "0.19.1"
-gix-pathspec = "0.11.0"
-gix-glob = "0.20.1"
-bstr = { version = "1.12.0", default-features = false }
+gitoxide-core = { version = "0.54.0", default-features = false, features = ["blocking-client", "organize", "clean", "serde"]}
+gix-config = { version = "0.53.0", features = ["serde"] }
+gix-submodule = "0.27.0"
+gix-pathspec = "0.16.0"
+gix-glob = "0.24.0"
+bstr = { version = "1.12.1", default-features = false }
 
 # CLI
-clap = { version = "4.5.40", features = [
+clap = { version = "4.5.60", features = [
   "derive",
   "cargo",
   "unicode",
   "wrap_help",
 ] }
-clap_complete = "4.5.54"
-clap_complete_nushell = "4.5.7"
-prodash = { version = "29.0.2", features = ["render-line-crossterm", "render-line-autoconfigure", "render-line"] }
+clap_complete = "4.5.66"
+clap_complete_nushell = "4.5.10"
+prodash = { version = "31.0.0", features = ["render-line-crossterm", "render-line-autoconfigure", "render-line"] }
 
 # TOML config
 figment = { version = "0.10.19", default-features = false, features = ["toml"] }
-serde = { version = "1.0.219", features = ["derive"] }
-serde_json = "1.0.140"
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = "1.0.149"
 
 # errors
-anyhow = "1.0.98"
-thiserror = "2.0.12"
+anyhow = "1.0.102"
+thiserror = "2.0.18"
 
 # bitflags for status flags
-bitflags = "2.6.0"
+bitflags = "2.11.0"
 
 # As of submod v0.2.0, git2 no longer optional
 # gix_submodule just isn't mature enough to realistically provide our functionality without falling back to git2
-git2 = { version = "0.20.2" }
+git2 = { version = "0.20.4" }
 
 [lib]
 name = "submod"
@@ -132,6 +135,3 @@ module_name_repetitions = "allow"
 missing_errors_doc = "allow"
 missing_panics_doc = "allow"
 
-[package.metadata.docs.rs]
-all-features = true
-rustdoc-args = ["--cfg", "docsrs"]

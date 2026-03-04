@@ -7,12 +7,18 @@
 //!
 //! This module is adapted and simplified from the `gix` CLI (https://github.com/GitoxideLabs/gitoxide/tree/main/src/) and its supporting `gitoxide-core` crate.
 
-use bstr::BString;
 use anyhow::Result;
+use bstr::BString;
+use gitoxide_core::repository::{
+    clean::Options as CleanOptions,
+    clone::{Options as CloneOptions, PROGRESS_RANGE as CloneProgress},
+    fetch::{Options as FetchOptions, PROGRESS_RANGE as FetchProgressRange},
+    status::{Options as StatusOptions, Submodules},
+    submodule::list,
+};
 use gix::{features::progress, progress::prodash};
-use std::io::{stdout, stderr};
-use gitoxide_core::repository::{clean::{Options as CleanOptions}, clone::{PROGRESS_RANGE as CloneProgress, Options as CloneOptions}, fetch::{Options as FetchOptions, PROGRESS_RANGE as FetchProgressRange}, submodule::{list, }, status::{Options as StatusOptions, Submodules}};
 use prodash::render::line;
+use std::io::{stderr, stdout};
 
 /// A standard range for line renderer.
 pub fn setup_line_renderer_range(
@@ -45,11 +51,15 @@ pub fn progress_tree(trace: bool) -> std::sync::Arc<prodash::tree::Root> {
 }
 
 /// Run a function with progress tracking, capturing output to stdout and stderr.
-pub fn get_progress(func_name: &str, range: Option<std::ops::RangeInclusive<u8>>, run: impl FnOnce(
-    progress::DoOrDiscard<prodash::tree::Item>,
-    &mut dyn std::io::Write,
-    &mut dyn std::io::Write,
-)) -> Result<()> {
+pub fn get_progress(
+    func_name: &str,
+    range: Option<std::ops::RangeInclusive<u8>>,
+    run: impl FnOnce(
+        progress::DoOrDiscard<prodash::tree::Item>,
+        &mut dyn std::io::Write,
+        &mut dyn std::io::Write,
+    ),
+) -> Result<()> {
     let standard_range = 2..=2;
     let range = range.unwrap_or_else(|| standard_range.clone());
     let progress = progress_tree(false);
@@ -60,8 +70,13 @@ pub fn get_progress(func_name: &str, range: Option<std::ops::RangeInclusive<u8>>
     let mut out = Vec::<u8>::new();
     let mut err = Vec::<u8>::new();
 
-    let _res = gix::trace::coarse!("run")
-        .into_scope(|| run(progress::DoOrDiscard::from(Some(sub_progress)), &mut out, &mut err));
+    let _res = gix::trace::coarse!("run").into_scope(|| {
+        run(
+            progress::DoOrDiscard::from(Some(sub_progress)),
+            &mut out,
+            &mut err,
+        )
+    });
 
     handle.shutdown_and_wait();
     std::io::Write::write_all(&mut stdout(), &out)?;
@@ -88,7 +103,13 @@ fn clean_options() -> CleanOptions {
 }
 
 pub fn harsh_clean(repo: gix::Repository, patterns: Vec<BString>) -> Result<()> {
-    gitoxide_core::repository::clean(repo, &mut stdout().lock(), &mut stderr().lock(), patterns, clean_options())
+    gitoxide_core::repository::clean(
+        repo,
+        &mut stdout().lock(),
+        &mut stderr().lock(),
+        patterns,
+        clean_options(),
+    )
 }
 
 fn status_options() -> StatusOptions {
@@ -105,12 +126,16 @@ fn status_options() -> StatusOptions {
 }
 
 /// Get the status of the repository, optionally filtering by patterns.
-pub fn get_status(
-    repo: gix::Repository,
-    patterns: Vec<BString>,
-) -> Result<()> {
+pub fn get_status(repo: gix::Repository, patterns: Vec<BString>) -> Result<()> {
     get_progress("status", None, |progress, out, err| {
-        let _ = gitoxide_core::repository::status::show(repo, patterns, out, err, progress, status_options());
+        let _ = gitoxide_core::repository::status::show(
+            repo,
+            patterns,
+            out,
+            err,
+            progress,
+            status_options(),
+        );
     })
 }
 
@@ -134,11 +159,7 @@ fn fetch_options(remote: Option<String>, shallow: bool) -> FetchOptions {
 }
 
 /// Fetch updates from a remote repository.
-pub fn fetch_repo(
-    repo: gix::Repository,
-    remote: Option<String>,
-    shallow: bool,
-) -> Result<()> {
+pub fn fetch_repo(repo: gix::Repository, remote: Option<String>, shallow: bool) -> Result<()> {
     get_progress("fetch", Some(FetchProgressRange), |progress, out, err| {
         if let Err(e) = gitoxide_core::repository::fetch(
             repo,
@@ -154,16 +175,17 @@ pub fn fetch_repo(
 }
 
 /// List all submodules in the repository.
-pub fn list_submodules(
-    repo: gix::Repository
-) -> Result<()> {
-    list(repo, &mut stdout().lock(), gitoxide_core::OutputFormat::Human, None)
+pub fn list_submodules(repo: gix::Repository) -> Result<()> {
+    list(
+        repo,
+        &mut stdout().lock(),
+        gitoxide_core::OutputFormat::Human,
+        None,
+    )
 }
 
 /// List all submodules in the repository and their status.
-pub fn list_submodules_with_status(
-    repo: gix::Repository,
-) -> Result<()> {
+pub fn list_submodules_with_status(repo: gix::Repository) -> Result<()> {
     let submodules = repo.submodules()?;
     if let Some(submodules) = submodules {
         submodules.into_iter().try_for_each(|sm| {
@@ -196,17 +218,15 @@ fn clone_options(shallow: bool) -> CloneOptions {
 }
 
 /// Clone a repository from a given URL to a specified path, with an option for shallow cloning.
-pub fn clone_repo(
-    url: &str,
-    path: Option<&str>,
-    shallow: bool,
-) {
+pub fn clone_repo(url: &str, path: Option<&str>, shallow: bool) {
     let path = path.map_or_else(
-        || std::path::PathBuf::from(
-            std::path::Path::new(url)
-                .file_name()
-                .unwrap_or_else(|| std::ffi::OsStr::new("repo"))
-        ),
+        || {
+            std::path::PathBuf::from(
+                std::path::Path::new(url)
+                    .file_name()
+                    .unwrap_or_else(|| std::ffi::OsStr::new("repo")),
+            )
+        },
         |p| p.into(),
     );
     let osstr_url = std::ffi::OsStr::new(url);

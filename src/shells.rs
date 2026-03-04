@@ -4,10 +4,10 @@
 //
 // SPDX-License-Identifier: LicenseRef-PlainMIT OR MIT
 
+use clap::{ValueEnum, builder::PossibleValue};
+use clap_complete::aot::Generator;
 use clap_complete::aot::Shell as AotShell;
 use clap_complete_nushell::Nushell as NushellShell;
-use clap_complete::aot::{Generator};
-use clap::{builder::PossibleValue, ValueEnum};
 
 /// Represents the supported shells for command-line completion.
 ///
@@ -135,8 +135,7 @@ impl TryFrom<NushellShell> for Shell {
     }
 }
 
-impl Shell  {
-
+impl Shell {
     /// Converts the `Shell` enum to a shell enum implementing `clap_complete::Generator` (as a Box pointer).
     pub fn try_to_clap_complete(&self) -> Result<Box<dyn Generator>, String> {
         match self {
@@ -181,7 +180,8 @@ impl Generator for Shell {
     /// Returns the file name for the completion file.
     fn file_name(&self, name: &str) -> String {
         let shell_self = self.try_to_clap_complete();
-        shell_self.map(|s| s.file_name(name))
+        shell_self
+            .map(|s| s.file_name(name))
             .unwrap_or_else(|_| format!("{name}.nu")) // Default to Nushell if conversion fails
     }
 
@@ -189,12 +189,19 @@ impl Generator for Shell {
     fn generate(&self, cmd: &clap::Command, buf: &mut dyn std::io::Write) {
         let shell_self = self.try_to_clap_complete();
         shell_self
-            .map(|s| s.try_generate(cmd, buf).unwrap_or_else(|e| panic!("failed to write completion file: {}", e)))
+            .map(|s| {
+                s.try_generate(cmd, buf)
+                    .unwrap_or_else(|e| panic!("failed to write completion file: {}", e))
+            })
             .unwrap_or_else(|_| panic!("failed to write completion file"));
     }
 
     /// Attempts to generate the completion file for the given command and writes it to the provided buffer.
-    fn try_generate(&self, cmd: &clap::Command, buf: &mut dyn std::io::Write) -> Result<(), std::io::Error> {
+    fn try_generate(
+        &self,
+        cmd: &clap::Command,
+        buf: &mut dyn std::io::Write,
+    ) -> Result<(), std::io::Error> {
         let shell_self = self.try_to_clap_complete();
         match shell_self {
             Ok(s) => s.try_generate(cmd, buf),

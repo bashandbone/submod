@@ -57,7 +57,6 @@ use crate::options::{
 use std::fs;
 use std::path::{Path, PathBuf};
 
-
 /// Custom error types for submodule operations
 #[derive(Debug, thiserror::Error)]
 pub enum SubmoduleError {
@@ -711,11 +710,13 @@ impl GitManager {
                 .map_err(Self::map_git_ops_error)?;
         } else {
             // Submodule is registered, just initialize and update using GitOperations
-            self.git_ops.init_submodule(path_str)
+            self.git_ops
+                .init_submodule(path_str)
                 .map_err(Self::map_git_ops_error)?;
 
             let update_opts = crate::config::SubmoduleUpdateOptions::default();
-            self.git_ops.update_submodule(path_str, &update_opts)
+            self.git_ops
+                .update_submodule(path_str, &update_opts)
                 .map_err(Self::map_git_ops_error)?;
         }
 
