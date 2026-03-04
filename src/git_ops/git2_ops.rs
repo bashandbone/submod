@@ -291,7 +291,7 @@ impl GitOperations for Git2Operations {
         // git2 submodule cloning requires remote callbacks that are complex to configure.
         // Fall through to the CLI fallback which handles this reliably.
         Err(anyhow::anyhow!(
-            "git2 add_submodule not fully implemented: use CLI fallback for '{}'",
+            "Unable to add submodule '{}' using the library API; it will be added using the Git CLI instead",
             opts.name
         ))
     }
