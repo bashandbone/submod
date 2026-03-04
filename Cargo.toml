@@ -40,6 +40,7 @@ rustdoc-args = ["--cfg", "docsrs"]
 
 
 [dependencies]
+bstr = { version = "1.12.1", default-features = false }
 # Gitoxide ops
 gix = { version = "0.80.0", default-features = false, features = [
   "attributes",
@@ -69,6 +70,8 @@ clap_complete = "4.5.66"
 clap_complete_nushell = "4.5.10"
 prodash = { version = "31.0.0", features = ["render-line-crossterm", "render-line-autoconfigure", "render-line"] }
 
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = "1.0.149"
 # TOML config
 figment = { version = "0.10.19", default-features = false, features = ["toml"] }
 serde = { version = "1.0.228", features = ["derive"] }
@@ -112,26 +115,36 @@ missing_docs = "warn"
 unreachable_code = "warn"
 
 [lints.clippy]
-# Pedantic lints for high code quality
-pedantic = { level = "warn", priority = -1 }
-# Nursery lints for cutting-edge suggestions
-nursery = { level = "warn", priority = -1 }
-# Performance lints
-perf = { level = "warn", priority = -1 }
 # Cargo-specific lints
 cargo = { level = "warn", priority = -1 }
 # Complexity lints
 complexity = { level = "warn", priority = -1 }
 # Correctness lints (deny these as they indicate bugs)
 correctness = { level = "deny", priority = -1 }
+# Nursery lints for cutting-edge suggestions
+nursery = { level = "warn", priority = -1 }
+# Pedantic lints for high code quality
+pedantic = { level = "warn", priority = -1 }
+# Performance lints
+perf = { level = "warn", priority = -1 }
 # Style lints
 style = { level = "warn", priority = -1 }
 # Suspicious constructs
 suspicious = { level = "warn", priority = -1 }
 
-# Allow some pedantic lints that can be overly strict for CLI tools
-too_many_lines = "allow"
-module_name_repetitions = "allow"
 missing_errors_doc = "allow"
 missing_panics_doc = "allow"
+module_name_repetitions = "allow"
+# Allow some pedantic lints that can be overly strict for CLI tools
+too_many_lines = "allow"
+
+[lints.rust]
+# Warn about missing documentation
+missing_docs = "warn"
+# Warn about unreachable code
+unreachable_code = "warn"
+# Deny unsafe code unless explicitly allowed
+unsafe_code = "forbid"
+# Warn about unused items
+unused = { level = "warn", priority = -1 }
 
