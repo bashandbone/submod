@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: 2026 Knitli Inc.
+
+SPDX-License-Identifier: LicenseRef-PlainMIT
+-->
+
 # Gix API Refactoring Plan: Replacing Disingenuous Implementation Claims
 
 ## Executive Summary

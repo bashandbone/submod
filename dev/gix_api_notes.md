@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: 2026 Knitli Inc.
+
+SPDX-License-Identifier: LicenseRef-PlainMIT
+-->
+
 # Gix API Notes
 
 gix::File is the main high level interface for interacting with gix configuration files across the gix crates.

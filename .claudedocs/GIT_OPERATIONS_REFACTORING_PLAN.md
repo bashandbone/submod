@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: 2026 Knitli Inc.
+
+SPDX-License-Identifier: LicenseRef-PlainMIT
+-->
+
 # Git Operations Refactoring Implementation Plan
 
 ## Executive Summary
