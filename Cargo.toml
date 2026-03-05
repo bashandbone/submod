@@ -23,6 +23,12 @@ keywords = [
 categories = ["command-line-utilities", "development-tools"]
 
 resolver = "3"
+include = [
+  "src/**/*",
+  "README.md",
+  "LICENSES/*",
+  "LICENSE.md"
+]
 
 [package.metadata.docs.rs]
 all-features = true
