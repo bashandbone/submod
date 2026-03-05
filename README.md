@@ -13,17 +13,19 @@ SPDX-License-Identifier: LicenseRef-PlainMIT OR MIT
 [![codecov](https://codecov.io/gh/bashandbone/submod/branch/main/graph/badge.svg?token=MOW92KKK0G)](https://codecov.io/gh/bashandbone/submod)
 ![Crates.io Downloads (latest version)](https://img.shields.io/crates/dv/submod)
 
-A lightweight, fast CLI tool for managing git submodules with advanced sparse checkout support. Built on top of `gitoxide` and `git2` libraries for maximum performance and reliability.
+Git submodules solve a real problem. **Managing submodules is a pain.** You use them infrequently enough that you always forget which command does what — and when something breaks, the recovery steps are a small nightmare. New contributors hit this especially hard: onboarding onto a project that uses submodules is its own obstacle course.
 
-## 🚀 Features
+`submod` wraps the whole lifecycle in one consistent CLI. Sixteen commands, including nuke-it-from-orbit for when you're done being reasonable. Built on gitoxide and git2, with automatic fallback so operations don't fail silently.[^1] It's actively used across @knitli and @plainlicense, where submodules handle shared functionality between repos.
 
-- **TOML-based configuration** - Define submodules, sparse-checkout paths, and settings in a simple config file
-- **Global defaults with overrides** - Set project-wide submodule settings with per-submodule customization
-- **Sparse checkout support** - Efficiently checkout only the parts of submodules you need
-- **Fast operations** - Leverages `gitoxide` for high-performance git operations
-- **Robust fallbacks** - Automatic fallback to `git2` and CLI when needed
-- **Comprehensive commands** - Add, check, init, update, reset, and sync submodules with ease
-- **Developer-friendly** - Clear status reporting and error messages
+## :rocket: Features
+
+- **TOML config** — define submodules, sparse-checkout paths, and defaults in one file
+- **Sparse checkout** — clone only the parts of a submodule you actually need
+- **Global defaults with per-submodule overrides** — set it once, customize where it matters
+- **Fallback chain** — tries gitoxide first, falls back to git2, then CLI
+- **Clear status and errors** — you'll know what broke and why
+
+[^1]: The fallback architecture is more a reflection of the status of `gitoxide` and `git2` submodule support than a stability concern. Their features do not consistently provide the full lifecycle of submodule operations. Together they cover >90%, but sometimes immaturely. The fallbacks architecture handles that gracefully and lets native operations grow with those libraries. 
 
 ## 📋 Table of Contents
 
