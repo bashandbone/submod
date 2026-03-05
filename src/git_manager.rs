@@ -834,11 +834,13 @@ impl GitManager {
     }
 
     /// Get mutable reference to the underlying config
+    #[allow(dead_code)]
     pub const fn config_mut(&mut self) -> &mut Config {
         &mut self.config
     }
 
     /// Get a clone of the underlying config
+    #[allow(dead_code)]
     pub fn config_clone(&self) -> Config {
         self.config.clone()
     }
@@ -957,7 +959,7 @@ impl GitManager {
         };
 
         // Build the current submodule map sorted by name for deterministic append order
-        let mut current_entries: std::collections::BTreeMap<String, &SubmoduleEntry> =
+        let current_entries: std::collections::BTreeMap<String, &SubmoduleEntry> =
             self.config.get_submodules().map(|(n, e)| (n.clone(), e)).collect();
 
         // Track which names appeared in the existing file (so we know what to append)

@@ -51,7 +51,7 @@ See the [README.md](../README.md) for full usage and configuration details.
 "#]
 
 use crate::shells::Shell;
-use clap::{Parser, Subcommand, arg, command};
+use clap::{Parser, Subcommand};
 
 use crate::long_abouts::COMPLETE_ME;
 use crate::options::{

@@ -57,6 +57,7 @@ fn shallow_filter(shallow: &bool) -> bool {
 }
 
 // Just a type wrapper around str to make it clear what we're working with
+/// A type alias for submodule names used throughout the configuration.
 pub type SubmoduleName = String;
 
 /// Git options for a submodule
@@ -76,6 +77,7 @@ pub struct SubmoduleGitOptions {
     pub update: Option<SerializableUpdate>,
 }
 
+#[allow(dead_code)]
 impl SubmoduleGitOptions {
     /// Create a new instance with defaults
     pub fn new(
@@ -104,6 +106,7 @@ impl SubmoduleGitOptions {
 }
 
 /// Convert git submodule options to git2-compatible options
+#[allow(dead_code)]
 pub struct Git2SubmoduleOptions {
     ignore: git2::SubmoduleIgnore,
     update: git2::SubmoduleUpdate,
@@ -112,7 +115,9 @@ pub struct Git2SubmoduleOptions {
 }
 
 /// Implementation for converting git2 submodule options
+#[allow(dead_code)]
 impl Git2SubmoduleOptions {
+    /// Create a new `Git2SubmoduleOptions` from individual git2 option values.
     pub fn new(
         ignore: git2::SubmoduleIgnore,
         update: git2::SubmoduleUpdate,
@@ -171,6 +176,7 @@ impl Iterator for SubmoduleDefaults {
     }
 }
 
+#[allow(dead_code)]
 impl SubmoduleDefaults {
     /// Returns a vector of SubmoduleDefaults with the current values (for comparison)
     pub fn get_values(&self) -> Vec<SubmoduleDefaults> {
@@ -223,9 +229,11 @@ pub struct SubmoduleAddOptions {
     /// Whether to create a shallow clone
     pub shallow: bool,
     /// Whether to skip initialization after adding
+    #[allow(dead_code)]
     pub no_init: bool,
 }
 
+#[allow(dead_code)]
 impl SubmoduleAddOptions {
     /// Create an add options from a SubmoduleEntry
     pub fn into_submodule_entry(self) -> SubmoduleEntry {
@@ -282,6 +290,7 @@ pub struct SubmoduleUpdateOptions {
     pub force: bool,
 }
 
+#[allow(dead_code)]
 impl SubmoduleUpdateOptions {
     /// Create a new instance with defaults
     pub fn new(strategy: SerializableUpdate, recursive: bool, force: bool) -> Self {
@@ -349,6 +358,7 @@ pub struct OtherSubmoduleSettings {
     pub no_init: bool,
 }
 
+#[allow(dead_code)]
 impl OtherSubmoduleSettings {
     /// Create a new instance with default values
     fn default() -> Self {
@@ -452,6 +462,7 @@ pub struct SubmoduleEntry {
     pub sparse_paths: Option<Vec<String>>,
 }
 
+#[allow(dead_code)]
 impl SubmoduleEntry {
     /// Create a new submodule entry with defaults
     pub fn new(
@@ -597,6 +608,7 @@ impl SubmoduleEntry {
         url.rsplit(&['/', ':'][..]).next().unwrap_or("").to_string()
     }
 
+    /// Returns the git-specific options for this submodule entry.
     pub fn git_options(&self) -> SubmoduleGitOptions {
         SubmoduleGitOptions {
             ignore: self.ignore.clone(),
@@ -606,6 +618,7 @@ impl SubmoduleEntry {
         }
     }
 
+    /// Returns the non-git settings for this submodule entry (path, url, active state, etc.).
     pub fn settings(&self) -> OtherSubmoduleSettings {
         OtherSubmoduleSettings {
             name: None, // We don't have a name in this struct, so we leave it as None
@@ -703,6 +716,7 @@ impl Serialize for SubmoduleEntries {
     }
 }
 
+#[allow(dead_code)]
 impl SubmoduleEntries {
     /// Create a new empty SubmoduleEntries
     pub fn new(
@@ -715,6 +729,7 @@ impl SubmoduleEntries {
         }
     }
 
+    /// Create a new empty `SubmoduleEntries` with default (empty) collections.
     pub fn default() -> Self {
         Self {
             submodules: Some(HashMap::new()),
@@ -749,6 +764,7 @@ impl SubmoduleEntries {
         self.clone()
     }
 
+    /// Returns a list of all submodule names, or `None` if no submodules are configured.
     pub fn submodule_names(&self) -> Option<Vec<String>> {
         self.submodules
             .as_ref()
@@ -823,6 +839,7 @@ impl SubmoduleEntries {
         self.submodules.as_ref()?.get(name)
     }
 
+    /// Returns `true` if a submodule with the given name exists.
     pub fn contains_key(&self, name: &str) -> bool {
         self.submodules
             .as_ref()
@@ -910,6 +927,7 @@ pub struct Config {
     pub submodules: SubmoduleEntries,
 }
 
+#[allow(dead_code)]
 impl Config {
     /// Create a new configuration with the given defaults and submodules
     pub fn new(defaults: SubmoduleDefaults, submodules: SubmoduleEntries) -> Self {

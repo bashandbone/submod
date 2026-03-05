@@ -8,14 +8,7 @@
 //! This module is adapted and simplified from the `gix` CLI (https://github.com/GitoxideLabs/gitoxide/tree/main/src/) and its supporting `gitoxide-core` crate.
 
 use anyhow::Result;
-use bstr::BString;
-use gitoxide_core::repository::{
-    clean::Options as CleanOptions,
-    clone::{Options as CloneOptions, PROGRESS_RANGE as CloneProgress},
-    fetch::{Options as FetchOptions, PROGRESS_RANGE as FetchProgressRange},
-    status::{Options as StatusOptions, Submodules},
-    submodule::list,
-};
+use gitoxide_core::repository::fetch::{Options as FetchOptions, PROGRESS_RANGE as FetchProgressRange};
 use gix::{features::progress, progress::prodash};
 use prodash::render::line;
 use std::io::{stderr, stdout};
@@ -84,61 +77,6 @@ pub fn get_progress(
     Ok(())
 }
 
-/// Set options for the `clean` command.
-///
-/// Since we use this as part of our intentionally destructive commands, we can be more aggressive with defaults.
-fn clean_options() -> CleanOptions {
-    CleanOptions {
-        debug: false,
-        format: gitoxide_core::OutputFormat::Human,
-        execute: true,
-        ignored: false,
-        pathspec_matches_result: false,
-        precious: true,
-        directories: true,
-        repositories: true,
-        skip_hidden_repositories: None,
-        find_untracked_repositories: gitoxide_core::repository::clean::FindRepository::All,
-    }
-}
-
-pub fn harsh_clean(repo: gix::Repository, patterns: Vec<BString>) -> Result<()> {
-    gitoxide_core::repository::clean(
-        repo,
-        &mut stdout().lock(),
-        &mut stderr().lock(),
-        patterns,
-        clean_options(),
-    )
-}
-
-fn status_options() -> StatusOptions {
-    StatusOptions {
-        ignored: None,
-        format: gitoxide_core::repository::status::Format::Simplified,
-        output_format: gitoxide_core::OutputFormat::Human,
-        submodules: Some(Submodules::All),
-        thread_limit: None,
-        statistics: false,
-        allow_write: false,
-        index_worktree_renames: None,
-    }
-}
-
-/// Get the status of the repository, optionally filtering by patterns.
-pub fn get_status(repo: gix::Repository, patterns: Vec<BString>) -> Result<()> {
-    get_progress("status", None, |progress, out, err| {
-        let _ = gitoxide_core::repository::status::show(
-            repo,
-            patterns,
-            out,
-            err,
-            progress,
-            status_options(),
-        );
-    })
-}
-
 /// Fetch options for the `fetch` command, with an option for shallow fetching.
 fn fetch_options(remote: Option<String>, shallow: bool) -> FetchOptions {
     let shallow = if shallow {
@@ -174,71 +112,3 @@ pub fn fetch_repo(repo: gix::Repository, remote: Option<String>, shallow: bool) 
     })
 }
 
-/// List all submodules in the repository.
-pub fn list_submodules(repo: gix::Repository) -> Result<()> {
-    list(
-        repo,
-        &mut stdout().lock(),
-        gitoxide_core::OutputFormat::Human,
-        None,
-    )
-}
-
-/// List all submodules in the repository and their status.
-pub fn list_submodules_with_status(repo: gix::Repository) -> Result<()> {
-    let submodules = repo.submodules()?;
-    if let Some(submodules) = submodules {
-        submodules.into_iter().try_for_each(|sm| {
-            let sm_repo = sm.open()?;
-            if let Some(repo) = sm_repo {
-                get_status(repo, vec![])?;
-            }
-            Ok(())
-        })
-    } else {
-        Ok(())
-    }
-}
-
-/// Clone options for the `clone` command, with an option for shallow cloning.
-fn clone_options(shallow: bool) -> CloneOptions {
-    let shallow = if shallow {
-        gix::remote::fetch::Shallow::DepthAtRemote(std::num::NonZeroU32::new(1).unwrap())
-    } else {
-        gix::remote::fetch::Shallow::NoChange
-    };
-    CloneOptions {
-        format: gitoxide_core::OutputFormat::Human,
-        bare: false,
-        handshake_info: false,
-        no_tags: false,
-        shallow: shallow,
-        ref_name: None,
-    }
-}
-
-/// Clone a repository from a given URL to a specified path, with an option for shallow cloning.
-pub fn clone_repo(url: &str, path: Option<&str>, shallow: bool) {
-    let path = path.map_or_else(
-        || {
-            std::path::PathBuf::from(
-                std::path::Path::new(url)
-                    .file_name()
-                    .unwrap_or_else(|| std::ffi::OsStr::new("repo")),
-            )
-        },
-        |p| p.into(),
-    );
-    let osstr_url = std::ffi::OsStr::new(url);
-    get_progress("clone", Some(CloneProgress), |progress, out, err| {
-        let _ = gitoxide_core::repository::clone(
-            osstr_url,
-            Some(path),
-            Vec::<BString>::new(), // No overrides for now
-            progress,
-            out,
-            err,
-            clone_options(shallow),
-        );
-    });
-}

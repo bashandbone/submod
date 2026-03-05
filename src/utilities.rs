@@ -2,6 +2,7 @@
 //
 // SPDX-License-Identifier: LicenseRef-PlainMIT OR MIT
 //! Utility functions for working with `Gitoxide` APIs commonly used across the codebase.
+#![allow(dead_code)]
 
 use anyhow::Result;
 use git2::Repository as Git2Repository;

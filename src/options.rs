@@ -22,6 +22,7 @@ use std::str::FromStr;
 use crate::utilities::{get_current_branch, get_current_repository};
 
 /// Configuration levels for git config operations
+#[allow(dead_code)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ConfigLevel {
     /// System-wide configuration
@@ -35,6 +36,7 @@ pub enum ConfigLevel {
 }
 
 /// Trait for converting between git submodule configuration enums and their gitmodules representation
+#[allow(dead_code)]
 pub trait GitmodulesConvert {
     /// Get the git key for a submodule by the submodule's name (in git config)
     fn gitmodules_key_path(&self, name: &str) -> String {
@@ -44,6 +46,7 @@ pub trait GitmodulesConvert {
     /// Get the git key for the enum setting
     fn gitmodules_key(&self) -> &str;
 
+    /// Format this option as a `.gitmodules` key=value line.
     fn as_gitmodules_key_value(&self, name: &str) -> String {
         format!(
             "{}={}",
@@ -52,6 +55,7 @@ pub trait GitmodulesConvert {
         )
     }
 
+    /// Format this option as a `.gitmodules` key=value line, encoded as bytes.
     fn as_gitmodules_byte_key_value(&self, name: &str) -> Vec<u8> {
         self.as_gitmodules_key_value(name).into_bytes()
     }
@@ -71,6 +75,7 @@ pub trait GitmodulesConvert {
 }
 
 /// Trait for checking if an enum is unspecified or default
+#[allow(dead_code)]
 pub trait OptionsChecks {
     /// Check if the enum is unspecified
     fn is_unspecified(&self) -> bool;
@@ -80,6 +85,7 @@ pub trait OptionsChecks {
 }
 
 /// Trait for converting between `git2` and `gix_submodule` types
+#[allow(dead_code)]
 pub trait GixGit2Convert {
     /// The git2 source type
     type Git2Type;
@@ -510,7 +516,9 @@ impl Default for SerializableBranch {
     }
 }
 
+#[allow(dead_code)]
 impl SerializableBranch {
+    /// Parse an optional branch string into a `SerializableBranch`, defaulting to the repo's current branch.
     pub fn set_branch(branch: Option<String>) -> Result<Self, anyhow::Error> {
         let branch = if let Some(b) = branch {
             if !b.is_empty() {

@@ -7,6 +7,7 @@
 pub mod config;
 /// Configuration management for submodules
 pub mod options;
+/// Shell completion generation support
 pub mod shells;
 pub mod utilities;
 

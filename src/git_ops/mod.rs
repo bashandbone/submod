@@ -10,7 +10,9 @@ providing seamless integration for submodule management and configuration tasks.
 
 We prefer Gix, but it's still unstable and several core features are missing, so we use git2 as a fallback for those features and for stability.
 "]
+/// git2-based git operations implementation
 pub mod git2_ops;
+/// gitoxide (gix)-based git operations implementation
 pub mod gix_ops;
 pub mod simple_gix;
 pub use git2_ops::Git2Operations;
@@ -28,6 +30,7 @@ use crate::options::{
 };
 
 /// Represents git configuration state
+#[allow(dead_code)]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct GitConfig {
     /// Configuration entries as key-value pairs
@@ -70,6 +73,7 @@ bitflags! {
 }
 
 /// Comprehensive submodule status information
+#[allow(dead_code)]
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct DetailedSubmoduleStatus {
     /// Path of the submodule
@@ -114,10 +118,13 @@ pub trait GitOperations {
     /// Write .gitmodules configuration
     fn write_gitmodules(&mut self, config: &SubmoduleEntries) -> Result<()>;
     /// Read git configuration at specified level
+    #[allow(dead_code)]
     fn read_git_config(&self, level: ConfigLevel) -> Result<GitConfig>;
     /// Write git configuration at specified level
+    #[allow(dead_code)]
     fn write_git_config(&self, config: &GitConfig, level: ConfigLevel) -> Result<()>;
     /// Set a single configuration value
+    #[allow(dead_code)]
     fn set_config_value(&self, key: &str, value: &str, level: ConfigLevel) -> Result<()>;
 
     // Submodule operations
@@ -132,12 +139,14 @@ pub trait GitOperations {
     /// Deinitialize a submodule
     fn deinit_submodule(&mut self, path: &str, force: bool) -> Result<()>;
     /// Get detailed status of a submodule
+    #[allow(dead_code)]
     fn get_submodule_status(&self, path: &str) -> Result<DetailedSubmoduleStatus>;
     /// List all submodules
     fn list_submodules(&self) -> Result<Vec<String>>;
 
     // Repository operations
     /// Fetch a submodule
+    #[allow(dead_code)]
     fn fetch_submodule(&self, path: &str) -> Result<()>;
     /// Reset a submodule
     fn reset_submodule(&self, path: &str, hard: bool) -> Result<()>;

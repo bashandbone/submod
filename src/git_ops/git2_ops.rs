@@ -124,6 +124,7 @@ impl Git2Operations {
         Ok(shallow_file.exists())
     }
     /// Convert git2 status flags to our status flags
+    #[allow(dead_code)]
     fn convert_git2_status_to_flags(&self, status: git2::SubmoduleStatus) -> SubmoduleStatusFlags {
         let mut flags = SubmoduleStatusFlags::empty();
         if status.contains(git2::SubmoduleStatus::IN_HEAD) {
@@ -171,6 +172,7 @@ impl Git2Operations {
         flags
     }
     /// Get git config at specified level
+    #[allow(dead_code)]
     fn get_config_at_level(&self, level: ConfigLevel) -> Result<git2::Config> {
         match level {
             ConfigLevel::Local => self.repo.config(),
@@ -270,7 +272,7 @@ impl GitOperations for Git2Operations {
             if let (Some(name), Some(value)) = (entry.name(), entry.value()) {
                 entries.insert(name.to_string(), value.to_string());
             }
-        });
+        })?;
         Ok(GitConfig { entries })
     }
     fn write_git_config(&self, config: &GitConfig, level: ConfigLevel) -> Result<()> {
@@ -716,6 +718,7 @@ impl GitOperations for Git2Operations {
 }
 impl Git2Operations {
     /// Get sparse checkout information for a submodule
+    #[allow(dead_code)]
     fn get_sparse_checkout_info(&self, path: &str) -> Result<(bool, Vec<String>)> {
         let submodule = self
             .repo

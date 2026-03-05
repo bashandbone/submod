@@ -5,10 +5,9 @@
 use anyhow::{Context, Result};
 use gix::bstr::ByteSlice;
 use std::collections::HashMap;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
-use crate::git_ops::simple_gix::{clone_repo, fetch_repo};
-use crate::utilities::repo_from_path;
+use crate::git_ops::simple_gix::fetch_repo;
 
 /// Parse a gix config file from raw bytes
 fn gix_file_from_bytes(bytes: Vec<u8>) -> Result<gix::config::File<'static>> {
@@ -23,7 +22,7 @@ fn gix_file_from_bytes(bytes: Vec<u8>) -> Result<gix::config::File<'static>> {
 
 use super::{DetailedSubmoduleStatus, GitConfig, GitOperations, SubmoduleStatusFlags};
 use crate::config::{
-    SubmoduleAddOptions, SubmoduleEntries, SubmoduleEntry, SubmoduleUpdateOptions,
+    SubmoduleAddOptions, SubmoduleEntries, SubmoduleUpdateOptions,
 };
 use crate::options::{ConfigLevel, GitmodulesConvert};
 use crate::utilities;
@@ -100,6 +99,7 @@ impl GixOperations {
     }
 
     /// Convert gix submodule status to our status flags
+    #[allow(dead_code)]
     fn convert_gix_status_to_flags(&self, status: &gix::submodule::Status) -> SubmoduleStatusFlags {
         let mut flags = SubmoduleStatusFlags::empty();
         // Map gix status to our flags
