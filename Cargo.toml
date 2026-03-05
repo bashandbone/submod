@@ -27,9 +27,11 @@ include = [
   "src/**/*",
   "README.md",
   "Cargo.toml",
+  "sample_config/submod.toml",
   "REUSE.toml",
   "LICENSES/*",
-  "LICENSE.md"
+  "LICENSE.md",
+  "submod-sbom.spdx"
 ]
 
 [package.metadata.docs.rs]
