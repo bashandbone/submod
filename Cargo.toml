@@ -26,6 +26,8 @@ resolver = "3"
 include = [
   "src/**/*",
   "README.md",
+  "Cargo.toml",
+  "REUSE.toml",
   "LICENSES/*",
   "LICENSE.md"
 ]
