@@ -601,7 +601,7 @@ impl GitManager {
                 SubmoduleError::GitoxideError(format!("GitOpsManager update failed: {e}"))
             })?;
 
-        println!("✅ Updated {name} using GitOpsManager abstraction");
+        println!("✅ Updated {name} successfully");
         Ok(())
     }
 
