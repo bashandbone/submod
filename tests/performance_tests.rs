@@ -161,14 +161,7 @@ ignore = "all"
         let start_time = Instant::now();
         for (i, deep_path) in deep_paths.iter().enumerate() {
             harness
-                .run_submod_success(&[
-                    "add",
-                    &remote_url,
-                    "--name",
-                    &format!("deep-{i}"),
-                    "--path",
-                    deep_path,
-                ])
+                .run_submod_success(&["add", &remote_url, "--name", &format!("deep-{i}"), "--path", deep_path])
                 .expect("Failed to add deep submodule");
         }
 

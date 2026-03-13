@@ -153,14 +153,7 @@ mod tests {
 
         // Add submodule normally first
         harness
-            .run_submod_success(&[
-                "add",
-                &remote_url,
-                "--name",
-                "sparse-disabled",
-                "--path",
-                "lib/sparse-disabled",
-            ])
+            .run_submod_success(&["add", &remote_url, "--name", "sparse-disabled", "--path", "lib/sparse-disabled"])
             .expect("Failed to add submodule");
 
         // Update config to include sparse paths
@@ -278,14 +271,7 @@ sparse_paths = ["src", "docs", "*.md"]
 
         // Add submodule without sparse checkout
         harness
-            .run_submod_success(&[
-                "add",
-                &remote_url,
-                "--name",
-                "no-sparse",
-                "--path",
-                "lib/no-sparse",
-            ])
+            .run_submod_success(&["add", &remote_url, "--name", "no-sparse", "--path", "lib/no-sparse"])
             .expect("Failed to add submodule");
 
         // Add submodule with sparse checkout

@@ -61,14 +61,7 @@ mod tests {
 
         // Add a submodule
         let stdout = harness
-            .run_submod_success(&[
-                "add",
-                &remote_url,
-                "--name",
-                "test-lib",
-                "--path",
-                "lib/test",
-            ])
+            .run_submod_success(&["add", &remote_url, "--name", "test-lib", "--path", "lib/test"])
             .expect("Failed to add submodule");
 
         assert!(stdout.contains("Added submodule"));
@@ -177,14 +170,7 @@ sparse_paths = ["src"]
 
         // Add and initialize submodule first
         harness
-            .run_submod_success(&[
-                "add",
-                &remote_url,
-                "--name",
-                "update-lib",
-                "--path",
-                "lib/update",
-            ])
+            .run_submod_success(&["add", &remote_url, "--name", "update-lib", "--path", "lib/update"])
             .expect("Failed to add submodule");
 
         // Run update command
@@ -207,14 +193,7 @@ sparse_paths = ["src"]
 
         // Add and initialize submodule
         harness
-            .run_submod_success(&[
-                "add",
-                &remote_url,
-                "--name",
-                "reset-lib",
-                "--path",
-                "lib/reset",
-            ])
+            .run_submod_success(&["add", &remote_url, "--name", "reset-lib", "--path", "lib/reset"])
             .expect("Failed to add submodule");
 
         // Make some changes in the submodule
@@ -252,25 +231,11 @@ sparse_paths = ["src"]
 
         // Add two submodules
         harness
-            .run_submod_success(&[
-                "add",
-                &remote_url1,
-                "--name",
-                "reset-lib1",
-                "--path",
-                "lib/reset1",
-            ])
+            .run_submod_success(&["add", &remote_url1, "--name", "reset-lib1", "--path", "lib/reset1"])
             .expect("Failed to add submodule 1");
 
         harness
-            .run_submod_success(&[
-                "add",
-                &remote_url2,
-                "--name",
-                "reset-lib2",
-                "--path",
-                "lib/reset2",
-            ])
+            .run_submod_success(&["add", &remote_url2, "--name", "reset-lib2", "--path", "lib/reset2"])
             .expect("Failed to add submodule 2");
 
         // Make changes in both submodules
@@ -406,14 +371,7 @@ active = true
 
         // Try to add submodule with invalid URL
         let output = harness
-            .run_submod(&[
-                "add",
-                "not-a-valid-url",
-                "--name",
-                "invalid-lib",
-                "--path",
-                "lib/invalid",
-            ])
+            .run_submod(&["add", "not-a-valid-url", "--name", "invalid-lib", "--path", "lib/invalid"])
             .expect("Failed to run submod");
 
         assert!(!output.status.success());
@@ -483,14 +441,7 @@ active = true
         let remote_url = format!("file://{}", remote_repo.display());
 
         harness
-            .run_submod_success(&[
-                "add",
-                &remote_url,
-                "--name",
-                "list-lib",
-                "--path",
-                "lib/list",
-            ])
+            .run_submod_success(&["add", &remote_url, "--name", "list-lib", "--path", "lib/list"])
             .expect("Failed to add submodule");
 
         let stdout = harness
@@ -538,14 +489,7 @@ active = true
         let remote_url = format!("file://{}", remote_repo.display());
 
         harness
-            .run_submod_success(&[
-                "add",
-                &remote_url,
-                "--name",
-                "disable-lib",
-                "--path",
-                "lib/disable",
-            ])
+            .run_submod_success(&["add", &remote_url, "--name", "disable-lib", "--path", "lib/disable"])
             .expect("Failed to add submodule");
 
         let stdout = harness
@@ -588,18 +532,9 @@ active = true
         let config = harness.read_config().expect("Failed to read config");
 
         // Comments must be preserved
-        assert!(
-            config.contains("# My project submodules"),
-            "top-level comment lost"
-        );
-        assert!(
-            config.contains("# This is my main library"),
-            "submodule comment lost"
-        );
-        assert!(
-            config.contains("# default settings"),
-            "defaults comment lost"
-        );
+        assert!(config.contains("# My project submodules"), "top-level comment lost");
+        assert!(config.contains("# This is my main library"), "submodule comment lost");
+        assert!(config.contains("# default settings"), "defaults comment lost");
         // active must be updated
         assert!(config.contains("active = false"), "active not updated");
     }
@@ -615,14 +550,7 @@ active = true
         let remote_url = format!("file://{}", remote_repo.display());
 
         harness
-            .run_submod_success(&[
-                "add",
-                &remote_url,
-                "--name",
-                "delete-lib",
-                "--path",
-                "lib/delete",
-            ])
+            .run_submod_success(&["add", &remote_url, "--name", "delete-lib", "--path", "lib/delete"])
             .expect("Failed to add submodule");
 
         // Verify it was added
@@ -673,10 +601,7 @@ active = true
         assert!(config.contains("[keep-me]"), "kept section was removed");
         assert!(config.contains("# Project submodules"), "top comment lost");
         // delete-me must be gone
-        assert!(
-            !config.contains("[delete-me]"),
-            "deleted section still present"
-        );
+        assert!(!config.contains("[delete-me]"), "deleted section still present");
     }
 
     #[test]
@@ -752,9 +677,7 @@ active = true
         let content = fs::read_to_string(&output_path).expect("Failed to read generated config");
         // Template should contain sample config content (at minimum a section or defaults)
         assert!(
-            content.contains("[defaults]")
-                || content.contains("vendor-utils")
-                || content.contains("sparse_paths"),
+            content.contains("[defaults]") || content.contains("vendor-utils") || content.contains("sparse_paths"),
             "Template config should contain sample content; got: {content}"
         );
     }
@@ -776,15 +699,8 @@ active = true
             ])
             .expect("Failed to generate empty config");
 
-        assert!(
-            stdout.contains("Generated empty config"),
-            "Expected 'Generated empty config' in stdout, got: {stdout}"
-        );
-        assert!(
-            output_path.exists(),
-            "Output file should exist at {}",
-            output_path.display()
-        );
+        assert!(stdout.contains("Generated empty config"), "Expected 'Generated empty config' in stdout, got: {stdout}");
+        assert!(output_path.exists(), "Output file should exist at {}", output_path.display());
     }
 
     #[test]
@@ -821,14 +737,7 @@ active = true
         let remote_url = format!("file://{}", remote_repo.display());
 
         harness
-            .run_submod_success(&[
-                "add",
-                &remote_url,
-                "--name",
-                "nuke-lib",
-                "--path",
-                "lib/nuke",
-            ])
+            .run_submod_success(&["add", &remote_url, "--name", "nuke-lib", "--path", "lib/nuke"])
             .expect("Failed to add submodule");
 
         // Nuke with --kill (does not reinit)

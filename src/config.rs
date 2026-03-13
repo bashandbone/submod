@@ -683,7 +683,8 @@ impl<'de> Deserialize<'de> for SubmoduleEntries {
     /// Accepts a map where each key maps to a [`SubmoduleEntry`], building both the
     /// `submodules` map and the `sparse_checkouts` map from each entry's `sparse_paths`.
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let map: HashMap<SubmoduleName, SubmoduleEntry> = HashMap::deserialize(deserializer)?;
+        let map: HashMap<SubmoduleName, SubmoduleEntry> =
+            HashMap::deserialize(deserializer)?;
         let mut sparse_checkouts: HashMap<SubmoduleName, Vec<String>> = HashMap::new();
         for (name, entry) in &map {
             if let Some(paths) = &entry.sparse_paths {

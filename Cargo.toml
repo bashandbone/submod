@@ -136,7 +136,3 @@ module_name_repetitions = "allow"
 # Allow some pedantic lints that can be overly strict for CLI tools
 too_many_lines = "allow"
 
-
-[[bench]]
-name = "benchmark"
-harness = false

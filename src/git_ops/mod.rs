@@ -263,9 +263,7 @@ impl GitOperations for GitOpsManager {
             |git2| git2.add_submodule(opts),
         )
         .or_else(|_| {
-            let workdir = self
-                .git2_ops
-                .workdir()
+            let workdir = self.git2_ops.workdir()
                 .ok_or_else(|| anyhow::anyhow!("Repository has no working directory"))?;
             let mut cmd = std::process::Command::new("git");
             cmd.current_dir(workdir)

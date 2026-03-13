@@ -101,11 +101,7 @@ fn main() -> Result<()> {
                 .map_err(|e| anyhow::anyhow!("Failed to create manager: {}", e))?;
 
             // Collect names first to avoid borrow conflict
-            let names: Vec<String> = manager
-                .config()
-                .get_submodules()
-                .map(|(n, _)| n.clone())
-                .collect();
+            let names: Vec<String> = manager.config().get_submodules().map(|(n, _)| n.clone()).collect();
             for name in &names {
                 manager
                     .init_submodule(name)
@@ -117,11 +113,7 @@ fn main() -> Result<()> {
                 .map_err(|e| anyhow::anyhow!("Failed to create manager: {}", e))?;
 
             // Collect names first to avoid borrow conflict
-            let names: Vec<String> = manager
-                .config()
-                .get_submodules()
-                .map(|(n, _)| n.clone())
-                .collect();
+            let names: Vec<String> = manager.config().get_submodules().map(|(n, _)| n.clone()).collect();
             if names.is_empty() {
                 println!("No submodules configured");
             } else {
@@ -172,11 +164,7 @@ fn main() -> Result<()> {
                 .map_err(|e| anyhow::anyhow!("Failed to check submodules: {}", e))?;
 
             // Collect names first to avoid borrow conflict
-            let names: Vec<String> = manager
-                .config()
-                .get_submodules()
-                .map(|(n, _)| n.clone())
-                .collect();
+            let names: Vec<String> = manager.config().get_submodules().map(|(n, _)| n.clone()).collect();
             for name in &names {
                 manager
                     .init_submodule(name)
