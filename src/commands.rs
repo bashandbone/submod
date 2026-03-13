@@ -101,7 +101,11 @@ pub enum Commands {
         )]
         branch: Option<String>,
 
-        #[arg(short = 'i', long = "ignore", help = "What changes in the submodule git should ignore.")]
+        #[arg(
+            short = 'i',
+            long = "ignore",
+            help = "What changes in the submodule git should ignore."
+        )]
         ignore: Option<Ignore>,
 
         #[arg(
@@ -112,10 +116,18 @@ pub enum Commands {
         )]
         sparse_paths: Option<Vec<String>>,
 
-        #[arg(short = 'f', long = "fetch", help = "Sets the recursive fetch behavior for the submodule (like, if we should fetch its submodules).")]
+        #[arg(
+            short = 'f',
+            long = "fetch",
+            help = "Sets the recursive fetch behavior for the submodule (like, if we should fetch its submodules)."
+        )]
         fetch: Option<FetchRecurse>,
 
-        #[arg(short = 'u', long = "update", help = "How git should update the submodule when you run `git submodule update`.")]
+        #[arg(
+            short = 'u',
+            long = "update",
+            help = "How git should update the submodule when you run `git submodule update`."
+        )]
         update: Option<Update>,
 
         // TODO: Implement this arg
