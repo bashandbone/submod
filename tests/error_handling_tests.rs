@@ -48,14 +48,7 @@ mod tests {
 
         for invalid_url in invalid_urls {
             let output = harness
-                .run_submod(&[
-                    "add",
-                    invalid_url,
-                    "--name",
-                    "invalid-test",
-                    "--path",
-                    "lib/invalid",
-                ])
+                .run_submod(&["add", invalid_url, "--name", "invalid-test", "--path", "lib/invalid"])
                 .expect("Failed to run submod");
 
             assert!(!output.status.success());
@@ -111,14 +104,7 @@ mod tests {
 
         // Try to add submodule to read-only directory
         let output = harness
-            .run_submod(&[
-                "add",
-                &remote_url,
-                "--name",
-                "perm-test",
-                "--path",
-                "readonly/submodule",
-            ])
+            .run_submod(&["add", &remote_url, "--name", "perm-test", "--path", "readonly/submodule"])
             .expect("Failed to run submod");
 
         assert!(!output.status.success());
@@ -247,14 +233,7 @@ mod tests {
 
         // Add a submodule
         harness
-            .run_submod_success(&[
-                "add",
-                &remote_url,
-                "--name",
-                "concurrent-test",
-                "--path",
-                "lib/concurrent",
-            ])
+            .run_submod_success(&["add", &remote_url, "--name", "concurrent-test", "--path", "lib/concurrent"])
             .expect("Failed to add submodule");
 
         // Simulate concurrent access by modifying config externally
@@ -296,14 +275,7 @@ active = true
 
         // Add submodule - should handle any space issues gracefully
         let output = harness
-            .run_submod(&[
-                "add",
-                &remote_url,
-                "--name",
-                "large-repo",
-                "--path",
-                "lib/large",
-            ])
+            .run_submod(&["add", &remote_url, "--name", "large-repo", "--path", "lib/large"])
             .expect("Failed to run submod");
 
         // Should either succeed or fail with a meaningful error
@@ -322,7 +294,7 @@ active = true
             vec!["--invalid-flag"],
             vec!["add"],                               // Missing required URL argument
             vec!["add", "--name", "x", "--path", "y"], // Missing required URL argument
-            vec!["reset"], // Missing submodule name when not using --all
+            vec!["reset"],                             // Missing submodule name when not using --all
             vec!["nonexistent-command"],
         ];
 
@@ -348,14 +320,7 @@ active = true
         let timeout_url = "http://nonexistent.invalid.domain.test/repo.git";
 
         let output = harness
-            .run_submod(&[
-                "add",
-                timeout_url,
-                "--name",
-                "timeout-test",
-                "--path",
-                "lib/timeout",
-            ])
+            .run_submod(&["add", timeout_url, "--name", "timeout-test", "--path", "lib/timeout"])
             .expect("Failed to run submod");
 
         assert!(!output.status.success());
@@ -386,14 +351,7 @@ active = true
         let fake_url = format!("file://{}", fake_remote.display());
 
         let output = harness
-            .run_submod(&[
-                "add",
-                &fake_url,
-                "--name",
-                "fake-repo",
-                "--path",
-                "lib/fake",
-            ])
+            .run_submod(&["add", &fake_url, "--name", "fake-repo", "--path", "lib/fake"])
             .expect("Failed to run submod");
 
         assert!(!output.status.success());
@@ -440,14 +398,7 @@ active = true
 
         // Try to add submodule (which requires writing to config)
         let output = harness
-            .run_submod(&[
-                "add",
-                &remote_url,
-                "--name",
-                "locked-test",
-                "--path",
-                "lib/locked",
-            ])
+            .run_submod(&["add", &remote_url, "--name", "locked-test", "--path", "lib/locked"])
             .expect("Failed to run submod");
 
         assert!(!output.status.success());
@@ -478,14 +429,7 @@ active = true
 
         // Try to add submodule to existing directory
         let output = harness
-            .run_submod(&[
-                "add",
-                &remote_url,
-                "--name",
-                "partial-test",
-                "--path",
-                "lib/partial",
-            ])
+            .run_submod(&["add", &remote_url, "--name", "partial-test", "--path", "lib/partial"])
             .expect("Failed to run submod");
 
         // Should handle existing directory appropriately

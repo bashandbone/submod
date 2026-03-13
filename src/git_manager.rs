@@ -165,18 +165,13 @@ impl GitManager {
         if let Some(ref paths) = sparse_paths {
             entry.sparse_paths = Some(paths.clone());
             // Also populate sparse_checkouts so consumers using sparse_checkouts() see the paths
-            self.config
-                .submodules
-                .add_checkout(name.clone(), paths.clone(), true);
+            self.config.submodules.add_checkout(name.clone(), paths.clone(), true);
         }
         // Normalize: convert Unspecified variants to None so they serialize cleanly
         if matches!(entry.ignore, Some(SerializableIgnore::Unspecified)) {
             entry.ignore = None;
         }
-        if matches!(
-            entry.fetch_recurse,
-            Some(SerializableFetchRecurse::Unspecified)
-        ) {
+        if matches!(entry.fetch_recurse, Some(SerializableFetchRecurse::Unspecified)) {
             entry.fetch_recurse = None;
         }
         if matches!(entry.update, Some(SerializableUpdate::Unspecified)) {
@@ -202,9 +197,7 @@ impl GitManager {
         for (name, entry) in self.config.get_submodules() {
             // Determine whether this name needs quoting (contains TOML-special characters).
             // Simple names (alphanumeric, hyphens, underscores) can use the bare [name] form.
-            let needs_quoting = name
-                .chars()
-                .any(|c| !c.is_alphanumeric() && c != '-' && c != '_');
+            let needs_quoting = name.chars().any(|c| !c.is_alphanumeric() && c != '-' && c != '_');
             let escaped_name = name.replace('\\', "\\\\").replace('"', "\\\"");
             let section_header = if needs_quoting {
                 format!("[\"{escaped_name}\"]")
@@ -225,24 +218,15 @@ impl GitManager {
                 output.push_str(&section_header);
                 output.push('\n');
                 if let Some(path) = &entry.path {
-                    output.push_str(&format!(
-                        "path = \"{}\"\n",
-                        path.replace('\\', "\\\\").replace('"', "\\\"")
-                    ));
+                    output.push_str(&format!("path = \"{}\"\n", path.replace('\\', "\\\\").replace('"', "\\\"")));
                 }
                 if let Some(url) = &entry.url {
-                    output.push_str(&format!(
-                        "url = \"{}\"\n",
-                        url.replace('\\', "\\\\").replace('"', "\\\"")
-                    ));
+                    output.push_str(&format!("url = \"{}\"\n", url.replace('\\', "\\\\").replace('"', "\\\"")));
                 }
                 if let Some(branch) = &entry.branch {
                     let val = branch.to_string();
                     if !val.is_empty() {
-                        output.push_str(&format!(
-                            "branch = \"{}\"\n",
-                            val.replace('\\', "\\\\").replace('"', "\\\"")
-                        ));
+                        output.push_str(&format!("branch = \"{}\"\n", val.replace('\\', "\\\\").replace('"', "\\\"")));
                     }
                 }
                 if let Some(ignore) = &entry.ignore {
@@ -275,9 +259,7 @@ impl GitManager {
                     if !sparse_paths.is_empty() {
                         let joined = sparse_paths
                             .iter()
-                            .map(|p| {
-                                format!("\"{}\"", p.replace('\\', "\\\\").replace('"', "\\\""))
-                            })
+                            .map(|p| format!("\"{}\"", p.replace('\\', "\\\\").replace('"', "\\\"")))
                             .collect::<Vec<_>>()
                             .join(", ");
                         output.push_str(&format!("sparse_paths = [{joined}]\n"));
@@ -286,9 +268,8 @@ impl GitManager {
             }
         }
 
-        std::fs::write(&self.config_path, &output).map_err(|e| {
-            SubmoduleError::ConfigError(format!("Failed to write config file: {e}"))
-        })?;
+        std::fs::write(&self.config_path, &output)
+            .map_err(|e| SubmoduleError::ConfigError(format!("Failed to write config file: {e}")))?;
         Ok(())
     }
 
@@ -422,26 +403,26 @@ impl GitManager {
         path: String,
         url: String,
         sparse_paths: Option<Vec<String>>,
-        _branch: Option<SerializableBranch>,
-        _ignore: Option<SerializableIgnore>,
-        _fetch: Option<SerializableFetchRecurse>,
-        _update: Option<SerializableUpdate>,
-        _shallow: Option<bool>,
-        _no_init: bool,
+        branch: Option<SerializableBranch>,
+        ignore: Option<SerializableIgnore>,
+        fetch: Option<SerializableFetchRecurse>,
+        update: Option<SerializableUpdate>,
+        shallow: Option<bool>,
+        no_init: bool,
     ) -> Result<(), SubmoduleError> {
-        if _no_init {
+        if no_init {
             self.update_toml_config(
                 name.clone(),
                 SubmoduleEntry {
                     path: Some(path.clone()),
                     url: Some(url.clone()),
-                    branch: _branch.clone(),
-                    ignore: _ignore.clone(),
-                    update: _update.clone(),
-                    fetch_recurse: _fetch.clone(),
+                    branch: branch.clone(),
+                    ignore: ignore.clone(),
+                    update: update.clone(),
+                    fetch_recurse: fetch.clone(),
                     active: Some(true),
-                    shallow: _shallow,
-                    no_init: Some(_no_init),
+                    shallow: shallow,
+                    no_init: Some(no_init),
                     sparse_paths: None,
                 },
                 sparse_paths.clone(),
@@ -457,18 +438,14 @@ impl GitManager {
             name: name.clone(),
             path: std::path::PathBuf::from(&path),
             url: url.clone(),
-            branch: None,
-            ignore: None,
-            update: None,
-            fetch_recurse: None,
-            shallow: false,
+            branch: branch.clone(),
+            ignore: ignore.clone(),
+            update: update.clone(),
+            fetch_recurse: fetch.clone(),
+            shallow: shallow.unwrap_or(false),
             no_init: false,
         };
-        match self
-            .git_ops
-            .add_submodule(&opts)
-            .map_err(Self::map_git_ops_error)
-        {
+        match self.git_ops.add_submodule(&opts).map_err(Self::map_git_ops_error) {
             Ok(()) => {
                 // Configure after successful submodule creation (clone/init handled by the underlying backend, currently the git CLI)
                 self.configure_submodule_post_creation(&name, &path, sparse_paths.clone())?;
@@ -477,13 +454,13 @@ impl GitManager {
                     SubmoduleEntry {
                         path: Some(path),
                         url: Some(url),
-                        branch: _branch,
-                        ignore: _ignore,
-                        update: _update,
-                        fetch_recurse: _fetch,
+                        branch: branch,
+                        ignore: ignore,
+                        update: update,
+                        fetch_recurse: fetch,
                         active: Some(true),
-                        shallow: _shallow,
-                        no_init: Some(_no_init),
+                        shallow: shallow,
+                        no_init: Some(no_init),
                         sparse_paths: None, // stored separately via configure_submodule_post_creation
                     },
                     sparse_paths,
@@ -722,15 +699,14 @@ impl GitManager {
                 name: name.to_string(),
                 path: std::path::PathBuf::from(path_str),
                 url: url_str.to_string(),
-                branch: None,
-                ignore: None,
-                update: None,
-                fetch_recurse: None,
-                shallow: false,
+                branch: config.branch.clone(),
+                ignore: config.ignore.clone(),
+                update: config.update.clone(),
+                fetch_recurse: config.fetch_recurse.clone(),
+                shallow: config.shallow.unwrap_or(false),
                 no_init: false,
             };
-            self.git_ops
-                .add_submodule(&opts)
+            self.git_ops.add_submodule(&opts)
                 .map_err(Self::map_git_ops_error)?;
         } else {
             // Submodule is registered, just initialize and update using GitOperations
@@ -891,24 +867,15 @@ impl GitManager {
     fn entry_to_kv_lines(entry: &SubmoduleEntry) -> Vec<(String, String)> {
         let mut kv: Vec<(String, String)> = Vec::new();
         if let Some(path) = &entry.path {
-            kv.push((
-                "path".into(),
-                format!("\"{}\"", path.replace('\\', "\\\\").replace('"', "\\\"")),
-            ));
+            kv.push(("path".into(), format!("\"{}\"", path.replace('\\', "\\\\").replace('"', "\\\""))));
         }
         if let Some(url) = &entry.url {
-            kv.push((
-                "url".into(),
-                format!("\"{}\"", url.replace('\\', "\\\\").replace('"', "\\\"")),
-            ));
+            kv.push(("url".into(), format!("\"{}\"", url.replace('\\', "\\\\").replace('"', "\\\""))));
         }
         if let Some(branch) = &entry.branch {
             let val = branch.to_string();
             if !val.is_empty() {
-                kv.push((
-                    "branch".into(),
-                    format!("\"{}\"", val.replace('\\', "\\\\").replace('"', "\\\"")),
-                ));
+                kv.push(("branch".into(), format!("\"{}\"", val.replace('\\', "\\\\").replace('"', "\\\""))));
             }
         }
         if let Some(ignore) = &entry.ignore {
@@ -951,17 +918,8 @@ impl GitManager {
     }
 
     /// Known submodule key names (used to identify which lines to update vs. preserve).
-    const KNOWN_SUBMODULE_KEYS: &'static [&'static str] = &[
-        "path",
-        "url",
-        "branch",
-        "ignore",
-        "fetch",
-        "update",
-        "active",
-        "shallow",
-        "sparse_paths",
-    ];
+    const KNOWN_SUBMODULE_KEYS: &'static [&'static str] =
+        &["path", "url", "branch", "ignore", "fetch", "update", "active", "shallow", "sparse_paths"];
 
     /// Known [defaults] key names.
     const KNOWN_DEFAULTS_KEYS: &'static [&'static str] = &["ignore", "fetch", "update"];
@@ -1001,11 +959,8 @@ impl GitManager {
         };
 
         // Build the current submodule map sorted by name for deterministic append order
-        let current_entries: std::collections::BTreeMap<String, &SubmoduleEntry> = self
-            .config
-            .get_submodules()
-            .map(|(n, e)| (n.clone(), e))
-            .collect();
+        let current_entries: std::collections::BTreeMap<String, &SubmoduleEntry> =
+            self.config.get_submodules().map(|(n, e)| (n.clone(), e)).collect();
 
         // Track which names appeared in the existing file (so we know what to append)
         let mut seen_names: std::collections::HashSet<String> = std::collections::HashSet::new();
@@ -1052,21 +1007,15 @@ impl GitManager {
             let mut kv = Vec::new();
             if let Some(ignore) = &defaults.ignore {
                 let val = ignore.to_string();
-                if !val.is_empty() {
-                    kv.push(("ignore".into(), format!("\"{val}\"")));
-                }
+                if !val.is_empty() { kv.push(("ignore".into(), format!("\"{val}\""))); }
             }
             if let Some(fetch_recurse) = &defaults.fetch_recurse {
                 let val = fetch_recurse.to_string();
-                if !val.is_empty() {
-                    kv.push(("fetch".into(), format!("\"{val}\"")));
-                }
+                if !val.is_empty() { kv.push(("fetch".into(), format!("\"{val}\""))); }
             }
             if let Some(update) = &defaults.update {
                 let val = update.to_string();
-                if !val.is_empty() {
-                    kv.push(("update".into(), format!("\"{val}\"")));
-                }
+                if !val.is_empty() { kv.push(("update".into(), format!("\"{val}\""))); }
             }
             kv
         };
@@ -1090,8 +1039,11 @@ impl GitManager {
                 // Rewrite [defaults] section preserving comments
                 output.push_str(header);
                 output.push('\n');
-                let new_body =
-                    Self::merge_section_body(body, &defaults_kv, Self::KNOWN_DEFAULTS_KEYS);
+                let new_body = Self::merge_section_body(
+                    body,
+                    &defaults_kv,
+                    Self::KNOWN_DEFAULTS_KEYS,
+                );
                 for line in &new_body {
                     output.push_str(line);
                     output.push('\n');
@@ -1126,9 +1078,8 @@ impl GitManager {
         // Append submodule sections that weren't in the existing file (sorted for determinism)
         for (name, entry) in &current_entries {
             if !seen_names.contains(name.as_str()) {
-                let needs_quoting = name
-                    .chars()
-                    .any(|c| !c.is_alphanumeric() && c != '-' && c != '_');
+                let needs_quoting =
+                    name.chars().any(|c| !c.is_alphanumeric() && c != '-' && c != '_');
                 let escaped_name = name.replace('\\', "\\\\").replace('"', "\\\"");
                 let section_header = if needs_quoting {
                     format!("[\"{escaped_name}\"]")
@@ -1144,9 +1095,8 @@ impl GitManager {
             }
         }
 
-        std::fs::write(&self.config_path, &output).map_err(|e| {
-            SubmoduleError::ConfigError(format!("Failed to write config file: {e}"))
-        })?;
+        std::fs::write(&self.config_path, &output)
+            .map_err(|e| SubmoduleError::ConfigError(format!("Failed to write config file: {e}")))?;
         Ok(())
     }
 
@@ -1160,12 +1110,11 @@ impl GitManager {
         known_keys: &[&str],
     ) -> Vec<String> {
         // Build a lookup of new values by key
-        let kv_map: std::collections::HashMap<&str, &str> = new_kv
-            .iter()
-            .map(|(k, v)| (k.as_str(), v.as_str()))
-            .collect();
+        let kv_map: std::collections::HashMap<&str, &str> =
+            new_kv.iter().map(|(k, v)| (k.as_str(), v.as_str())).collect();
 
-        let mut emitted_keys: std::collections::HashSet<&str> = std::collections::HashSet::new();
+        let mut emitted_keys: std::collections::HashSet<&str> =
+            std::collections::HashSet::new();
         let mut result: Vec<String> = Vec::new();
 
         for line in body {
@@ -1314,9 +1263,7 @@ impl GitManager {
         // Update the entry in config
         let mut updated = entry.clone();
         updated.active = Some(false);
-        self.config
-            .submodules
-            .update_entry(name.to_string(), updated);
+        self.config.submodules.update_entry(name.to_string(), updated);
 
         self.write_full_config()?;
         println!("Disabled submodule '{name}'.");
@@ -1379,20 +1326,19 @@ impl GitManager {
             })?
             .clone();
 
-        let new_path = path.as_ref().map(|p| p.to_string_lossy().to_string());
+        let new_path = path.as_ref().map(|p| {
+            p.to_string_lossy().to_string()
+        });
 
         // If path is changing, delete and re-add
         if let Some(ref np) = new_path {
             let old_path = entry.path.as_deref().unwrap_or(name);
             if np != old_path {
-                let sub_url = url
-                    .as_deref()
+                let sub_url = url.as_deref()
                     .or(entry.url.as_deref())
-                    .ok_or_else(|| {
-                        SubmoduleError::ConfigError(
-                            "Cannot re-clone submodule: no URL available.".to_string(),
-                        )
-                    })?
+                    .ok_or_else(|| SubmoduleError::ConfigError(
+                        "Cannot re-clone submodule: no URL available.".to_string(),
+                    ))?
                     .to_string();
 
                 // Delete old then re-add at new path
@@ -1408,8 +1354,7 @@ impl GitManager {
 
                 // Compute effective sparse paths: caller's value if provided, else preserve existing
                 let effective_sparse = if let Some(ref sp) = sparse_paths {
-                    let paths: Vec<String> =
-                        sp.iter().map(|p| p.to_string_lossy().to_string()).collect();
+                    let paths: Vec<String> = sp.iter().map(|p| p.to_string_lossy().to_string()).collect();
                     if paths.is_empty() { None } else { Some(paths) }
                 } else {
                     entry.sparse_paths.clone().filter(|v| !v.is_empty())
@@ -1493,9 +1438,7 @@ impl GitManager {
                     .submodules
                     .add_checkout(name.to_string(), new_paths, replace);
             }
-            self.config
-                .submodules
-                .update_entry(name.to_string(), updated);
+            self.config.submodules.update_entry(name.to_string(), updated);
         }
 
         self.write_full_config()?;
@@ -1529,13 +1472,19 @@ impl GitManager {
         // Snapshot entries before deleting (needed for reinit)
         let snapshots: Vec<(String, SubmoduleEntry)> = targets
             .iter()
-            .filter_map(|n| self.config.get_submodule(n).map(|e| (n.clone(), e.clone())))
+            .filter_map(|n| {
+                self.config
+                    .get_submodule(n)
+                    .map(|e| (n.clone(), e.clone()))
+            })
             .collect();
 
         // Validate all targets exist before starting
         for name in &targets {
             if self.config.get_submodule(name).is_none() {
-                return Err(SubmoduleError::SubmoduleNotFound { name: name.clone() });
+                return Err(SubmoduleError::SubmoduleNotFound {
+                    name: name.clone(),
+                });
             }
         }
 
@@ -1550,13 +1499,22 @@ impl GitManager {
                 let url = match entry.url.clone() {
                     Some(u) if !u.is_empty() => u,
                     _ => {
-                        eprintln!("Skipping reinit of '{name}': no URL in config entry.");
+                        eprintln!(
+                            "Skipping reinit of '{name}': no URL in config entry."
+                        );
                         continue;
                     }
                 };
                 println!("🔄 Reinitializing submodule '{name}'...");
-                let path = entry.path.as_deref().unwrap_or(&name).to_string();
-                let sparse = entry.sparse_paths.clone().filter(|paths| !paths.is_empty());
+                let path = entry
+                    .path
+                    .as_deref()
+                    .unwrap_or(&name)
+                    .to_string();
+                let sparse = entry
+                    .sparse_paths
+                    .clone()
+                    .filter(|paths| !paths.is_empty());
                 self.add_submodule(
                     name.clone(),
                     path.into(),
@@ -1608,7 +1566,10 @@ impl GitManager {
             })?;
 
             // Build a Config from the SubmoduleEntries
-            let config = Config::new(crate::config::SubmoduleDefaults::default(), entries);
+            let config = Config::new(
+                crate::config::SubmoduleDefaults::default(),
+                entries,
+            );
 
             // Serialize using write_full_config logic but to the output path
             let tmp_manager = GitManager {

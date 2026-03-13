@@ -8,9 +8,7 @@
 //! This module is adapted and simplified from the `gix` CLI (https://github.com/GitoxideLabs/gitoxide/tree/main/src/) and its supporting `gitoxide-core` crate.
 
 use anyhow::Result;
-use gitoxide_core::repository::fetch::{
-    Options as FetchOptions, PROGRESS_RANGE as FetchProgressRange,
-};
+use gitoxide_core::repository::fetch::{Options as FetchOptions, PROGRESS_RANGE as FetchProgressRange};
 use gix::{features::progress, progress::prodash};
 use prodash::render::line;
 use std::io::{stderr, stdout};
