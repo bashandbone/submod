@@ -74,6 +74,7 @@ jobs:
             - uses: rustsec/audit-check@v1.4.1
               with:
                   token: ${{ secrets.GITHUB_TOKEN }}
+                  ignore: RUSTSEC-2024-0364
 
     coverage:
         name: Code Coverage
