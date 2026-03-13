@@ -1,0 +1,8 @@
+# SPDX-FileCopyrightText: 2025 Adam Poulemanos <89049923+bashandbone@users.noreply.github.com>
+#
+# SPDX-License-Identifier: LicenseRef-PlainMIT OR MIT
+
+[advisories]
+ignore = [
+    "RUSTSEC-2024-0364", # gitoxide-core does not neutralize special characters for terminals. No patched version available.
+]
