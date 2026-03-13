@@ -118,7 +118,6 @@ pub enum Commands {
         #[arg(short = 'u', long = "update", help = "How git should update the submodule when you run `git submodule update`.")]
         update: Option<Update>,
 
-        // TODO: Implement this arg
         #[arg(short = 's', long = "shallow", default_value = "false", action = clap::ArgAction::SetTrue, default_missing_value = "true", help = "If given, sets the submodule as a shallow clone. It will only fetch the last commit of the branch, not the full history.")]
         shallow: bool,
 
