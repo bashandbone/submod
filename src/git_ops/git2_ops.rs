@@ -702,8 +702,9 @@ impl GitOperations for Git2Operations {
         })?;
         let patterns = content
             .lines()
-            .map(|line| line.trim().to_string())
+            .map(|line| line.trim())
             .filter(|line| !line.is_empty() && !line.starts_with('#'))
+            .map(|line| line.to_string())
             .collect();
         Ok(patterns)
     }

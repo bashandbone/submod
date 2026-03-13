@@ -788,7 +788,8 @@ active = true
             .output()
             .expect("Failed to run git");
 
-        let is_shallow = String::from_utf8_lossy(&output.stdout).trim();
+        let output_str = String::from_utf8_lossy(&output.stdout);
+        let is_shallow = output_str.trim();
         assert_eq!(
             is_shallow, "true",
             "Repository at lib/shallow should be shallow"
