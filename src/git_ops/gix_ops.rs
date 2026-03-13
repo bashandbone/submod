@@ -588,23 +588,33 @@ impl GitOperations for GixOperations {
 
             // 2. Check if submodule has uncommitted changes (unless force is true)
             if !force && submodule_path.exists() && submodule_path.join(".git").exists() {
-                if let Ok(submodule_repo) = gix::open(&submodule_path) {
-                    // TODO: properly implement this
-                    // Check for uncommitted changes
-                    // Note: gix status API is complex, for now we'll do a simple check
-                    // by looking at the index vs HEAD
-                    let head = submodule_repo.head_commit().ok();
-                    let index = submodule_repo.index_or_empty().ok();
+                // Check for uncommitted changes using git2 fallback as gix status API is complex
+                if let Ok(git2_repo) = git2::Repository::open(&submodule_path) {
+                    let mut status_opts = git2::StatusOptions::new();
+                    status_opts.include_untracked(true);
+                    status_opts.include_ignored(false);
 
-                    // Simple check: if we can't get head or index, assume there might be changes
-                    if head.is_none() || index.is_none() {
-                        if !force {
+                    if let Ok(statuses) = git2_repo.statuses(Some(&mut status_opts)) {
+                        let is_dirty = !statuses.is_empty();
+                        if is_dirty {
                             return Err(anyhow::anyhow!(
-                                "Submodule '{}' might have uncommitted changes. Use force=true to override.",
+                                "Submodule '{}' has uncommitted changes. Use force=true to override.",
                                 path
                             ));
                         }
+                    } else {
+                        // If we can't determine dirty status reliably, assume it might have changes
+                        return Err(anyhow::anyhow!(
+                            "Submodule '{}' might have uncommitted changes. Use force=true to override.",
+                            path
+                        ));
                     }
+                } else {
+                    // If we can't open repo, assume there might be changes
+                    return Err(anyhow::anyhow!(
+                        "Submodule '{}' might have uncommitted changes. Use force=true to override.",
+                        path
+                    ));
                 }
             }
 
