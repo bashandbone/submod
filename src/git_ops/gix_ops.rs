@@ -21,9 +21,7 @@ fn gix_file_from_bytes(bytes: Vec<u8>) -> Result<gix::config::File<'static>> {
 }
 
 use super::{DetailedSubmoduleStatus, GitConfig, GitOperations, SubmoduleStatusFlags};
-use crate::config::{
-    SubmoduleAddOptions, SubmoduleEntries, SubmoduleUpdateOptions,
-};
+use crate::config::{SubmoduleAddOptions, SubmoduleEntries, SubmoduleUpdateOptions};
 use crate::options::{ConfigLevel, GitmodulesConvert};
 use crate::utilities;
 

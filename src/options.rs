@@ -402,9 +402,8 @@ impl<'de> Deserialize<'de> for SerializableBranch {
     /// become [`Name`](SerializableBranch::Name).
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         let s = String::deserialize(deserializer)?;
-        SerializableBranch::from_str(&s).map_err(|_| {
-            serde::de::Error::custom(format!("invalid branch value: {s}"))
-        })
+        SerializableBranch::from_str(&s)
+            .map_err(|_| serde::de::Error::custom(format!("invalid branch value: {s}")))
     }
 }
 
