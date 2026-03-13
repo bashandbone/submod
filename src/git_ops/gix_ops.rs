@@ -588,29 +588,28 @@ impl GitOperations for GixOperations {
 
             // 2. Check if submodule has uncommitted changes (unless force is true)
             if !force && submodule_path.exists() && submodule_path.join(".git").exists() {
-                // Check for uncommitted changes using git2 fallback as gix status API is complex
-                if let Ok(git2_repo) = git2::Repository::open(&submodule_path) {
-                    let mut status_opts = git2::StatusOptions::new();
-                    status_opts.include_untracked(true);
-                    status_opts.include_ignored(false);
-
-                    if let Ok(statuses) = git2_repo.statuses(Some(&mut status_opts)) {
-                        let is_dirty = !statuses.is_empty();
-                        if is_dirty {
+                if let Ok(submodule_repo) = gix::open(&submodule_path) {
+                    // Check for uncommitted changes using gix.
+                    // The is_dirty() method will return true if there are uncommitted changes,
+                    // including untracked files and modifications to tracked files.
+                    match submodule_repo.is_dirty() {
+                        Ok(is_dirty) => {
+                            if is_dirty {
+                                return Err(anyhow::anyhow!(
+                                    "Submodule '{}' has uncommitted changes. Use force=true to override.",
+                                    path
+                                ));
+                            }
+                        }
+                        Err(err) => {
+                            // If we can't determine dirty status reliably, assume it might have changes
                             return Err(anyhow::anyhow!(
-                                "Submodule '{}' has uncommitted changes. Use force=true to override.",
-                                path
+                                "Submodule '{}' might have uncommitted changes. Use force=true to override.\nError: {}",
+                                path, err
                             ));
                         }
-                    } else {
-                        // If we can't determine dirty status reliably, assume it might have changes
-                        return Err(anyhow::anyhow!(
-                            "Submodule '{}' might have uncommitted changes. Use force=true to override.",
-                            path
-                        ));
                     }
                 } else {
-                    // If we can't open repo, assume there might be changes
                     return Err(anyhow::anyhow!(
                         "Submodule '{}' might have uncommitted changes. Use force=true to override.",
                         path
