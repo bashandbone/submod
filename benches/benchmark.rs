@@ -1,4 +1,5 @@
-use criterion::{Criterion, black_box, criterion_group, criterion_main};
+use criterion::{Criterion, criterion_group, criterion_main};
+use std::hint::black_box;
 
 fn line_key_old<'a>(line: &str, known_keys: &[&'a str]) -> Option<&'a str> {
     let trimmed = line.trim();
