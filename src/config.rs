@@ -793,7 +793,7 @@ impl SubmoduleEntries {
                     false => {
                         // Append to the existing checkout
                         let mut new_checkout = existing_checkout.clone();
-                        new_checkout.extend(checkout.iter().cloned());
+                        new_checkout.extend_from_slice(checkout);
                         sparse_checkouts.insert(name, new_checkout);
                     }
                 }
