@@ -782,27 +782,27 @@ impl SubmoduleEntries {
     }
 
     /// Add a sparse checkout
-    pub fn add_checkout(&mut self, name: SubmoduleName, checkout: Vec<String>, replace: bool) {
+    pub fn add_checkout(&mut self, name: SubmoduleName, checkout: &[String], replace: bool) {
         if let Some(sparse_checkouts) = &mut self.sparse_checkouts {
             if let Some(existing_checkout) = sparse_checkouts.get(&name) {
                 match replace {
                     true => {
                         // Replace the existing checkout with the new one
-                        sparse_checkouts.insert(name, checkout);
+                        sparse_checkouts.insert(name, checkout.to_vec());
                     }
                     false => {
                         // Append to the existing checkout
                         let mut new_checkout = existing_checkout.clone();
-                        new_checkout.extend(checkout);
+                        new_checkout.extend_from_slice(checkout);
                         sparse_checkouts.insert(name, new_checkout);
                     }
                 }
             } else {
                 // No existing checkout, just insert the new one
-                sparse_checkouts.insert(name, checkout);
+                sparse_checkouts.insert(name, checkout.to_vec());
             }
         } else {
-            self.sparse_checkouts = Some(HashMap::from([(name, checkout)]));
+            self.sparse_checkouts = Some(HashMap::from([(name, checkout.to_vec())]));
         }
     }
 
