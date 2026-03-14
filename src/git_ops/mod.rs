@@ -262,9 +262,59 @@ impl GitOperations for GitOpsManager {
             |gix| gix.add_submodule(opts),
             |git2| git2.add_submodule(opts),
         )
-        .or_else(|_| {
+        .or_else(|git2_err| {
             let workdir = self.git2_ops.workdir()
                 .ok_or_else(|| anyhow::anyhow!("Repository has no working directory"))?;
+
+            // Clean up potentially partially initialized submodule path before fallback
+            let sub_path = workdir.join(&opts.path);
+            if sub_path.exists() {
+                let _ = std::fs::remove_dir_all(&sub_path);
+            }
+
+            // git2 also adds the submodule to .gitmodules, which will cause CLI to fail
+            // if we don't clean it up.
+            let gitmodules_path = workdir.join(".gitmodules");
+            if gitmodules_path.exists() {
+                // If it fails to read or write we just ignore it as it's a fallback cleanup
+                if let Ok(content) = std::fs::read_to_string(&gitmodules_path) {
+                    let mut new_content = String::new();
+                    let mut in_target_section = false;
+                    for line in content.lines() {
+                        if line.starts_with("[submodule \"") {
+                            in_target_section = line.contains(&format!("\"{}\"", opts.name));
+                        }
+                        if !in_target_section {
+                            new_content.push_str(line);
+                            new_content.push('\n');
+                        }
+                    }
+                    let _ = std::fs::write(&gitmodules_path, new_content);
+                }
+            }
+
+            // Also git2 might have added it to .git/config
+            let gitconfig_path = workdir.join(".git").join("config");
+            if gitconfig_path.exists() {
+                let _ = std::process::Command::new("git")
+                    .args(["config", "--remove-section", &format!("submodule.{}", opts.name)])
+                    .current_dir(workdir)
+                    .output();
+            }
+
+            // Also git2 might have created the internal git directory
+            let internal_git_dir = workdir.join(".git").join("modules").join(&opts.name);
+            if internal_git_dir.exists() {
+                let _ = std::fs::remove_dir_all(&internal_git_dir);
+            }
+
+            // And removed from index
+            let _ = std::process::Command::new("git")
+                .args(["rm", "--cached", "-r", "--ignore-unmatch"])
+                .arg(&opts.path)
+                .current_dir(workdir)
+                .output();
+
             let mut cmd = std::process::Command::new("git");
             cmd.current_dir(workdir)
                 .arg("submodule")
@@ -283,7 +333,8 @@ impl GitOperations for GitOpsManager {
                 Ok(())
             } else {
                 Err(anyhow::anyhow!(
-                    "Failed to add submodule: {}",
+                    "Failed to add submodule (git2 failed with: {}). CLI output: {}",
+                    git2_err,
                     String::from_utf8_lossy(&output.stderr).trim()
                 ))
             }

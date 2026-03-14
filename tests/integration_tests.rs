@@ -760,9 +760,32 @@ active = true
         let remote_repo = harness
             .create_test_remote("shallow_lib")
             .expect("Failed to create remote");
+
+        // We use a file URL since that works locally for Git.
+        // Note: Git locally defaults to turning off full file-based shallow clone protocols,
+        // so we need to enable it for testing.
+        std::process::Command::new("git")
+            .args(["config", "protocol.file.allow", "always"])
+            .current_dir(&harness.work_dir)
+            .output()
+            .expect("Failed to configure git protocol");
+
+        // Also enable `uploadpack.allowFilter` to let git clone shallowly from file URL
+        std::process::Command::new("git")
+            .args(["config", "uploadpack.allowFilter", "true"])
+            .current_dir(&remote_repo)
+            .output()
+            .expect("Failed to configure git uploadpack");
+
+        std::process::Command::new("git")
+            .args(["config", "uploadpack.allowAnySHA1InWant", "true"])
+            .current_dir(&remote_repo)
+            .output()
+            .expect("Failed to configure git uploadpack");
+
         let remote_url = format!("file://{}", remote_repo.display());
 
-        // Add submodule with shallow flag
+        // Add submodule with shallow flag (add branch argument to explicitly point to main)
         let stdout = harness
             .run_submod_success(&[
                 "add",
