@@ -162,10 +162,14 @@ impl GitManager {
         mut entry: crate::config::SubmoduleEntry,
         sparse_paths: Option<Vec<String>>,
     ) -> Result<(), SubmoduleError> {
-        if let Some(ref paths) = sparse_paths {
-            entry.sparse_paths = Some(paths.clone());
-            // Also populate sparse_checkouts so consumers using sparse_checkouts() see the paths
-            self.config.submodules.add_checkout(name.clone(), paths, true);
+        if let Some(paths) = sparse_paths {
+            // Move the Vec into entry.sparse_paths to avoid cloning,
+            // then borrow it for add_checkout.
+            entry.sparse_paths = Some(paths);
+            if let Some(ref stored_paths) = entry.sparse_paths {
+                // Also populate sparse_checkouts so consumers using sparse_checkouts() see the paths
+                self.config.submodules.add_checkout(name.clone(), stored_paths, true);
+            }
         }
         // Normalize: convert Unspecified variants to None so they serialize cleanly
         if matches!(entry.ignore, Some(SerializableIgnore::Unspecified)) {
