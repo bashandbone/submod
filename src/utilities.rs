@@ -226,3 +226,21 @@ pub(crate) fn get_name(
         Err(anyhow::anyhow!("No valid name source provided"))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_name_from_url() {
+        // Happy paths
+        assert_eq!(name_from_url("https://github.com/user/repo").unwrap(), "repo");
+        assert_eq!(name_from_url("https://github.com/user/repo.git").unwrap(), "repo");
+        assert_eq!(name_from_url("https://github.com/user/repo/").unwrap(), "repo");
+        assert_eq!(name_from_url("git@github.com:user/repo.git").unwrap(), "repo");
+
+        // Error paths
+        let err = name_from_url("").unwrap_err();
+        assert_eq!(err.to_string(), "URL cannot be empty");
+    }
+}
