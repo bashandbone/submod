@@ -267,7 +267,7 @@ mod tests {
             get_name(
                 Some("".to_string()),
                 None,
-                Some(std::ffi::OsString::from("path/to/my-module"))
+                Some(PathBuf::from_iter(["path", "to", "my-module"]).into_os_string())
             )
             .unwrap(),
             "my-module"
