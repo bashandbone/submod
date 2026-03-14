@@ -232,15 +232,81 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_name_from_url() {
-        // Happy paths
-        assert_eq!(name_from_url("https://github.com/user/repo").unwrap(), "repo");
-        assert_eq!(name_from_url("https://github.com/user/repo.git").unwrap(), "repo");
-        assert_eq!(name_from_url("https://github.com/user/repo/").unwrap(), "repo");
-        assert_eq!(name_from_url("git@github.com:user/repo.git").unwrap(), "repo");
+    fn test_get_name_valid_name() {
+        assert_eq!(
+            get_name(Some("my-repo".to_string()), None, None).unwrap(),
+            "my-repo"
+        );
+        assert_eq!(
+            get_name(
+                Some("  spaced-repo  ".to_string()),
+                None,
+                None
+            )
+            .unwrap(),
+            "spaced-repo"
+        );
+    }
 
-        // Error paths
-        let err = name_from_url("").unwrap_err();
-        assert_eq!(err.to_string(), "URL cannot be empty");
+    #[test]
+    fn test_get_name_empty_name_fallback_url() {
+        assert_eq!(
+            get_name(
+                Some("   ".to_string()),
+                Some("https://github.com/user/repo.git".to_string()),
+                None
+            )
+            .unwrap(),
+            "repo"
+        );
+    }
+
+    #[test]
+    fn test_get_name_empty_name_fallback_path() {
+        assert_eq!(
+            get_name(
+                Some("".to_string()),
+                None,
+                Some(PathBuf::from_iter(["path", "to", "my-module"]).into_os_string())
+            )
+            .unwrap(),
+            "my-module"
+        );
+    }
+
+    #[test]
+    fn test_get_name_empty_name_no_fallback() {
+        assert!(get_name(Some("  ".to_string()), None, None).is_err());
+    }
+
+    #[test]
+    fn test_get_name_no_name_valid_path() {
+        assert_eq!(
+            get_name(
+                None,
+                None,
+                Some(std::ffi::OsString::from("another-path"))
+            )
+            .unwrap(),
+            "another-path"
+        );
+    }
+
+    #[test]
+    fn test_get_name_no_name_no_path_valid_url() {
+        assert_eq!(
+            get_name(
+                None,
+                Some("git@github.com:user/another-repo.git".to_string()),
+                None
+            )
+            .unwrap(),
+            "another-repo"
+        );
+    }
+
+    #[test]
+    fn test_get_name_all_none() {
+        assert!(get_name(None, None, None).is_err());
     }
 }
