@@ -772,6 +772,8 @@ active = true
                 "--path",
                 "lib/shallow",
                 "--shallow",
+                "--branch",
+                "main",
             ])
             .expect("Failed to add submodule");
 

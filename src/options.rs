@@ -694,3 +694,82 @@ impl GixGit2Convert for SerializableUpdate {
         Self::try_from(gix).map_err(|_| ()) // Handle unsupported variants
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_serializable_ignore_gitmodules_key() {
+        assert_eq!(SerializableIgnore::All.gitmodules_key(), "ignore");
+        assert_eq!(SerializableIgnore::Dirty.gitmodules_key(), "ignore");
+        assert_eq!(SerializableIgnore::Untracked.gitmodules_key(), "ignore");
+        assert_eq!(SerializableIgnore::None.gitmodules_key(), "ignore");
+        assert_eq!(SerializableIgnore::Unspecified.gitmodules_key(), "ignore");
+    }
+
+    #[test]
+    fn test_serializable_ignore_to_gitmodules() {
+        assert_eq!(SerializableIgnore::All.to_gitmodules(), "all");
+        assert_eq!(SerializableIgnore::Dirty.to_gitmodules(), "dirty");
+        assert_eq!(SerializableIgnore::Untracked.to_gitmodules(), "untracked");
+        assert_eq!(SerializableIgnore::None.to_gitmodules(), "none");
+        assert_eq!(SerializableIgnore::Unspecified.to_gitmodules(), "");
+    }
+
+    #[test]
+    fn test_serializable_ignore_from_gitmodules() {
+        assert_eq!(
+            SerializableIgnore::from_gitmodules("all").unwrap(),
+            SerializableIgnore::All
+        );
+        assert_eq!(
+            SerializableIgnore::from_gitmodules("dirty").unwrap(),
+            SerializableIgnore::Dirty
+        );
+        assert_eq!(
+            SerializableIgnore::from_gitmodules("untracked").unwrap(),
+            SerializableIgnore::Untracked
+        );
+        assert_eq!(
+            SerializableIgnore::from_gitmodules("none").unwrap(),
+            SerializableIgnore::None
+        );
+        assert_eq!(
+            SerializableIgnore::from_gitmodules("").unwrap(),
+            SerializableIgnore::Unspecified
+        );
+
+        assert!(SerializableIgnore::from_gitmodules("invalid").is_err());
+        assert!(SerializableIgnore::from_gitmodules("ALL").is_err());
+    }
+
+    #[test]
+    fn test_serializable_ignore_from_gitmodules_bytes() {
+        assert_eq!(
+            SerializableIgnore::from_gitmodules_bytes(b"all").unwrap(),
+            SerializableIgnore::All
+        );
+        assert_eq!(
+            SerializableIgnore::from_gitmodules_bytes(b"dirty").unwrap(),
+            SerializableIgnore::Dirty
+        );
+        assert_eq!(
+            SerializableIgnore::from_gitmodules_bytes(b"untracked").unwrap(),
+            SerializableIgnore::Untracked
+        );
+        assert_eq!(
+            SerializableIgnore::from_gitmodules_bytes(b"none").unwrap(),
+            SerializableIgnore::None
+        );
+        assert_eq!(
+            SerializableIgnore::from_gitmodules_bytes(b"").unwrap(),
+            SerializableIgnore::Unspecified
+        );
+
+        assert!(SerializableIgnore::from_gitmodules_bytes(b"invalid").is_err());
+
+        // Invalid UTF-8
+        assert!(SerializableIgnore::from_gitmodules_bytes(&[0xFF, 0xFE, 0xFD]).is_err());
+    }
+}
