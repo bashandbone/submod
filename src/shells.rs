@@ -95,6 +95,71 @@ impl TryFrom<AotShell> for Shell {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_from_path_bash() {
+        assert_eq!(Shell::from_path("/bin/bash"), Some(Shell::Bash));
+        assert_eq!(Shell::from_path("bash.exe"), Some(Shell::Bash));
+    }
+
+    #[test]
+    fn test_from_path_zsh() {
+        assert_eq!(Shell::from_path("/usr/bin/zsh"), Some(Shell::Zsh));
+        assert_eq!(Shell::from_path("zsh"), Some(Shell::Zsh));
+    }
+
+    #[test]
+    fn test_from_path_fish() {
+        assert_eq!(Shell::from_path("/usr/local/bin/fish"), Some(Shell::Fish));
+        assert_eq!(Shell::from_path("fish"), Some(Shell::Fish));
+    }
+
+    #[test]
+    fn test_from_path_powershell() {
+        // Rust's Path parsing behavior depends on the target OS,
+        // so to make this test cross-platform we use standard paths
+        // or paths that parse as expected on Unix.
+        assert_eq!(Shell::from_path("powershell.exe"), Some(Shell::PowerShell));
+        assert_eq!(Shell::from_path("/usr/bin/pwsh"), Some(Shell::PowerShell));
+        assert_eq!(Shell::from_path("powershell_ise.exe"), Some(Shell::PowerShell));
+    }
+
+    #[test]
+    fn test_from_path_elvish() {
+        assert_eq!(Shell::from_path("/usr/bin/elvish"), Some(Shell::Elvish));
+        assert_eq!(Shell::from_path("elvish"), Some(Shell::Elvish));
+    }
+
+    #[test]
+    fn test_from_path_nushell() {
+        assert_eq!(Shell::from_path("/usr/bin/nu"), Some(Shell::Nushell));
+        assert_eq!(Shell::from_path("nu.exe"), Some(Shell::Nushell));
+        assert_eq!(Shell::from_path("nushell"), Some(Shell::Nushell));
+    }
+
+    #[test]
+    fn test_from_path_unknown() {
+        assert_eq!(Shell::from_path("/bin/sh"), None);
+        assert_eq!(Shell::from_path("cmd.exe"), None);
+        assert_eq!(Shell::from_path("python"), None);
+        assert_eq!(Shell::from_path("unknown_shell"), None);
+    }
+
+    #[test]
+    fn test_from_path_empty_and_invalid() {
+        assert_eq!(Shell::from_path(""), None);
+        assert_eq!(Shell::from_path("/"), None);
+        assert_eq!(Shell::from_path("."), None);
+        assert_eq!(Shell::from_path(".."), None);
+
+        // .bash file stem is ".bash" which won't match "bash", so it should be None.
+        assert_eq!(Shell::from_path(".bash"), None);
+    }
+}
+
 impl TryFrom<Shell> for AotShell {
     type Error = String;
 
