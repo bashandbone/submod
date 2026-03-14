@@ -699,11 +699,11 @@ impl GitManager {
                 name: name.to_string(),
                 path: std::path::PathBuf::from(path_str),
                 url: url_str.to_string(),
-                branch: None,
-                ignore: None,
-                update: None,
-                fetch_recurse: None,
-                shallow: false,
+                branch: config.branch.clone(),
+                ignore: config.ignore.clone(),
+                update: config.update.clone(),
+                fetch_recurse: config.fetch_recurse.clone(),
+                shallow: config.shallow.unwrap_or(false),
                 no_init: false,
             };
             self.git_ops.add_submodule(&opts)
@@ -933,8 +933,11 @@ impl GitManager {
         }
         for key in known_keys {
             // Match "key =" or "key=" at start of trimmed line
-            if trimmed.starts_with(&format!("{key} =")) || trimmed.starts_with(&format!("{key}=")) {
-                return Some(key);
+            if trimmed.starts_with(key) {
+                let rest = &trimmed[key.len()..];
+                if rest.starts_with('=') || rest.starts_with(" =") {
+                    return Some(key);
+                }
             }
         }
         None

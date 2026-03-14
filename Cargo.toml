@@ -100,6 +100,7 @@ figment = { version = "0.10.19", default-features = false, features = [
 ] }
 tempfile = "3.14.0"
 serde_json = "1.0.140"
+criterion = "0.8.2"
 
 [lints.rust]
 # Deny unsafe code unless explicitly allowed
@@ -135,3 +136,6 @@ module_name_repetitions = "allow"
 # Allow some pedantic lints that can be overly strict for CLI tools
 too_many_lines = "allow"
 
+[[bench]]
+name = "benchmark"
+harness = false

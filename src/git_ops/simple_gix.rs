@@ -111,4 +111,3 @@ pub fn fetch_repo(repo: gix::Repository, remote: Option<String>, shallow: bool) 
         }
     })
 }
-

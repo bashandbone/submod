@@ -751,4 +751,48 @@ active = true
         let config = harness.read_config().expect("Failed to read config");
         assert!(!config.contains("[nuke-lib]"));
     }
+
+    #[test]
+    fn test_add_submodule_shallow() {
+        let harness = TestHarness::new().expect("Failed to create test harness");
+        harness.init_git_repo().expect("Failed to init git repo");
+
+        let remote_repo = harness
+            .create_test_remote("shallow_lib")
+            .expect("Failed to create remote");
+        let remote_url = format!("file://{}", remote_repo.display());
+
+        // Add submodule with shallow flag
+        let stdout = harness
+            .run_submod_success(&[
+                "add",
+                &remote_url,
+                "--name",
+                "shallow-lib",
+                "--path",
+                "lib/shallow",
+                "--shallow",
+            ])
+            .expect("Failed to add submodule");
+
+        assert!(stdout.contains("Added submodule"));
+
+        // Verify config includes shallow = true
+        let config = harness.read_config().expect("Failed to read config");
+        assert!(config.contains("shallow = true"));
+
+        // Verify it is a shallow clone using git command
+        let output = std::process::Command::new("git")
+            .args(["rev-parse", "--is-shallow-repository"])
+            .current_dir(harness.work_dir.join("lib/shallow"))
+            .output()
+            .expect("Failed to run git");
+
+        let output_str = String::from_utf8_lossy(&output.stdout);
+        let is_shallow = output_str.trim();
+        assert_eq!(
+            is_shallow, "true",
+            "Repository at lib/shallow should be shallow"
+        );
+    }
 }
