@@ -162,10 +162,14 @@ impl GitManager {
         mut entry: crate::config::SubmoduleEntry,
         sparse_paths: Option<Vec<String>>,
     ) -> Result<(), SubmoduleError> {
-        if let Some(ref paths) = sparse_paths {
-            entry.sparse_paths = Some(paths.clone());
-            // Also populate sparse_checkouts so consumers using sparse_checkouts() see the paths
-            self.config.submodules.add_checkout(name.clone(), paths.clone(), true);
+        if let Some(paths) = sparse_paths {
+            // Move the Vec into entry.sparse_paths to avoid cloning,
+            // then borrow it for add_checkout.
+            entry.sparse_paths = Some(paths);
+            if let Some(ref stored_paths) = entry.sparse_paths {
+                // Also populate sparse_checkouts so consumers using sparse_checkouts() see the paths
+                self.config.submodules.add_checkout(name.clone(), stored_paths, true);
+            }
         }
         // Normalize: convert Unspecified variants to None so they serialize cleanly
         if matches!(entry.ignore, Some(SerializableIgnore::Unspecified)) {
@@ -1428,18 +1432,18 @@ impl GitManager {
                     .iter()
                     .map(|p| p.to_string_lossy().to_string())
                     .collect();
-                if append_sparse {
-                    let existing = updated.sparse_paths.get_or_insert_with(Vec::new);
-                    existing.extend(new_paths.clone());
-                } else {
-                    updated.sparse_paths = Some(new_paths.clone());
-                }
-
                 // Keep SubmoduleEntries.sparse_checkouts in sync with sparse_paths
                 let replace = !append_sparse;
                 self.config
                     .submodules
-                    .add_checkout(name.to_string(), new_paths, replace);
+                    .add_checkout(name.to_string(), &new_paths, replace);
+
+                if append_sparse {
+                    let existing = updated.sparse_paths.get_or_insert_with(Vec::new);
+                    existing.extend(new_paths);
+                } else {
+                    updated.sparse_paths = Some(new_paths);
+                }
             }
             self.config.submodules.update_entry(name.to_string(), updated);
         }
