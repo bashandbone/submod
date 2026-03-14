@@ -933,8 +933,11 @@ impl GitManager {
         }
         for key in known_keys {
             // Match "key =" or "key=" at start of trimmed line
-            if trimmed.starts_with(&format!("{key} =")) || trimmed.starts_with(&format!("{key}=")) {
-                return Some(key);
+            if trimmed.starts_with(key) {
+                let rest = &trimmed[key.len()..];
+                if rest.starts_with('=') || rest.starts_with(" =") {
+                    return Some(key);
+                }
             }
         }
         None
