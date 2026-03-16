@@ -3,10 +3,14 @@ SPDX-FileCopyrightText: 2025 Adam Poulemanos <89049923+bashandbone@users.noreply
 
 SPDX-License-Identifier: LicenseRef-PlainMIT OR MIT
 -->
-
 # Changelog
 
-## v0.2.0 - 2025-06-23
+## v0.2.1 - 2026-03-15
+
+- Added implementation and tests for shallow checkouts and the `no-init` flag
+- Several small performance and testing improvements
+
+## v0.2.0 - 2026-03-6
 
 ### **Git2 Now Required**
 
