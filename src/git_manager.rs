@@ -420,7 +420,7 @@ impl GitManager {
                     ignore: ignore.clone(),
                     update: update.clone(),
                     fetch_recurse: fetch_recurse.clone(),
-                    active: Some(true),
+                    active: Some(!no_init),
                     shallow,
                     no_init: Some(no_init),
                     sparse_paths: None,
@@ -458,7 +458,7 @@ impl GitManager {
                         ignore,
                         update,
                         fetch_recurse,
-                        active: Some(true),
+                        active: Some(!no_init),
                         shallow,
                         no_init: Some(no_init),
                         sparse_paths: None, // stored separately via configure_submodule_post_creation
