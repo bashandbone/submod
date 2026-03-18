@@ -94,6 +94,7 @@ jobs:
       name: Publish to crates.io
       needs: [build]
       runs-on: ubuntu-latest
+      environment: cratesio
       steps:
           - uses: actions/checkout@v4
             with:
@@ -105,5 +106,4 @@ jobs:
                 override: true
           - uses: katyo/publish-crates@v2
             with:
-                registry-token: ${{ secrets.CRATESIO_KEY }}
                 args: --allow-dirty
