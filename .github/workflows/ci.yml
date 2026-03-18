@@ -103,7 +103,7 @@ jobs:
                     --include-build-script \
                     --lcov --output-path lcov.info \
                     --ignore-filename-regex \
-                    '^\..*|^dev/.*|^tests/.*|^C[LaHO].*|.*\.toml$|.*\.pkl$|.*\.license$|.*\.spdx$|.*\.md$|benches/.*|.*long_about\.rs$|scripts/.*$'
+                    '^[^s][^r][^c].*'
             - name: Upload coverage to Codecov
               uses: codecov/codecov-action@v5
               with:
