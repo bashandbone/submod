@@ -194,11 +194,29 @@ impl GitOpsManager {
     pub fn reopen(&mut self) {
         let Some(workdir) = self.git2_ops.workdir() else { return };
         let workdir = workdir.to_path_buf();
-        if let Ok(new_ops) = Git2Operations::new(Some(&workdir)) {
-            self.git2_ops = new_ops;
+        match Git2Operations::new(Some(&workdir)) {
+            Ok(new_ops) => {
+                self.git2_ops = new_ops;
+            }
+            Err(e) => {
+                eprintln!(
+                    "Failed to reopen git2 repository at {}: {}",
+                    workdir.display(),
+                    e
+                );
+            }
         }
-        if let Ok(new_gix) = GixOperations::new(Some(&workdir)) {
-            self.gix_ops = Some(new_gix);
+        match GixOperations::new(Some(&workdir)) {
+            Ok(new_gix) => {
+                self.gix_ops = Some(new_gix);
+            }
+            Err(e) => {
+                eprintln!(
+                    "Failed to reopen gix repository at {}: {}",
+                    workdir.display(),
+                    e
+                );
+            }
         }
     }
 

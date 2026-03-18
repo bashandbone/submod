@@ -1338,7 +1338,11 @@ impl GitManager {
 
         // Reopen the git repository to flush any cached state (git2 caches internal state
         // about submodules and will fail on subsequent add_submodule calls if not refreshed).
-        self.git_ops.reopen();
+        if let Err(e) = self.git_ops.reopen() {
+            eprintln!(
+                "Warning: failed to refresh git repository state after deleting submodule '{name}': {e}"
+            );
+        }
 
         println!("Deleted submodule '{name}'.");
         Ok(())
