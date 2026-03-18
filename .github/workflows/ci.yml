@@ -96,7 +96,7 @@ jobs:
             - name: Install cargo-llvm-cov
               uses: taiki-e/install-action@cargo-llvm-cov
             - name: Install nextest
-              run: taiki-e/install-action@nextest
+              run: taiki-e/install-action@cargo-nextest
 
             - name: Generate code coverage
               run: |
