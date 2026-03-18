@@ -181,6 +181,8 @@ Check the status of all configured submodules:
 submod check
 ```
 
+*alias*: `submod c`
+
 ### `submod init`
 
 Initialize all missing submodules:
@@ -189,6 +191,8 @@ Initialize all missing submodules:
 submod init
 ```
 
+*alias*: `submid i`
+
 ### `submod update`
 
 Update all submodules to their latest commits:
@@ -196,6 +200,7 @@ Update all submodules to their latest commits:
 ```bash
 submod update
 ```
+*alias*: `submod u`
 
 ### `submod reset`
 
@@ -208,6 +213,7 @@ submod reset --all
 # Reset specific submodules (comma-separated)
 submod reset my-lib,vendor-utils
 ```
+*alias*: `submod r`
 
 ### `submod sync`
 
@@ -216,6 +222,7 @@ Run a complete sync (check + init + update):
 ```bash
 submod sync
 ```
+*alias*: `submod s`
 
 ### `submod change`
 
@@ -232,6 +239,7 @@ Change global defaults for all submodules:
 ```bash
 submod change-global --ignore dirty --update checkout
 ```
+*aliases*: `submod cg`, `submod chgl`, `submod global`
 
 ### `submod list`
 
@@ -242,6 +250,8 @@ submod list
 submod list --recursive
 ```
 
+*aliases*: `submod ls`, `submod l`
+
 ### `submod delete`
 
 Delete a submodule from configuration and filesystem:
@@ -250,6 +260,8 @@ Delete a submodule from configuration and filesystem:
 submod delete my-lib
 ```
 
+*alias*: `submod del`
+
 ### `submod disable`
 
 Disable a submodule without deleting files (sets `active = false`):
@@ -257,6 +269,8 @@ Disable a submodule without deleting files (sets `active = false`):
 ```bash
 submod disable my-lib
 ```
+
+*alias*: `submod del`
 
 ### `submod nuke-it-from-orbit`
 
@@ -269,6 +283,9 @@ submod nuke-it-from-orbit --all
 # Nuke specific submodules permanently
 submod nuke-it-from-orbit --kill my-lib,old-dep
 ```
+*aliases*: `submod nuke-em`, `submod nuke-it`, `submod nuke-them`
+
+Use `nuke-it-from-orbit` was created because sometimes submodule just... don't cooperate. You're done being nice and just want to get back to work. Nuke it.
 
 ### `submod generate-config`
 
@@ -281,14 +298,63 @@ submod generate-config --from-setup .
 # As a template with defaults
 submod generate-config --template --output my-config.toml
 ```
+*aliases*: `submod gc`, `submod genconf`
 
 ### `submod completeme`
 
 Generate shell completion scripts:
 
-```bash
-submod completeme bash   # or: zsh, fish, powershell, elvish, nushell
+#### bash
+
+```bash "bash"
+mkdir -p ~/.bash_completion.d
+submod completeme bash > ~/.bash_completion.d/submod
 ```
+*aliases*: `submod comp`, `submod complete`, `submod comp-me`, `submod complete-me`
+
+<details>
+<summary>Add completions to other shells</summary>
+
+#### zsh
+
+```zsh "zsh"
+# zsh has an fpath array with possible function directories. You can
+# put your competions in any of these; we use the first one here:
+ZSH_DEFAULT="${XDG_DATA_HOME:-~/.local/share}/zsh/site-functions"
+ZFUNCDIR=""${fpath[1]:-$ZSH_DEFAULT}"
+mkdir -p "$ZFUNCDIR"
+submod completeme zsh > "${ZFUNCDIR}/_submod"
+```
+
+#### fish
+
+```fish
+mkdir -p "${XDG_CONFIG_HOME:-~/.config}/fish/completions"
+submod completeme fish > "{XDG_CONFIG_HOME:-~/.config}/fish/completions/submod.fish
+```
+
+#### powershell
+
+```pwsh
+mkdir -p $Home\Documents\PowerShell\completions
+submod completeme powershell > $Home\Documents\PowerShell\completions\submod.completion.ps1
+```
+
+#### elvish
+
+```elvish
+mkdir -p ~/.config/elvish/completions
+submod completeme elvish > ~/.config/elvish/completions/submod.elv
+```
+
+#### nushell
+
+```nushell
+submod completeme nu > "$NUSHELL_CONFIG_DIR/scripts/completions/submod.nu"
+echo 'use completions/submod.nu' >> "$NU_CONFIG_PATH"
+```
+
+</details>
 
 ## 💻 Usage Examples
 
@@ -340,6 +406,8 @@ submod check
 # Re-sync everything
 submod sync
 ```
+
+If that doesn't work, try [nuke-it-from-orbit](https://github.com/bashandbone/submod/edit/main/README.md#submod-nuke-it-from-orbit)
 
 ## 🛠️ Development
 
