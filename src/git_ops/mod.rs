@@ -191,33 +191,35 @@ impl GitOpsManager {
     /// Reopen the repository from the working directory to refresh any cached state.
     /// This is needed after destructive operations (e.g., submodule delete) so that the
     /// in-memory git2 repository object reflects the updated on-disk state.
-    pub fn reopen(&mut self) {
-        let Some(workdir) = self.git2_ops.workdir() else { return };
-        let workdir = workdir.to_path_buf();
-        match Git2Operations::new(Some(&workdir)) {
-            Ok(new_ops) => {
-                self.git2_ops = new_ops;
-            }
-            Err(e) => {
-                eprintln!(
-                    "Failed to reopen git2 repository at {}: {}",
-                    workdir.display(),
-                    e
-                );
-            }
-        }
+    ///
+    /// Returns an error if the git2 repository (the required backend) cannot be reopened.
+    /// A gix reopen failure is non-fatal since gix is an optional optimistic backend.
+    pub fn reopen(&mut self) -> Result<()> {
+        let workdir = self
+            .git2_ops
+            .workdir()
+            .ok_or_else(|| anyhow::anyhow!("Cannot reopen repository: no working directory"))?
+            .to_path_buf();
+
+        // git2 is the required backend — propagate its reopen error.
+        self.git2_ops = Git2Operations::new(Some(&workdir))
+            .with_context(|| format!("Failed to reopen git2 repository at {}", workdir.display()))?;
+
+        // gix is an optional optimistic backend — log failures but don't fail.
         match GixOperations::new(Some(&workdir)) {
             Ok(new_gix) => {
                 self.gix_ops = Some(new_gix);
             }
             Err(e) => {
                 eprintln!(
-                    "Failed to reopen gix repository at {}: {}",
+                    "Warning: failed to reopen gix repository at {}: {}",
                     workdir.display(),
                     e
                 );
             }
         }
+
+        Ok(())
     }
 
     /// Try gix first, fall back to git2
