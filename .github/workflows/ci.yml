@@ -101,7 +101,7 @@ jobs:
                   cargo llvm-cov \
                     --all-features --workspace \
                     --include-build-script \
-                    --lcov --output-path lcov.info
+                    --lcov --output-path lcov.info \
                     --ignore-filename-regex \
                     '^\..*|^dev/.*|^tests/.*|^C[LaHO].*|.*\.toml$|.*\.pkl$|.*\.license$|.*\.spdx$|.*\.md$|benches/.*|.*long_about\.rs$|scripts/.*$'
             - name: Upload coverage to Codecov
