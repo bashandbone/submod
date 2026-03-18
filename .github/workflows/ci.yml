@@ -103,10 +103,13 @@ jobs:
                     --include-build-script \
                     --lcov --output-path lcov.info \
                     --ignore-filename-regex \
-                    '^[^s][^r][^c].*'
+                    '.*[^.][^r][^s]$'
             - name: Upload coverage to Codecov
               uses: codecov/codecov-action@v5
               with:
                   files: lcov.info
                   token: ${{ secrets.CODECOV_TOKEN }}
                   fail_ci_if_error: true
+            - name: Log report
+              run: |
+                cat lcov.info
