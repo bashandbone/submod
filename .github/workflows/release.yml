@@ -106,3 +106,4 @@ jobs:
           - uses: katyo/publish-crates@v2
             with:
                 registry-token: ${{ secrets.CRATESIO_KEY }}
+                args: --allow-dirty
