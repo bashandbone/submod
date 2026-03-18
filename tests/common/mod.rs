@@ -27,33 +27,12 @@ impl TestHarness {
         let work_dir = temp_dir.path().join("workspace");
         fs::create_dir_all(&work_dir)?;
 
-        // Build the binary in debug mode for testing
-        let output = Command::new("cargo")
-            .args(["build", "--bin", "submod"])
-            .output()?;
-
-        if !output.status.success() {
-            let stderr = String::from_utf8_lossy(&output.stderr);
-            panic!("Failed to build submod binary: {stderr}");
-        }
-
-        // Get the actual target directory from cargo metadata
-        let metadata_output = Command::new("cargo")
-            .args(["metadata", "--format-version", "1", "--no-deps"])
-            .output()?;
-
-        assert!(
-            metadata_output.status.success(),
-            "Failed to get cargo metadata"
-        );
-
-        let metadata_str = String::from_utf8_lossy(&metadata_output.stdout);
-        let metadata: serde_json::Value = serde_json::from_str(&metadata_str)?;
-        let target_dir = metadata["target_directory"]
-            .as_str()
-            .ok_or("Could not find target_directory in cargo metadata")?;
-
-        let submod_bin = PathBuf::from(target_dir).join("debug").join("submod");
+        // Use the binary path set by cargo at compile time. This ensures integration
+        // tests use the same binary that cargo (and cargo-llvm-cov) built — including
+        // the instrumented binary when running under coverage. Manually calling
+        // `cargo build` here would produce a non-instrumented binary in target/debug/,
+        // causing all subprocess-based tests to report zero coverage.
+        let submod_bin = PathBuf::from(env!("CARGO_BIN_EXE_submod"));
 
         Ok(Self {
             temp_dir,

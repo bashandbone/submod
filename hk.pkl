@@ -34,11 +34,6 @@ local linters = new Mapping<String, Step> {
         fix = "typos --write-changes --config {{ workspace_indicator }} {{ files }}"
     }
 
-    ["prettier"] = (Builtins.prettier) {
-        glob = Builtins.prettier.glob.add("*.yml").add(".roomodes")
-        stage = this.glob
-    }
-
 
     // define a custom linter
     ["pkl"] = new Step {
