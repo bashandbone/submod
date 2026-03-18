@@ -3,7 +3,6 @@
 // SPDX-License-Identifier: LicenseRef-PlainMIT OR MIT
 
 //! A series of multiline strings for long-about text. We put them here to keep the command module somewhat readable.
-
 pub const COMPLETE_ME: &str = r##"
 Generates shell completion script for the specified shell.
 
