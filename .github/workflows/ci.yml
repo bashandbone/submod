@@ -70,7 +70,7 @@ jobs:
         name: Security Audit
         runs-on: ubuntu-latest
         steps:
-            - uses: actions/checkout@v4
+            - uses: actions/checkout@v6
             - uses: rustsec/audit-check@v1.4.1
               with:
                   token: ${{ secrets.GITHUB_TOKEN }}
@@ -88,12 +88,16 @@ jobs:
               uses: dtolnay/rust-toolchain@stable
               with:
                   components: llvm-tools-preview
+            - name: Setup git
+              run: |
+                git config --global user.email "ci@example.com"
+                git config --global user.name "CI"
 
             - name: Install cargo-llvm-cov
               uses: taiki-e/install-action@cargo-llvm-cov
 
             - name: Generate code coverage
-              run: cargo llvm-cov --all-features --lcov --output-path lcov.info
+              run: cargo llvm-cov --all-features --workspace --include-build-script --lcov --output-path lcov.info
 
             - name: Upload coverage to Codecov
               uses: codecov/codecov-action@v5
