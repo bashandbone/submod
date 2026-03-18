@@ -97,8 +97,13 @@ jobs:
               uses: taiki-e/install-action@cargo-llvm-cov
 
             - name: Generate code coverage
-              run: cargo llvm-cov --all-features --workspace --include-build-script --lcov --output-path lcov.info
-
+              run: |
+                  cargo llvm-cov \
+                    --all-features --workspace \
+                    --include-build-script \
+                    --lcov --output-path lcov.info
+                    --ignore-filename-regex \
+                    '^\..*|^dev/.*|^tests/.*|^C[LaHO].*|.*\.toml$|.*\.pkl$|.*\.license$|.*\.spdx$|.*\.md$|benches/.*|.*long_about\.rs$|scripts/.*$'
             - name: Upload coverage to Codecov
               uses: codecov/codecov-action@v5
               with:
