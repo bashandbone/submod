@@ -403,14 +403,23 @@ impl Serialize for SerializableBranch {
 
 impl<'de> Deserialize<'de> for SerializableBranch {
     /// Deserialize from a plain string, delegating to [`from_gitmodules`](GitmodulesConvert::from_gitmodules).
-    /// Accepts `"."`, `"current"`, `"current-in-super-project"`, `"superproject"`, or `"super"`
+    /// Accepts `"."`, `"current"`, `"current-in-super-project"`, `"current-in-superproject"`, `"superproject"`, or `"super"`
     /// as [`CurrentInSuperproject`](SerializableBranch::CurrentInSuperproject); all other
     /// non-empty, non-whitespace strings become [`Name`](SerializableBranch::Name).
     /// Empty or whitespace-only strings are rejected with a deserialization error.
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         let s = String::deserialize(deserializer)?;
-        SerializableBranch::from_gitmodules(&s)
-            .map_err(|_| serde::de::Error::custom(format!("invalid branch value: {s}")))
+        // Backward compatibility: accept the previously-documented alias
+        // "current-in-superproject" in addition to the spellings handled
+        // by `from_gitmodules`.
+        if s == "current-in-superproject" {
+            return Ok(SerializableBranch::CurrentInSuperproject);
+        }
+        SerializableBranch::from_gitmodules(&s).map_err(|_| {
+            serde::de::Error::custom(format!(
+                "invalid branch value: {s:?}; expected \".\", \"current\", \"current-in-super-project\", \"superproject\", \"super\", or a non-empty, non-whitespace branch name"
+            ))
+        })
     }
 }
 
@@ -447,10 +456,6 @@ impl GitmodulesConvert for SerializableBranch {
             || options == "current-in-super-project"
             || options == "superproject"
             || options == "super"
-            || SerializableBranch::current_in_superproject()
-                .ok()
-                .as_deref()
-                .map_or(false, |cur| cur == options)
         {
             return Ok(SerializableBranch::CurrentInSuperproject);
         }
@@ -476,7 +481,7 @@ mod tests {
     fn test_branch_deserialize_from_toml_rejects_empty_and_whitespace() {
         // Empty string should be rejected
         let res_empty: Result<SerializableBranch, toml::de::Error> =
-            toml::from_str(r#"branch = """"#);
+            toml::from_str("branch = \"\"");
         assert!(res_empty.is_err(), "expected error for empty branch value");
         let err_empty = res_empty.unwrap_err().to_string();
         assert!(
@@ -486,7 +491,7 @@ mod tests {
 
         // Whitespace-only string should be rejected
         let res_ws: Result<SerializableBranch, toml::de::Error> =
-            toml::from_str(r#"branch = "   ""#);
+            toml::from_str("branch = \"   \"");
         assert!(res_ws.is_err(), "expected error for whitespace-only branch value");
         let err_ws = res_ws.unwrap_err().to_string();
         assert!(
