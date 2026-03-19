@@ -402,13 +402,14 @@ impl Serialize for SerializableBranch {
 }
 
 impl<'de> Deserialize<'de> for SerializableBranch {
-    /// Deserialize from a plain string using the same logic as [`FromStr`].
+    /// Deserialize from a plain string, delegating to [`from_gitmodules`](GitmodulesConvert::from_gitmodules).
     /// Accepts `"."`, `"current"`, `"current-in-super-project"`, `"superproject"`, or `"super"`
-    /// as [`CurrentInSuperproject`](SerializableBranch::CurrentInSuperproject); all other strings
-    /// become [`Name`](SerializableBranch::Name).
+    /// as [`CurrentInSuperproject`](SerializableBranch::CurrentInSuperproject); all other
+    /// non-empty, non-whitespace strings become [`Name`](SerializableBranch::Name).
+    /// Empty or whitespace-only strings are rejected with a deserialization error.
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         let s = String::deserialize(deserializer)?;
-        SerializableBranch::from_str(&s)
+        SerializableBranch::from_gitmodules(&s)
             .map_err(|_| serde::de::Error::custom(format!("invalid branch value: {s}")))
     }
 }
