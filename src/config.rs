@@ -683,8 +683,7 @@ impl<'de> Deserialize<'de> for SubmoduleEntries {
     /// Accepts a map where each key maps to a [`SubmoduleEntry`], building both the
     /// `submodules` map and the `sparse_checkouts` map from each entry's `sparse_paths`.
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let map: HashMap<SubmoduleName, SubmoduleEntry> =
-            HashMap::deserialize(deserializer)?;
+        let map: HashMap<SubmoduleName, SubmoduleEntry> = HashMap::deserialize(deserializer)?;
         let mut sparse_checkouts: HashMap<SubmoduleName, Vec<String>> = HashMap::new();
         for (name, entry) in &map {
             if let Some(paths) = &entry.sparse_paths {
@@ -1116,5 +1115,997 @@ impl Provider for Config {
     // TODO: This will likely need to change to add developer/user profiles
     fn profile(&self) -> Option<figment::Profile> {
         Some(REPO)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ================================================================
+    // SubmoduleDefaults::merge_from
+    // ================================================================
+
+    #[test]
+    fn test_defaults_merge_from_both_set() {
+        let base = SubmoduleDefaults {
+            ignore: Some(SerializableIgnore::All),
+            fetch_recurse: Some(SerializableFetchRecurse::Always),
+            update: Some(SerializableUpdate::Rebase),
+        };
+        let other = SubmoduleDefaults {
+            ignore: Some(SerializableIgnore::Dirty),
+            fetch_recurse: None,
+            update: Some(SerializableUpdate::Merge),
+        };
+        let merged = base.merge_from(other);
+        // other.ignore overrides
+        assert_eq!(merged.ignore, Some(SerializableIgnore::Dirty));
+        // other.fetch_recurse is None → base preserved
+        assert_eq!(merged.fetch_recurse, Some(SerializableFetchRecurse::Always));
+        // other.update overrides
+        assert_eq!(merged.update, Some(SerializableUpdate::Merge));
+    }
+
+    #[test]
+    fn test_defaults_merge_from_empty_other() {
+        let base = SubmoduleDefaults {
+            ignore: Some(SerializableIgnore::All),
+            fetch_recurse: Some(SerializableFetchRecurse::Never),
+            update: Some(SerializableUpdate::Checkout),
+        };
+        let other = SubmoduleDefaults::default();
+        let merged = base.merge_from(other);
+        // Base values should be preserved
+        assert_eq!(merged.ignore, Some(SerializableIgnore::All));
+        assert_eq!(merged.fetch_recurse, Some(SerializableFetchRecurse::Never));
+        assert_eq!(merged.update, Some(SerializableUpdate::Checkout));
+    }
+
+    #[test]
+    fn test_defaults_merge_from_empty_base() {
+        let base = SubmoduleDefaults::default();
+        let other = SubmoduleDefaults {
+            ignore: Some(SerializableIgnore::Dirty),
+            fetch_recurse: Some(SerializableFetchRecurse::Always),
+            update: Some(SerializableUpdate::Merge),
+        };
+        let merged = base.merge_from(other);
+        assert_eq!(merged.ignore, Some(SerializableIgnore::Dirty));
+        assert_eq!(merged.fetch_recurse, Some(SerializableFetchRecurse::Always));
+        assert_eq!(merged.update, Some(SerializableUpdate::Merge));
+    }
+
+    #[test]
+    fn test_defaults_merge_from_both_empty_gets_defaults() {
+        let base = SubmoduleDefaults::default();
+        let other = SubmoduleDefaults::default();
+        let merged = base.merge_from(other);
+        // Should fill in defaults via .or_else
+        assert_eq!(merged.ignore, Some(SerializableIgnore::default()));
+        assert_eq!(
+            merged.fetch_recurse,
+            Some(SerializableFetchRecurse::default())
+        );
+        assert_eq!(merged.update, Some(SerializableUpdate::default()));
+    }
+
+    // ================================================================
+    // SubmoduleEntry::is_local / is_remote
+    // ================================================================
+
+    #[test]
+    fn test_entry_is_local() {
+        let mut entry = SubmoduleEntry::new(
+            Some("./local-repo".to_string()),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        );
+        assert!(entry.is_local());
+
+        entry.url = Some("../sibling".to_string());
+        assert!(entry.is_local());
+
+        entry.url = Some("/absolute/path".to_string());
+        assert!(entry.is_local());
+
+        // Not local
+        entry.url = Some("https://github.com/repo".to_string());
+        assert!(!entry.is_local());
+
+        // None url
+        entry.url = None;
+        assert!(!entry.is_local());
+    }
+
+    #[test]
+    fn test_entry_is_remote() {
+        let mut entry = SubmoduleEntry::new(
+            Some("https://github.com/user/repo".to_string()),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        );
+        assert!(entry.is_remote());
+
+        entry.url = Some("http://example.com/repo".to_string());
+        assert!(entry.is_remote());
+
+        entry.url = Some("ssh://git@github.com/repo".to_string());
+        assert!(entry.is_remote());
+
+        entry.url = Some("git@github.com:user/repo.git".to_string());
+        assert!(entry.is_remote());
+
+        entry.url = Some("git://example.com/repo".to_string());
+        assert!(entry.is_remote());
+
+        // Not remote
+        entry.url = Some("./local".to_string());
+        assert!(!entry.is_remote());
+
+        entry.url = None;
+        assert!(!entry.is_remote());
+    }
+
+    #[test]
+    fn test_entry_neither_local_nor_remote() {
+        // A bare name isn't classified as either
+        let entry = SubmoduleEntry::new(
+            Some("just-a-name".to_string()),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        );
+        assert!(!entry.is_local());
+        assert!(!entry.is_remote());
+    }
+
+    // ================================================================
+    // SubmoduleEntry::from_gitmodules
+    // ================================================================
+
+    #[test]
+    fn test_entry_from_gitmodules_full() {
+        let mut map = HashMap::new();
+        map.insert(
+            "url".to_string(),
+            "https://github.com/user/repo.git".to_string(),
+        );
+        map.insert("path".to_string(), "libs/repo".to_string());
+        map.insert("branch".to_string(), "main".to_string());
+        map.insert("ignore".to_string(), "dirty".to_string());
+        map.insert("update".to_string(), "rebase".to_string());
+        map.insert("fetchRecurse".to_string(), "true".to_string());
+        map.insert("active".to_string(), "true".to_string());
+        map.insert("shallow".to_string(), "true".to_string());
+
+        let entry = SubmoduleEntry::from_gitmodules(&"repo".to_string(), map);
+        assert_eq!(
+            entry.url,
+            Some("https://github.com/user/repo.git".to_string())
+        );
+        assert_eq!(entry.path, Some("libs/repo".to_string()));
+        assert_eq!(
+            entry.branch,
+            Some(SerializableBranch::Name("main".to_string()))
+        );
+        assert_eq!(entry.ignore, Some(SerializableIgnore::Dirty));
+        assert_eq!(entry.update, Some(SerializableUpdate::Rebase));
+        assert_eq!(entry.fetch_recurse, Some(SerializableFetchRecurse::Always));
+        assert_eq!(entry.active, Some(true));
+        assert_eq!(entry.shallow, Some(true));
+    }
+
+    #[test]
+    fn test_entry_from_gitmodules_minimal() {
+        let mut map = HashMap::new();
+        map.insert(
+            "url".to_string(),
+            "https://example.com/repo.git".to_string(),
+        );
+
+        let entry = SubmoduleEntry::from_gitmodules(&"mymod".to_string(), map);
+        assert_eq!(entry.url, Some("https://example.com/repo.git".to_string()));
+        // path defaults to name when not in the map
+        assert!(entry.path.is_some());
+        // active defaults to true, shallow to false
+        assert_eq!(entry.active, Some(true));
+        assert_eq!(entry.shallow, Some(false));
+    }
+
+    #[test]
+    fn test_entry_from_gitmodules_invalid_values_silently_ignored() {
+        let mut map = HashMap::new();
+        map.insert("url".to_string(), "https://example.com/repo".to_string());
+        map.insert("ignore".to_string(), "INVALID".to_string());
+        map.insert("update".to_string(), "BOGUS".to_string());
+        map.insert("active".to_string(), "not-a-bool".to_string());
+
+        let entry = SubmoduleEntry::from_gitmodules(&"mod".to_string(), map);
+        // Invalid values should result in None (parsed with .ok())
+        assert_eq!(entry.ignore, None);
+        assert_eq!(entry.update, None);
+        // Invalid bool parses to None, defaults to true
+        assert_eq!(entry.active, Some(true));
+    }
+
+    #[test]
+    fn test_entry_from_gitmodules_branch_dot_alias() {
+        let mut map = HashMap::new();
+        map.insert("branch".to_string(), ".".to_string());
+        map.insert("url".to_string(), "https://example.com/repo".to_string());
+
+        let entry = SubmoduleEntry::from_gitmodules(&"mod".to_string(), map);
+        assert_eq!(
+            entry.branch,
+            Some(SerializableBranch::CurrentInSuperproject)
+        );
+    }
+
+    // ================================================================
+    // SubmoduleEntry::update_with_options
+    // ================================================================
+
+    #[test]
+    fn test_entry_update_with_options() {
+        let entry = SubmoduleEntry::new(
+            Some("https://example.com".to_string()),
+            Some("path".to_string()),
+            Some(SerializableBranch::Name("main".to_string())),
+            Some(SerializableIgnore::None),
+            Some(SerializableUpdate::Checkout),
+            Some(SerializableFetchRecurse::OnDemand),
+            Some(true),
+            Some(false),
+            None,
+        );
+
+        let opts = SubmoduleGitOptions {
+            ignore: Some(SerializableIgnore::All),
+            fetch_recurse: None,
+            branch: Some(SerializableBranch::Name("develop".to_string())),
+            update: None,
+        };
+
+        let updated = entry.update_with_options(opts);
+        assert_eq!(updated.ignore, Some(SerializableIgnore::All));
+        assert_eq!(
+            updated.fetch_recurse,
+            Some(SerializableFetchRecurse::OnDemand)
+        ); // unchanged
+        assert_eq!(
+            updated.branch,
+            Some(SerializableBranch::Name("develop".to_string()))
+        );
+        assert_eq!(updated.update, Some(SerializableUpdate::Checkout)); // unchanged
+    }
+
+    #[test]
+    fn test_entry_update_with_empty_options_preserves() {
+        let entry = SubmoduleEntry::new(
+            Some("url".to_string()),
+            Some("path".to_string()),
+            Some(SerializableBranch::Name("main".to_string())),
+            Some(SerializableIgnore::Dirty),
+            Some(SerializableUpdate::Rebase),
+            Some(SerializableFetchRecurse::Always),
+            Some(true),
+            None,
+            None,
+        );
+        // Default-derived SubmoduleGitOptions has all None fields
+        let opts = SubmoduleGitOptions {
+            ignore: None,
+            fetch_recurse: None,
+            branch: None,
+            update: None,
+        };
+        let updated = entry.update_with_options(opts);
+        // None options don't override existing values
+        assert_eq!(updated.ignore, Some(SerializableIgnore::Dirty));
+        assert_eq!(updated.update, Some(SerializableUpdate::Rebase));
+        assert_eq!(
+            updated.branch,
+            Some(SerializableBranch::Name("main".to_string()))
+        );
+        assert_eq!(
+            updated.fetch_recurse,
+            Some(SerializableFetchRecurse::Always)
+        );
+    }
+
+    // ================================================================
+    // SubmoduleEntries: sparse checkout operations
+    // ================================================================
+
+    #[test]
+    fn test_entries_add_checkout_replace() {
+        let mut entries = SubmoduleEntries::default();
+        entries.add_checkout("mod1".to_string(), &["src/".to_string()], false);
+        assert_eq!(
+            entries.sparse_checkouts().unwrap().get("mod1").unwrap(),
+            &vec!["src/".to_string()]
+        );
+
+        // Append
+        entries.add_checkout("mod1".to_string(), &["docs/".to_string()], false);
+        assert_eq!(
+            entries.sparse_checkouts().unwrap().get("mod1").unwrap(),
+            &vec!["src/".to_string(), "docs/".to_string()]
+        );
+
+        // Replace
+        entries.add_checkout("mod1".to_string(), &["lib/".to_string()], true);
+        assert_eq!(
+            entries.sparse_checkouts().unwrap().get("mod1").unwrap(),
+            &vec!["lib/".to_string()]
+        );
+    }
+
+    #[test]
+    fn test_entries_add_checkout_when_none() {
+        let mut entries = SubmoduleEntries {
+            submodules: Some(HashMap::new()),
+            sparse_checkouts: None,
+        };
+        entries.add_checkout("mod1".to_string(), &["src/".to_string()], false);
+        assert!(entries.sparse_checkouts().is_some());
+        assert_eq!(
+            entries.sparse_checkouts().unwrap().get("mod1").unwrap(),
+            &vec!["src/".to_string()]
+        );
+    }
+
+    #[test]
+    fn test_entries_remove_sparse_path() {
+        let mut entries = SubmoduleEntries::default();
+        entries.add_checkout(
+            "mod1".to_string(),
+            &["src/".to_string(), "docs/".to_string()],
+            false,
+        );
+
+        entries.remove_sparse_path("mod1".to_string(), "src/".to_string());
+        assert_eq!(
+            entries.sparse_checkouts().unwrap().get("mod1").unwrap(),
+            &vec!["docs/".to_string()]
+        );
+
+        // Remove last path → entry is cleaned up
+        entries.remove_sparse_path("mod1".to_string(), "docs/".to_string());
+        assert!(!entries.sparse_checkouts().unwrap().contains_key("mod1"));
+    }
+
+    #[test]
+    fn test_entries_add_sparse_path() {
+        let mut entries = SubmoduleEntries::default();
+        entries.add_sparse_path("mod1".to_string(), "src/".to_string());
+        assert_eq!(
+            entries.sparse_checkouts().unwrap().get("mod1").unwrap(),
+            &vec!["src/".to_string()]
+        );
+        entries.add_sparse_path("mod1".to_string(), "docs/".to_string());
+        assert_eq!(
+            entries.sparse_checkouts().unwrap().get("mod1").unwrap(),
+            &vec!["src/".to_string(), "docs/".to_string()]
+        );
+    }
+
+    #[test]
+    fn test_entries_add_sparse_path_when_none() {
+        let mut entries = SubmoduleEntries {
+            submodules: Some(HashMap::new()),
+            sparse_checkouts: None,
+        };
+        entries.add_sparse_path("mod1".to_string(), "src/".to_string());
+        assert!(entries.sparse_checkouts().is_some());
+    }
+
+    #[test]
+    fn test_entries_delete_checkout() {
+        let mut entries = SubmoduleEntries::default();
+        entries.add_checkout("mod1".to_string(), &["src/".to_string()], false);
+        entries.delete_checkout("mod1".to_string());
+        assert!(!entries.sparse_checkouts().unwrap().contains_key("mod1"));
+    }
+
+    // ================================================================
+    // SubmoduleEntries: update_entry
+    // ================================================================
+
+    #[test]
+    fn test_entries_update_entry_with_sparse() {
+        let mut entries = SubmoduleEntries::default();
+        let entry = SubmoduleEntry {
+            url: Some("https://example.com/repo".to_string()),
+            path: Some("libs/repo".to_string()),
+            branch: None,
+            ignore: None,
+            update: None,
+            fetch_recurse: None,
+            active: Some(true),
+            shallow: None,
+            no_init: None,
+            sparse_paths: Some(vec!["src/".to_string()]),
+        };
+        entries.update_entry("repo".to_string(), entry);
+
+        assert!(entries.submodules().unwrap().contains_key("repo"));
+        assert_eq!(
+            entries.sparse_checkouts().unwrap().get("repo").unwrap(),
+            &vec!["src/".to_string()]
+        );
+    }
+
+    #[test]
+    fn test_entries_update_entry_removes_sparse_when_empty() {
+        let mut entries = SubmoduleEntries::default();
+        // First add with sparse
+        let entry_with_sparse = SubmoduleEntry {
+            url: Some("url".to_string()),
+            path: Some("path".to_string()),
+            branch: None,
+            ignore: None,
+            update: None,
+            fetch_recurse: None,
+            active: Some(true),
+            shallow: None,
+            no_init: None,
+            sparse_paths: Some(vec!["src/".to_string()]),
+        };
+        entries.update_entry("repo".to_string(), entry_with_sparse);
+        assert!(entries.sparse_checkouts().unwrap().contains_key("repo"));
+
+        // Update without sparse → should remove from sparse map
+        let entry_no_sparse = SubmoduleEntry {
+            url: Some("url".to_string()),
+            path: Some("path".to_string()),
+            branch: None,
+            ignore: None,
+            update: None,
+            fetch_recurse: None,
+            active: Some(true),
+            shallow: None,
+            no_init: None,
+            sparse_paths: None,
+        };
+        entries.update_entry("repo".to_string(), entry_no_sparse);
+        assert!(!entries.sparse_checkouts().unwrap().contains_key("repo"));
+    }
+
+    // ================================================================
+    // SubmoduleEntries: iteration and queries
+    // ================================================================
+
+    #[test]
+    fn test_entries_contains_key() {
+        let mut entries = SubmoduleEntries::default();
+        assert!(!entries.contains_key("mod1"));
+
+        let entry = SubmoduleEntry::new(
+            Some("url".to_string()),
+            Some("path".to_string()),
+            None,
+            None,
+            None,
+            None,
+            Some(true),
+            None,
+            None,
+        );
+        entries = entries.add_submodule("mod1".to_string(), entry);
+        assert!(entries.contains_key("mod1"));
+        assert!(!entries.contains_key("mod2"));
+    }
+
+    #[test]
+    fn test_entries_submodule_names() {
+        let mut entries = SubmoduleEntries::default();
+        let entry = SubmoduleEntry::new(
+            Some("url".to_string()),
+            Some("path".to_string()),
+            None,
+            None,
+            None,
+            None,
+            Some(true),
+            None,
+            None,
+        );
+        entries = entries.add_submodule("alpha".to_string(), entry.clone());
+        entries = entries.add_submodule("beta".to_string(), entry);
+        let names = entries.submodule_names().unwrap();
+        assert!(names.contains(&"alpha".to_string()));
+        assert!(names.contains(&"beta".to_string()));
+        assert_eq!(names.len(), 2);
+    }
+
+    #[test]
+    fn test_entries_remove_submodule() {
+        let entry = SubmoduleEntry::new(
+            Some("url".to_string()),
+            Some("path".to_string()),
+            None,
+            None,
+            None,
+            None,
+            Some(true),
+            None,
+            None,
+        );
+        let mut entries = SubmoduleEntries::default()
+            .add_submodule("mod1".to_string(), entry.clone())
+            .add_submodule("mod2".to_string(), entry);
+        assert!(entries.contains_key("mod1"));
+        entries.remove_submodule("mod1");
+        assert!(!entries.contains_key("mod1"));
+        assert!(entries.contains_key("mod2"));
+    }
+
+    #[test]
+    fn test_entries_iter_joins_sparse() {
+        let mut entries = SubmoduleEntries::default();
+        let entry = SubmoduleEntry::new(
+            Some("url".to_string()),
+            Some("path".to_string()),
+            None,
+            None,
+            None,
+            None,
+            Some(true),
+            None,
+            None,
+        );
+        entries = entries.add_submodule("mod1".to_string(), entry);
+        entries.add_checkout("mod1".to_string(), &["src/".to_string()], false);
+
+        let items: Vec<_> = entries.iter().collect();
+        assert_eq!(items.len(), 1);
+        let (name, (_, sparse)) = &items[0];
+        assert_eq!(*name, "mod1");
+        assert_eq!(*sparse, vec!["src/".to_string()]);
+    }
+
+    #[test]
+    fn test_entries_iter_no_sparse() {
+        let mut entries = SubmoduleEntries::default();
+        let entry = SubmoduleEntry::new(
+            Some("url".to_string()),
+            Some("path".to_string()),
+            None,
+            None,
+            None,
+            None,
+            Some(true),
+            None,
+            None,
+        );
+        entries = entries.add_submodule("mod1".to_string(), entry);
+
+        let items: Vec<_> = entries.iter().collect();
+        let (_, (_, sparse)) = &items[0];
+        assert!(sparse.is_empty());
+    }
+
+    // ================================================================
+    // Config::apply_option_default
+    // ================================================================
+
+    #[test]
+    fn test_apply_option_default_none_gets_default() {
+        let mut val: Option<SerializableIgnore> = None;
+        let default = Some(SerializableIgnore::Dirty);
+        Config::apply_option_default(&mut val, &default, SerializableIgnore::Unspecified);
+        assert_eq!(val, Some(SerializableIgnore::Dirty));
+    }
+
+    #[test]
+    fn test_apply_option_default_unspecified_gets_default() {
+        let mut val = Some(SerializableIgnore::Unspecified);
+        let default = Some(SerializableIgnore::All);
+        Config::apply_option_default(&mut val, &default, SerializableIgnore::Unspecified);
+        assert_eq!(val, Some(SerializableIgnore::All));
+    }
+
+    #[test]
+    fn test_apply_option_default_real_value_preserved() {
+        let mut val = Some(SerializableIgnore::Dirty);
+        let default = Some(SerializableIgnore::All);
+        Config::apply_option_default(&mut val, &default, SerializableIgnore::Unspecified);
+        assert_eq!(val, Some(SerializableIgnore::Dirty));
+    }
+
+    #[test]
+    fn test_apply_option_default_none_value_none_default() {
+        let mut val: Option<SerializableIgnore> = None;
+        let default: Option<SerializableIgnore> = None;
+        Config::apply_option_default(&mut val, &default, SerializableIgnore::Unspecified);
+        // Falls back to the sentinel
+        assert_eq!(val, Some(SerializableIgnore::Unspecified));
+    }
+
+    // ================================================================
+    // Config::apply_defaults
+    // ================================================================
+
+    #[test]
+    fn test_config_apply_defaults() {
+        let defaults = SubmoduleDefaults {
+            ignore: Some(SerializableIgnore::Dirty),
+            fetch_recurse: Some(SerializableFetchRecurse::Always),
+            update: Some(SerializableUpdate::Rebase),
+        };
+        let entry = SubmoduleEntry::new(
+            Some("url".to_string()),
+            Some("path".to_string()),
+            None,
+            None,
+            None,
+            None,
+            Some(true),
+            None,
+            None,
+        );
+        let entries = SubmoduleEntries::default().add_submodule("mod1".to_string(), entry);
+        let config = Config::new(defaults, entries);
+
+        let applied = config.apply_defaults();
+        let sub = applied.submodules.get("mod1").unwrap();
+        // Submodule had None → should get defaults
+        assert_eq!(sub.ignore, Some(SerializableIgnore::Dirty));
+        assert_eq!(sub.fetch_recurse, Some(SerializableFetchRecurse::Always));
+        assert_eq!(sub.update, Some(SerializableUpdate::Rebase));
+    }
+
+    #[test]
+    fn test_config_apply_defaults_entry_overrides() {
+        let defaults = SubmoduleDefaults {
+            ignore: Some(SerializableIgnore::Dirty),
+            fetch_recurse: Some(SerializableFetchRecurse::Always),
+            update: Some(SerializableUpdate::Rebase),
+        };
+        let entry = SubmoduleEntry::new(
+            Some("url".to_string()),
+            Some("path".to_string()),
+            None,
+            Some(SerializableIgnore::All), // explicit override
+            None,
+            None,
+            Some(true),
+            None,
+            None,
+        );
+        let entries = SubmoduleEntries::default().add_submodule("mod1".to_string(), entry);
+        let config = Config::new(defaults, entries);
+
+        let applied = config.apply_defaults();
+        let sub = applied.submodules.get("mod1").unwrap();
+        // Explicit override preserved
+        assert_eq!(sub.ignore, Some(SerializableIgnore::All));
+        // Others get defaults
+        assert_eq!(sub.fetch_recurse, Some(SerializableFetchRecurse::Always));
+        assert_eq!(sub.update, Some(SerializableUpdate::Rebase));
+    }
+
+    #[test]
+    fn test_config_apply_defaults_no_submodules() {
+        let config = Config::default();
+        let applied = config.apply_defaults();
+        // Should not panic
+        assert!(applied.submodules.submodules().unwrap().is_empty());
+    }
+
+    // ================================================================
+    // SubmoduleAddOptions conversions
+    // ================================================================
+
+    #[test]
+    fn test_add_options_into_submodule_entry() {
+        let opts = SubmoduleAddOptions {
+            name: "mymod".to_string(),
+            path: PathBuf::from("libs/mymod"),
+            url: "https://example.com/repo.git".to_string(),
+            branch: Some(SerializableBranch::Name("main".to_string())),
+            ignore: Some(SerializableIgnore::Dirty),
+            update: None,
+            fetch_recurse: None,
+            shallow: true,
+            no_init: false,
+        };
+        let entry = opts.into_submodule_entry();
+        assert_eq!(entry.url, Some("https://example.com/repo.git".to_string()));
+        assert_eq!(entry.path, Some("libs/mymod".to_string()));
+        assert_eq!(
+            entry.branch,
+            Some(SerializableBranch::Name("main".to_string()))
+        );
+        assert_eq!(entry.shallow, Some(true));
+        assert_eq!(entry.active, Some(true)); // no_init=false → active=true
+    }
+
+    #[test]
+    fn test_add_options_into_entry_no_init() {
+        let opts = SubmoduleAddOptions {
+            name: "mymod".to_string(),
+            path: PathBuf::from("libs/mymod"),
+            url: "https://example.com/repo.git".to_string(),
+            branch: None,
+            ignore: None,
+            update: None,
+            fetch_recurse: None,
+            shallow: false,
+            no_init: true,
+        };
+        let entry = opts.into_submodule_entry();
+        assert_eq!(entry.active, Some(false)); // no_init=true → active=false
+        assert_eq!(entry.no_init, Some(true));
+    }
+
+    #[test]
+    fn test_add_options_from_tuple_fallbacks() {
+        // When url is None, falls back to path, then name
+        let entry = SubmoduleEntry {
+            url: None,
+            path: Some("libs/mymod".to_string()),
+            branch: None,
+            ignore: None,
+            update: None,
+            fetch_recurse: None,
+            active: None,
+            shallow: None,
+            no_init: None,
+            sparse_paths: None,
+        };
+        let opts = SubmoduleAddOptions::from_submodule_entries_tuple(("mymod".to_string(), entry));
+        // url fallback: path
+        assert_eq!(opts.url, "libs/mymod");
+        assert_eq!(opts.path, PathBuf::from("libs/mymod"));
+    }
+
+    #[test]
+    fn test_add_options_from_tuple_no_url_no_path() {
+        let entry = SubmoduleEntry {
+            url: None,
+            path: None,
+            branch: None,
+            ignore: None,
+            update: None,
+            fetch_recurse: None,
+            active: None,
+            shallow: None,
+            no_init: None,
+            sparse_paths: None,
+        };
+        let opts = SubmoduleAddOptions::from_submodule_entries_tuple(("mymod".to_string(), entry));
+        // Falls back to name for both url and path
+        assert_eq!(opts.url, "mymod");
+        assert_eq!(opts.path, PathBuf::from("mymod"));
+    }
+
+    // ================================================================
+    // SubmoduleEntry::git_options
+    // ================================================================
+
+    #[test]
+    fn test_entry_git_options() {
+        let entry = SubmoduleEntry::new(
+            Some("url".to_string()),
+            Some("path".to_string()),
+            Some(SerializableBranch::Name("dev".to_string())),
+            Some(SerializableIgnore::All),
+            Some(SerializableUpdate::Merge),
+            Some(SerializableFetchRecurse::Never),
+            Some(true),
+            None,
+            None,
+        );
+        let opts = entry.git_options();
+        assert_eq!(
+            opts.branch,
+            Some(SerializableBranch::Name("dev".to_string()))
+        );
+        assert_eq!(opts.ignore, Some(SerializableIgnore::All));
+        assert_eq!(opts.update, Some(SerializableUpdate::Merge));
+        assert_eq!(opts.fetch_recurse, Some(SerializableFetchRecurse::Never));
+    }
+
+    // ================================================================
+    // SubmoduleEntries: serialization roundtrip
+    // ================================================================
+
+    #[test]
+    fn test_entries_serde_roundtrip() {
+        let mut entries = SubmoduleEntries::default();
+        let entry = SubmoduleEntry {
+            url: Some("https://example.com/repo".to_string()),
+            path: Some("libs/repo".to_string()),
+            branch: Some(SerializableBranch::Name("main".to_string())),
+            ignore: Some(SerializableIgnore::Dirty),
+            update: Some(SerializableUpdate::Rebase),
+            fetch_recurse: Some(SerializableFetchRecurse::Always),
+            active: Some(true),
+            shallow: Some(false),
+            no_init: None,
+            sparse_paths: Some(vec!["src/".to_string()]),
+        };
+        entries = entries.add_submodule("mymod".to_string(), entry);
+
+        let serialized = toml::to_string(&entries).unwrap();
+        let deserialized: SubmoduleEntries = toml::from_str(&serialized).unwrap();
+
+        assert!(deserialized.submodules().unwrap().contains_key("mymod"));
+        let de_entry = deserialized.submodules().unwrap().get("mymod").unwrap();
+        assert_eq!(de_entry.url, Some("https://example.com/repo".to_string()));
+        assert_eq!(
+            de_entry.branch,
+            Some(SerializableBranch::Name("main".to_string()))
+        );
+        assert_eq!(de_entry.ignore, Some(SerializableIgnore::Dirty));
+        // Sparse paths should be in the sparse_checkouts map
+        assert!(
+            deserialized
+                .sparse_checkouts()
+                .unwrap()
+                .contains_key("mymod")
+        );
+    }
+
+    // ================================================================
+    // OtherSubmoduleSettings::name_from_url
+    // ================================================================
+
+    #[test]
+    fn test_other_settings_name_from_url() {
+        assert_eq!(
+            OtherSubmoduleSettings::name_from_url("https://github.com/user/repo.git"),
+            "repo"
+        );
+        assert_eq!(
+            OtherSubmoduleSettings::name_from_url("git@github.com:user/lib.git"),
+            "lib"
+        );
+        assert_eq!(
+            OtherSubmoduleSettings::name_from_url("https://github.com/user/repo/"),
+            "repo"
+        );
+        assert_eq!(OtherSubmoduleSettings::name_from_url("simple"), "simple");
+    }
+
+    // ================================================================
+    // Config full TOML roundtrip
+    // ================================================================
+
+    #[test]
+    fn test_config_toml_roundtrip() {
+        let toml_str = r#"
+[defaults]
+ignore = "dirty"
+update = "rebase"
+
+[mymod]
+path = "libs/mymod"
+url = "https://example.com/repo.git"
+branch = "main"
+active = true
+"#;
+        let config: Config = toml::from_str(toml_str).unwrap();
+        assert_eq!(config.defaults.ignore, Some(SerializableIgnore::Dirty));
+        assert_eq!(config.defaults.update, Some(SerializableUpdate::Rebase));
+        assert!(config.submodules.contains_key("mymod"));
+        let entry = config.submodules.get("mymod").unwrap();
+        assert_eq!(entry.url, Some("https://example.com/repo.git".to_string()));
+        assert_eq!(
+            entry.branch,
+            Some(SerializableBranch::Name("main".to_string()))
+        );
+    }
+
+    #[test]
+    fn test_config_toml_branch_aliases() {
+        let toml_str = r#"
+[mymod]
+path = "libs/mymod"
+url = "https://example.com/repo.git"
+branch = "."
+active = true
+"#;
+        let config: Config = toml::from_str(toml_str).unwrap();
+        let entry = config.submodules.get("mymod").unwrap();
+        assert_eq!(
+            entry.branch,
+            Some(SerializableBranch::CurrentInSuperproject)
+        );
+
+        let toml_str2 = r#"
+[mymod]
+path = "libs/mymod"
+url = "https://example.com/repo.git"
+branch = "super"
+active = true
+"#;
+        let config2: Config = toml::from_str(toml_str2).unwrap();
+        let entry2 = config2.submodules.get("mymod").unwrap();
+        assert_eq!(
+            entry2.branch,
+            Some(SerializableBranch::CurrentInSuperproject)
+        );
+    }
+
+    // ================================================================
+    // SubmoduleGitOptions
+    // ================================================================
+
+    #[test]
+    fn test_git_options_new() {
+        let opts = SubmoduleGitOptions::new(
+            Some(SerializableIgnore::All),
+            Some(SerializableFetchRecurse::Always),
+            Some(SerializableBranch::Name("main".to_string())),
+            Some(SerializableUpdate::Merge),
+        );
+        assert_eq!(opts.ignore, Some(SerializableIgnore::All));
+        assert_eq!(opts.fetch_recurse, Some(SerializableFetchRecurse::Always));
+    }
+
+    // ================================================================
+    // SubmoduleEntries::from_gitmodules
+    // ================================================================
+
+    #[test]
+    fn test_entries_from_gitmodules() {
+        let mut outer = HashMap::new();
+        let mut inner = HashMap::new();
+        inner.insert(
+            "url".to_string(),
+            "https://example.com/repo.git".to_string(),
+        );
+        inner.insert("path".to_string(), "libs/repo".to_string());
+        outer.insert("repo".to_string(), inner);
+
+        let entries = SubmoduleEntries::from_gitmodules(outer);
+        assert!(entries.contains_key("repo"));
+        let entry = entries.get("repo").unwrap();
+        assert_eq!(entry.url, Some("https://example.com/repo.git".to_string()));
+    }
+
+    // ================================================================
+    // Provider trait
+    // ================================================================
+
+    #[test]
+    fn test_config_provider_metadata() {
+        let config = Config::default();
+        let meta = config.metadata();
+        assert_eq!(meta.name, "CLI arguments");
+    }
+
+    #[test]
+    fn test_config_provider_profile() {
+        let config = Config::default();
+        assert!(config.profile().is_some());
+    }
+
+    #[test]
+    fn test_config_provider_data() {
+        let config = Config::default();
+        let data = config.data();
+        assert!(data.is_ok());
     }
 }

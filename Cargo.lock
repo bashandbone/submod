@@ -123,9 +123,6 @@ name = "bitflags"
 version = "2.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "843867be96c8daad0d758b57df9392b6d8d271134fce549de6ce169ff98a92af"
-dependencies = [
- "serde_core",
-]
 
 [[package]]
 name = "block-buffer"
@@ -170,9 +167,6 @@ name = "bytesize"
 version = "2.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6bd91ee7b2422bcb158d90ef4d14f75ef67f340943fc4149891dcce8f8b972a3"
-dependencies = [
- "serde_core",
-]
 
 [[package]]
 name = "cast"
@@ -352,19 +346,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "crossbeam"
-version = "0.8.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1137cd7e7fc0fb5d3c5a8678be38ec56e819125d8d7907411fe24ccb943faca8"
-dependencies = [
- "crossbeam-channel",
- "crossbeam-deque",
- "crossbeam-epoch",
- "crossbeam-queue",
- "crossbeam-utils",
-]
-
-[[package]]
 name = "crossbeam-channel"
 version = "0.5.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -388,15 +369,6 @@ name = "crossbeam-epoch"
 version = "0.9.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5b82ac4a3c2ca9c3460964f020e1402edd5753411d7737aa39c3714ad1b5420e"
-dependencies = [
- "crossbeam-utils",
-]
-
-[[package]]
-name = "crossbeam-queue"
-version = "0.3.12"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0f58bbc28f91df819d0aa2a2c00cd19754769c2fad90579b3592b1c9ba7a3115"
 dependencies = [
  "crossbeam-utils",
 ]
@@ -660,12 +632,8 @@ dependencies = [
  "gix-pack",
  "gix-status",
  "gix-transport",
- "gix-url",
- "jwalk",
  "layout-rs",
  "open",
- "serde",
- "serde_json",
  "tempfile",
  "thiserror",
 ]
@@ -726,7 +694,6 @@ dependencies = [
  "gix-worktree-state",
  "nonempty",
  "parking_lot",
- "serde",
  "signal-hook 0.4.3",
  "smallvec",
  "thiserror",
@@ -741,7 +708,6 @@ dependencies = [
  "bstr",
  "gix-date",
  "gix-error",
- "serde",
  "winnow",
 ]
 
@@ -757,7 +723,6 @@ dependencies = [
  "gix-quote",
  "gix-trace",
  "kstring",
- "serde",
  "smallvec",
  "thiserror",
  "unicode-bom",
@@ -826,7 +791,6 @@ dependencies = [
  "gix-hash",
  "memmap2",
  "nonempty",
- "serde",
 ]
 
 [[package]]
@@ -843,7 +807,6 @@ dependencies = [
  "gix-ref",
  "gix-sec",
  "memchr",
- "serde",
  "smallvec",
  "thiserror",
  "unicode-bom",
@@ -860,7 +823,6 @@ dependencies = [
  "bstr",
  "gix-path",
  "libc",
- "serde",
  "thiserror",
 ]
 
@@ -879,7 +841,6 @@ dependencies = [
  "gix-sec",
  "gix-trace",
  "gix-url",
- "serde",
  "thiserror",
 ]
 
@@ -893,7 +854,6 @@ dependencies = [
  "gix-error",
  "itoa",
  "jiff",
- "serde",
  "smallvec",
 ]
 
@@ -1043,7 +1003,6 @@ dependencies = [
  "bstr",
  "gix-features",
  "gix-path",
- "serde",
 ]
 
 [[package]]
@@ -1054,7 +1013,6 @@ checksum = "d8ced05d2d7b13bff08b2f7eb4e47cfeaf00b974c2ddce08377c4fe1f706b3eb"
 dependencies = [
  "faster-hex",
  "gix-features",
- "serde",
  "sha1-checked",
  "thiserror",
 ]
@@ -1080,7 +1038,6 @@ dependencies = [
  "gix-glob",
  "gix-path",
  "gix-trace",
- "serde",
  "unicode-bom",
 ]
 
@@ -1108,7 +1065,6 @@ dependencies = [
  "libc",
  "memmap2",
  "rustix",
- "serde",
  "smallvec",
  "thiserror",
 ]
@@ -1134,7 +1090,6 @@ dependencies = [
  "gix-actor",
  "gix-date",
  "gix-error",
- "serde",
 ]
 
 [[package]]
@@ -1193,7 +1148,6 @@ dependencies = [
  "gix-utils",
  "gix-validate",
  "itoa",
- "serde",
  "smallvec",
  "thiserror",
  "winnow",
@@ -1215,7 +1169,6 @@ dependencies = [
  "gix-path",
  "gix-quote",
  "parking_lot",
- "serde",
  "tempfile",
  "thiserror",
 ]
@@ -1239,7 +1192,6 @@ dependencies = [
  "gix-traverse",
  "memmap2",
  "parking_lot",
- "serde",
  "smallvec",
  "thiserror",
  "uluru",
@@ -1320,7 +1272,6 @@ dependencies = [
  "gix-utils",
  "maybe-async",
  "nonempty",
- "serde",
  "thiserror",
  "winnow",
 ]
@@ -1353,7 +1304,6 @@ dependencies = [
  "gix-utils",
  "gix-validate",
  "memmap2",
- "serde",
  "thiserror",
  "winnow",
 ]
@@ -1391,7 +1341,6 @@ dependencies = [
  "gix-revwalk",
  "gix-trace",
  "nonempty",
- "serde",
 ]
 
 [[package]]
@@ -1419,7 +1368,6 @@ dependencies = [
  "bitflags",
  "gix-path",
  "libc",
- "serde",
  "windows-sys 0.61.2",
 ]
 
@@ -1433,7 +1381,6 @@ dependencies = [
  "gix-hash",
  "gix-lock",
  "nonempty",
- "serde",
  "thiserror",
 ]
 
@@ -1509,7 +1456,6 @@ dependencies = [
  "gix-quote",
  "gix-sec",
  "gix-url",
- "serde",
  "thiserror",
 ]
 
@@ -1539,7 +1485,6 @@ dependencies = [
  "bstr",
  "gix-path",
  "percent-encoding",
- "serde",
  "thiserror",
 ]
 
@@ -1579,7 +1524,6 @@ dependencies = [
  "gix-object",
  "gix-path",
  "gix-validate",
- "serde",
 ]
 
 [[package]]
@@ -1927,22 +1871,11 @@ dependencies = [
 ]
 
 [[package]]
-name = "jwalk"
-version = "0.8.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2735847566356cd2179a2a38264839308f7079fa96e6bd5a42d740460e003c56"
-dependencies = [
- "crossbeam",
- "rayon",
-]
-
-[[package]]
 name = "kstring"
 version = "2.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "558bf9508a558512042d3095138b1f7b8fe90c5467d94f9f1da28b3731c5dbd1"
 dependencies = [
- "serde",
  "static_assertions",
 ]
 
@@ -2086,9 +2019,6 @@ name = "nonempty"
 version = "0.12.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9737e026353e5cd0736f98eddae28665118eb6f6600902a7f50db585621fecb6"
-dependencies = [
- "serde",
-]
 
 [[package]]
 name = "nu-ansi-term"
@@ -2518,9 +2448,6 @@ name = "smallvec"
 version = "1.15.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "67b1b7a3b5fe4f1376887184045fcf45c69e92af734b7aaddc05fb777b6fbd03"
-dependencies = [
- "serde",
-]
 
 [[package]]
 name = "stable_deref_trait"
@@ -2546,7 +2473,6 @@ version = "0.2.1"
 dependencies = [
  "anyhow",
  "bitflags",
- "bstr",
  "clap",
  "clap_complete",
  "clap_complete_nushell",
@@ -2555,14 +2481,12 @@ dependencies = [
  "git2",
  "gitoxide-core",
  "gix",
- "gix-config",
- "gix-glob",
- "gix-pathspec",
  "gix-submodule",
  "prodash",
  "serde",
  "tempfile",
  "thiserror",
+ "toml",
 ]
 
 [[package]]

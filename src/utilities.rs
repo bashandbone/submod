@@ -238,12 +238,7 @@ mod tests {
             "my-repo"
         );
         assert_eq!(
-            get_name(
-                Some("  spaced-repo  ".to_string()),
-                None,
-                None
-            )
-            .unwrap(),
+            get_name(Some("  spaced-repo  ".to_string()), None, None).unwrap(),
             "spaced-repo"
         );
     }
@@ -282,12 +277,7 @@ mod tests {
     #[test]
     fn test_get_name_no_name_valid_path() {
         assert_eq!(
-            get_name(
-                None,
-                None,
-                Some(std::ffi::OsString::from("another-path"))
-            )
-            .unwrap(),
+            get_name(None, None, Some(std::ffi::OsString::from("another-path"))).unwrap(),
             "another-path"
         );
     }
@@ -308,5 +298,158 @@ mod tests {
     #[test]
     fn test_get_name_all_none() {
         assert!(get_name(None, None, None).is_err());
+    }
+
+    // ================================================================
+    // name_from_url edge cases
+    // ================================================================
+
+    #[test]
+    fn test_name_from_url_standard() {
+        assert_eq!(
+            name_from_url("https://github.com/user/repo.git").unwrap(),
+            "repo"
+        );
+        assert_eq!(
+            name_from_url("https://github.com/user/repo").unwrap(),
+            "repo"
+        );
+    }
+
+    #[test]
+    fn test_name_from_url_trailing_slashes() {
+        assert_eq!(
+            name_from_url("https://github.com/user/repo/").unwrap(),
+            "repo"
+        );
+        assert_eq!(
+            name_from_url("https://github.com/user/repo///").unwrap(),
+            "repo"
+        );
+    }
+
+    #[test]
+    fn test_name_from_url_ssh_format() {
+        assert_eq!(
+            name_from_url("git@github.com:user/mylib.git").unwrap(),
+            "mylib"
+        );
+    }
+
+    #[test]
+    fn test_name_from_url_file_url() {
+        assert_eq!(name_from_url("file:///path/to/repo.git").unwrap(), "repo");
+    }
+
+    #[test]
+    fn test_name_from_url_simple_name() {
+        assert_eq!(name_from_url("repo").unwrap(), "repo");
+        assert_eq!(name_from_url("my-lib.git").unwrap(), "my-lib");
+    }
+
+    #[test]
+    fn test_name_from_url_empty() {
+        assert!(name_from_url("").is_err());
+    }
+
+    // ================================================================
+    // name_from_osstring
+    // ================================================================
+
+    #[test]
+    fn test_name_from_osstring_simple() {
+        assert_eq!(
+            name_from_osstring(std::ffi::OsString::from("my-repo")).unwrap(),
+            "my-repo"
+        );
+    }
+
+    #[test]
+    fn test_name_from_osstring_path() {
+        let path = PathBuf::from_iter(["path", "to", "module"]);
+        assert_eq!(name_from_osstring(path.into_os_string()).unwrap(), "module");
+    }
+
+    #[test]
+    fn test_name_from_osstring_empty() {
+        assert!(name_from_osstring(std::ffi::OsString::from("")).is_err());
+        assert!(name_from_osstring(std::ffi::OsString::from("  ")).is_err());
+    }
+
+    #[test]
+    fn test_name_from_osstring_null_byte() {
+        assert!(name_from_osstring(std::ffi::OsString::from("foo\0bar")).is_err());
+    }
+
+    // ================================================================
+    // osstring_to_string
+    // ================================================================
+
+    #[test]
+    fn test_osstring_to_string_valid() {
+        assert_eq!(
+            osstring_to_string(std::ffi::OsString::from("hello")).unwrap(),
+            "hello"
+        );
+    }
+
+    // ================================================================
+    // path_to_string
+    // ================================================================
+
+    #[test]
+    fn test_path_to_string_valid() {
+        let path = std::path::Path::new("/home/user/repo");
+        assert_eq!(path_to_string(path).unwrap(), "/home/user/repo");
+    }
+
+    // ================================================================
+    // path_to_os_string
+    // ================================================================
+
+    #[test]
+    fn test_path_to_os_string_roundtrip() {
+        let path = std::path::Path::new("/some/path");
+        let os = path_to_os_string(path);
+        assert_eq!(os, std::ffi::OsString::from("/some/path"));
+    }
+
+    // ================================================================
+    // set_path
+    // ================================================================
+
+    #[test]
+    fn test_set_path_valid_utf8() {
+        let os = std::ffi::OsString::from("/valid/path");
+        assert_eq!(set_path(os).unwrap(), "/valid/path");
+    }
+
+    // ================================================================
+    // get_sparse_paths
+    // ================================================================
+
+    #[test]
+    fn test_get_sparse_paths_valid() {
+        let paths = Some(vec!["src/".to_string(), "docs/".to_string()]);
+        let result = get_sparse_paths(paths).unwrap();
+        assert_eq!(result, Some(vec!["src/".to_string(), "docs/".to_string()]));
+    }
+
+    #[test]
+    fn test_get_sparse_paths_none() {
+        let result = get_sparse_paths(None).unwrap();
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_get_sparse_paths_null_byte() {
+        let paths = Some(vec!["src/\0bad".to_string()]);
+        assert!(get_sparse_paths(paths).is_err());
+    }
+
+    #[test]
+    fn test_get_sparse_paths_empty_vec() {
+        let result = get_sparse_paths(Some(vec![])).unwrap();
+        assert_eq!(result, Some(vec![]));
     }
 }

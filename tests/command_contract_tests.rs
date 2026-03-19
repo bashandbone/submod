@@ -358,10 +358,12 @@ mod tests {
 
         // Sparse checkout should be reconfigured
         let sparse_file = harness.get_sparse_checkout_file_path("lib/sparse-reinit");
-        assert!(sparse_file.exists(), "Sparse checkout file should exist after reinit");
+        assert!(
+            sparse_file.exists(),
+            "Sparse checkout file should exist after reinit"
+        );
 
-        let sparse_content =
-            fs::read_to_string(&sparse_file).expect("Failed to read sparse file");
+        let sparse_content = fs::read_to_string(&sparse_file).expect("Failed to read sparse file");
         assert!(
             sparse_content.contains("src"),
             "Sparse checkout should contain 'src' after reinit"
@@ -417,8 +419,7 @@ mod tests {
 
         assert!(output_path.exists(), "Output config file should exist");
 
-        let content =
-            fs::read_to_string(&output_path).expect("Failed to read generated config");
+        let content = fs::read_to_string(&output_path).expect("Failed to read generated config");
         // The generated config should reference the submodule's URL (the most reliable identifier)
         assert!(
             content.contains(remote.to_str().unwrap_or("")),
@@ -432,8 +433,7 @@ mod tests {
         harness.init_git_repo().expect("Failed to init git repo");
 
         let output_path = harness.work_dir.join("force_gen.toml");
-        fs::write(&output_path, "# existing content\n")
-            .expect("Failed to write existing file");
+        fs::write(&output_path, "# existing content\n").expect("Failed to write existing file");
 
         // Without --force should fail
         let no_force = harness
@@ -467,8 +467,7 @@ mod tests {
             "Expected success message after --force; got: {stdout}"
         );
 
-        let content =
-            fs::read_to_string(&output_path).expect("Failed to read generated config");
+        let content = fs::read_to_string(&output_path).expect("Failed to read generated config");
         // The existing content must be gone and replaced with generated defaults.
         assert!(
             !content.contains("# existing content") && content.contains("[defaults]"),
@@ -491,18 +490,20 @@ mod tests {
         let url = format!("file://{}", remote.display());
 
         harness
-            .run_submod_success(&["add", &url, "--name", "movable-lib", "--path", "lib/original"])
+            .run_submod_success(&[
+                "add",
+                &url,
+                "--name",
+                "movable-lib",
+                "--path",
+                "lib/original",
+            ])
             .expect("Failed to add submodule");
 
         assert!(harness.file_exists("lib/original/.git"));
 
         let stdout = harness
-            .run_submod_success(&[
-                "change",
-                "movable-lib",
-                "--path",
-                "lib/moved",
-            ])
+            .run_submod_success(&["change", "movable-lib", "--path", "lib/moved"])
             .expect("Failed to change submodule path");
 
         // Should confirm the update
@@ -608,9 +609,8 @@ mod tests {
         let url = format!("file://{}", remote.display());
 
         // Start disabled
-        let config_content = format!(
-            "[reenable-lib]\npath = \"lib/reenable\"\nurl = \"{url}\"\nactive = false\n"
-        );
+        let config_content =
+            format!("[reenable-lib]\npath = \"lib/reenable\"\nurl = \"{url}\"\nactive = false\n");
         harness
             .create_config(&config_content)
             .expect("Failed to create config");
@@ -655,12 +655,7 @@ mod tests {
 
         // Replace sparse paths (no --append)
         harness
-            .run_submod_success(&[
-                "change",
-                "sparse-replace",
-                "--sparse-paths",
-                "tests",
-            ])
+            .run_submod_success(&["change", "sparse-replace", "--sparse-paths", "tests"])
             .expect("Failed to change sparse paths");
 
         let config = harness.read_config().expect("Failed to read config");
@@ -738,9 +733,8 @@ mod tests {
             .expect("Failed to create remote");
         let url = format!("file://{}", remote.display());
 
-        let config_content = format!(
-            "[multi-lib]\npath = \"lib/multi\"\nurl = \"{url}\"\nactive = true\n"
-        );
+        let config_content =
+            format!("[multi-lib]\npath = \"lib/multi\"\nurl = \"{url}\"\nactive = true\n");
         harness
             .create_config(&config_content)
             .expect("Failed to create config");
@@ -777,13 +771,7 @@ mod tests {
             .expect("Failed to create config");
 
         harness
-            .run_submod_success(&[
-                "change-global",
-                "--update",
-                "rebase",
-                "--fetch",
-                "always",
-            ])
+            .run_submod_success(&["change-global", "--update", "rebase", "--fetch", "always"])
             .expect("Failed to run change-global with update and fetch");
 
         let config = harness.read_config().expect("Failed to read config");
@@ -939,7 +927,14 @@ mod tests {
         let url = format!("file://{}", remote.display());
 
         let stdout = harness
-            .run_submod_success(&["add", &url, "--name", "add-contract", "--path", "lib/addcnt"])
+            .run_submod_success(&[
+                "add",
+                &url,
+                "--name",
+                "add-contract",
+                "--path",
+                "lib/addcnt",
+            ])
             .expect("Failed to add submodule");
 
         assert!(
@@ -1094,7 +1089,10 @@ mod tests {
             .run_submod_success(&["list"])
             .expect("Failed to run list");
 
-        assert!(stdout.contains("list-full"), "list should show submodule name");
+        assert!(
+            stdout.contains("list-full"),
+            "list should show submodule name"
+        );
         assert!(stdout.contains("lib/lf"), "list should show submodule path");
         assert!(stdout.contains(&url), "list should show submodule URL");
         assert!(stdout.contains("active"), "list should show active status");
@@ -1142,7 +1140,14 @@ mod tests {
         let url = format!("file://{}", remote.display());
 
         harness
-            .run_submod_success(&["add", &url, "--name", "del-contract", "--path", "lib/delcon"])
+            .run_submod_success(&[
+                "add",
+                &url,
+                "--name",
+                "del-contract",
+                "--path",
+                "lib/delcon",
+            ])
             .expect("Failed to add submodule");
 
         let stdout = harness
