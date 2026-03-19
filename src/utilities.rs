@@ -228,6 +228,7 @@ pub(crate) fn get_name(
 }
 
 #[cfg(test)]
+#[cfg_attr(coverage_nightly, coverage(off))]
 mod tests {
     use super::*;
 

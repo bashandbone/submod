@@ -701,6 +701,7 @@ impl GixGit2Convert for SerializableUpdate {
 }
 
 #[cfg(test)]
+#[cfg_attr(coverage_nightly, coverage(off))]
 mod tests {
     use super::*;
 

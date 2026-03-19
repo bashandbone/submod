@@ -91,8 +91,9 @@ else
     cargo build --bin submod >/dev/null 2>&1
 fi
 
-# Force Rust tests to run serially to avoid git submodule race conditions
-export RUST_TEST_THREADS=1
+# Test parallelism is managed by nextest test groups in .config/nextest.toml.
+# Integration tests that modify git repos run serially within their group;
+# other tests (config, contract) run in parallel.
 
 if [[ $? -eq 0 ]]; then
     print_success "Build completed successfully"

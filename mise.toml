@@ -23,7 +23,6 @@ uv = "latest"  # Another runner for MCP servers.
 
 [env]
 CARGO_TARGET_DIR = "target"
-RUST_TEST_THREADS = 1
 HK_MISE = 1
 
 [tasks.cleancache]

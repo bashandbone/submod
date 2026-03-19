@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2025 Adam Poulemanos <89049923+bashandbone@users.noreply.github.com>
 //
 // SPDX-License-Identifier: LicenseRef-PlainMIT OR MIT
+#![cfg_attr(coverage_nightly, feature(coverage_attribute))]
 
 #![doc = r"
 Main entry point for the submod CLI tool.
@@ -36,6 +37,7 @@ use crate::utilities::{get_name, get_sparse_paths, set_path};
 use anyhow::Result;
 use clap::Parser;
 use clap_complete::generate;
+#[cfg_attr(coverage_nightly, coverage(off))]
 fn main() -> Result<()> {
     let cli = Cli::parse();
     // config-path is always set because it has a default value, "submod.toml"

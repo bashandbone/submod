@@ -13,7 +13,7 @@ mise run build                 # alias: mise run b
 
 ### Test
 ```bash
-cargo nextest run --all-features --no-fail-fast -j 1   # run all tests (preferred)
+cargo nextest run --all-features --no-fail-fast         # run all tests (preferred)
 cargo test --test integration_tests                     # integration tests only
 cargo test --test command_contract_tests                # command contract tests only
 ./scripts/run-tests.sh --verbose                        # comprehensive test runner with reporting
@@ -21,7 +21,7 @@ cargo test --test command_contract_tests                # command contract tests
 mise run test                                           # alias: mise run t (runs via hk)
 ```
 
-Tests must run single-threaded (`RUST_TEST_THREADS=1` is set in `mise.toml`). The test suite is integration-test-focused; unit tests are minimal by design.
+Integration tests that modify git repos are serialized via nextest test groups (`.config/nextest.toml`); other tests run in parallel. Each test gets an isolated git config via `GIT_CONFIG_GLOBAL` so tests never race on `~/.gitconfig`. The test suite is integration-test-focused; unit tests are minimal by design.
 
 ### Lint & Format
 ```bash
