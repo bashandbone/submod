@@ -2561,7 +2561,6 @@ dependencies = [
  "gix-submodule",
  "prodash",
  "serde",
- "serde_json",
  "tempfile",
  "thiserror",
 ]

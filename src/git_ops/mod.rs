@@ -183,6 +183,45 @@ impl GitOpsManager {
         Ok(Self { gix_ops, git2_ops })
     }
 
+    /// Return the working directory of the underlying git repository, if any.
+    pub fn workdir(&self) -> Option<&std::path::Path> {
+        self.git2_ops.workdir()
+    }
+
+    /// Reopen the repository from the working directory to refresh any cached state.
+    /// This is needed after destructive operations (e.g., submodule delete) so that the
+    /// in-memory git2 repository object reflects the updated on-disk state.
+    ///
+    /// Returns an error if the git2 repository (the required backend) cannot be reopened.
+    /// A gix reopen failure is non-fatal since gix is an optional optimistic backend.
+    pub fn reopen(&mut self) -> Result<()> {
+        let workdir = self
+            .git2_ops
+            .workdir()
+            .ok_or_else(|| anyhow::anyhow!("Cannot reopen repository: no working directory"))?
+            .to_path_buf();
+
+        // git2 is the required backend — propagate its reopen error.
+        self.git2_ops = Git2Operations::new(Some(&workdir))
+            .with_context(|| format!("Failed to reopen git2 repository at {}", workdir.display()))?;
+
+        // gix is an optional optimistic backend — log failures but don't fail.
+        match GixOperations::new(Some(&workdir)) {
+            Ok(new_gix) => {
+                self.gix_ops = Some(new_gix);
+            }
+            Err(e) => {
+                eprintln!(
+                    "Warning: failed to reopen gix repository at {}: {}",
+                    workdir.display(),
+                    e
+                );
+            }
+        }
+
+        Ok(())
+    }
+
     /// Try gix first, fall back to git2
     fn try_with_fallback<T, F1, F2>(&self, gix_op: F1, git2_op: F2) -> Result<T>
     where
@@ -296,16 +335,33 @@ impl GitOperations for GitOpsManager {
             // Also git2 might have added it to .git/config
             let gitconfig_path = workdir.join(".git").join("config");
             if gitconfig_path.exists() {
+                // Remove by name (our submodule name)
                 let _ = std::process::Command::new("git")
                     .args(["config", "--remove-section", &format!("submodule.{}", opts.name)])
                     .current_dir(workdir)
                     .output();
+                // Remove by path (git2 uses path as key when name != path)
+                let path_key = opts.path.display().to_string();
+                if path_key != opts.name {
+                    let _ = std::process::Command::new("git")
+                        .args(["config", "--remove-section", &format!("submodule.{path_key}")])
+                        .current_dir(workdir)
+                        .output();
+                }
             }
 
             // Also git2 might have created the internal git directory
             let internal_git_dir = workdir.join(".git").join("modules").join(&opts.name);
             if internal_git_dir.exists() {
                 let _ = std::fs::remove_dir_all(&internal_git_dir);
+            }
+
+            // git2's repo.submodule() uses the *path* (not the name) as the key for the
+            // internal modules directory, so ".git/modules/lib/reinit" may exist even when
+            // ".git/modules/<name>" has already been cleaned up.  Remove both.
+            let path_internal_git_dir = workdir.join(".git").join("modules").join(&opts.path);
+            if path_internal_git_dir.exists() {
+                let _ = std::fs::remove_dir_all(&path_internal_git_dir);
             }
 
             // And removed from index
@@ -322,7 +378,16 @@ impl GitOperations for GitOpsManager {
                 .arg("--name")
                 .arg(&opts.name);
             if let Some(branch) = &opts.branch {
-                cmd.arg("--branch").arg(branch.to_string());
+                let branch_str = branch.to_string();
+                // "." is the gitmodules/git-config token meaning "track the same branch as
+                // the superproject" (SerializableBranch::CurrentInSuperproject).  It is only
+                // meaningful as a stored config value; passing it as `--branch .` to
+                // `git submodule add` is invalid and causes:
+                //   fatal: 'HEAD' is not a valid branch name
+                // Skip the flag so git resolves the remote's default branch automatically.
+                if branch_str != "." {
+                    cmd.arg("--branch").arg(&branch_str);
+                }
             }
             if opts.shallow {
                 cmd.arg("--depth").arg("1");

@@ -1301,9 +1301,49 @@ impl GitManager {
             }
         }
 
+        // Ensure thorough cleanup of git state left behind by git2 (which uses the *path*
+        // as the submodule key rather than the *name*).  The gix/git2 cleanups above key
+        // on the name, so path-based artifacts may linger and prevent a clean re-add.
+        if let Some(workdir) = self.git_ops.workdir() {
+            let workdir = workdir.to_path_buf();
+
+            // Remove path-based git config section (created by git2 during add)
+            if path != name {
+                let _ = std::process::Command::new("git")
+                    .args(["config", "--remove-section", &format!("submodule.{path}")])
+                    .current_dir(&workdir)
+                    .output();
+            }
+            // Also ensure name-based config section is gone
+            let _ = std::process::Command::new("git")
+                .args(["config", "--remove-section", &format!("submodule.{name}")])
+                .current_dir(&workdir)
+                .output();
+
+            // Remove path-based .git/modules directory (created by git2 using path as key)
+            let path_modules_dir = workdir.join(".git").join("modules").join(&path);
+            if path_modules_dir.exists() {
+                let _ = fs::remove_dir_all(&path_modules_dir);
+            }
+            // Also ensure name-based .git/modules directory is gone
+            let name_modules_dir = workdir.join(".git").join("modules").join(name);
+            if name_modules_dir.exists() {
+                let _ = fs::remove_dir_all(&name_modules_dir);
+            }
+        }
+
         // Remove from config
         self.config.submodules.remove_submodule(name);
         self.write_full_config()?;
+
+        // Reopen the git repository to flush any cached state (git2 caches internal state
+        // about submodules and will fail on subsequent add_submodule calls if not refreshed).
+        if let Err(e) = self.git_ops.reopen() {
+            eprintln!(
+                "Warning: failed to refresh git repository state after deleting submodule '{name}': {e}"
+            );
+        }
+
         println!("Deleted submodule '{name}'.");
         Ok(())
     }
