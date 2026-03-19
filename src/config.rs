@@ -1292,7 +1292,7 @@ mod tests {
         map.insert("branch".to_string(), "main".to_string());
         map.insert("ignore".to_string(), "dirty".to_string());
         map.insert("update".to_string(), "rebase".to_string());
-        map.insert("fetchRecurse".to_string(), "true".to_string());
+        map.insert("fetchRecurseSubmodules".to_string(), "true".to_string());
         map.insert("active".to_string(), "true".to_string());
         map.insert("shallow".to_string(), "true".to_string());
 
