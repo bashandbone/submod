@@ -58,7 +58,7 @@
         },
         "branch": {
           "type": "string",
-          "description": "Branch to track in the submodule. Defaults to the submodule's default branch (usually main or master).\nUse \".\" or the aliases \"current\", \"current-in-super-project\", \"superproject\", or \"super\" to track the superproject's current branch. **Do not use these strings as actual branch names in the submodule repository.** If you need to track a branch with one of these names, use the full branch name (e.g., \"refs/heads/current\")."
+          "description": "Branch to track in the submodule. Defaults to the submodule's default branch (usually main or master).\nUse \".\" or the aliases \"current\", \"current-in-superproject\", \"superproject\", or \"super\" to track the superproject's current branch. **Do not use these strings as actual branch names in the submodule repository.** If you need to track a branch with one of these names, use the full branch name (e.g., \"refs/heads/current\")."
         },
         "sparse_paths": {
           "type": "array",
