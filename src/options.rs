@@ -403,13 +403,19 @@ impl Serialize for SerializableBranch {
 
 impl<'de> Deserialize<'de> for SerializableBranch {
     /// Deserialize from a plain string using the same logic as [`FromStr`].
-    /// Accepts `"."`, `"current"`, `"current-in-super-project"`, `"superproject"`, or `"super"`
-    /// as [`CurrentInSuperproject`](SerializableBranch::CurrentInSuperproject); all other strings
+    /// Accepts `"."`, `"current"`, `"current-in-super-project"`, `"current-in-superproject"`,
+    /// `"superproject"`, or `"super"` as
+    /// [`CurrentInSuperproject`](SerializableBranch::CurrentInSuperproject); all other strings
     /// become [`Name`](SerializableBranch::Name).
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         let s = String::deserialize(deserializer)?;
-        SerializableBranch::from_str(&s)
-            .map_err(|_| serde::de::Error::custom(format!("invalid branch value: {s}")))
+        let branch = match s.as_str() {
+            "." | "current" | "current-in-super-project" | "current-in-superproject" | "superproject" | "super" => {
+                SerializableBranch::CurrentInSuperproject
+            }
+            _ => SerializableBranch::Name(s),
+        };
+        Ok(branch)
     }
 }
 
