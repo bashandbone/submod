@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: 2025 Adam Poulemanos <89049923+bashandbone@users.noreply.github.com>
+
+SPDX-License-Identifier: LicenseRef-PlainMIT OR MIT
+-->
+
 # CLAUDE.md
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
