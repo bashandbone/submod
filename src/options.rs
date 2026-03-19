@@ -473,34 +473,6 @@ impl GitmodulesConvert for SerializableBranch {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::SerializableBranch;
-
-    #[test]
-    fn test_branch_deserialize_from_toml_rejects_empty_and_whitespace() {
-        // Empty string should be rejected
-        let res_empty: Result<SerializableBranch, toml::de::Error> =
-            toml::from_str("branch = \"\"");
-        assert!(res_empty.is_err(), "expected error for empty branch value");
-        let err_empty = res_empty.unwrap_err().to_string();
-        assert!(
-            err_empty.contains("invalid branch value"),
-            "error for empty branch value should contain context, got: {err_empty}"
-        );
-
-        // Whitespace-only string should be rejected
-        let res_ws: Result<SerializableBranch, toml::de::Error> =
-            toml::from_str("branch = \"   \"");
-        assert!(res_ws.is_err(), "expected error for whitespace-only branch value");
-        let err_ws = res_ws.unwrap_err().to_string();
-        assert!(
-            err_ws.contains("invalid branch value"),
-            "error for whitespace-only branch value should contain context, got: {err_ws}"
-        );
-    }
-}
-
 impl TryFrom<Branch> for SerializableBranch {
     type Error = ();
 
@@ -741,6 +713,29 @@ impl GixGit2Convert for SerializableUpdate {
 #[cfg_attr(coverage_nightly, coverage(off))]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_branch_deserialize_from_toml_rejects_empty_and_whitespace() {
+        // Empty string should be rejected
+        let res_empty: Result<SerializableBranch, toml::de::Error> =
+            toml::from_str("branch = \"\"");
+        assert!(res_empty.is_err(), "expected error for empty branch value");
+        let err_empty = res_empty.unwrap_err().to_string();
+        assert!(
+            err_empty.contains("invalid branch value"),
+            "error for empty branch value should contain context, got: {err_empty}"
+        );
+
+        // Whitespace-only string should be rejected
+        let res_ws: Result<SerializableBranch, toml::de::Error> =
+            toml::from_str("branch = \"   \"");
+        assert!(res_ws.is_err(), "expected error for whitespace-only branch value");
+        let err_ws = res_ws.unwrap_err().to_string();
+        assert!(
+            err_ws.contains("invalid branch value"),
+            "error for whitespace-only branch value should contain context, got: {err_ws}"
+        );
+    }
 
     #[test]
     fn test_serializable_ignore_gitmodules_key() {
