@@ -716,9 +716,15 @@ mod tests {
 
     #[test]
     fn test_branch_deserialize_from_toml_rejects_empty_and_whitespace() {
+        // Use a wrapper struct because TOML top-level must be a table;
+        // SerializableBranch appears as a field value in real config files.
+        #[derive(Debug, serde::Deserialize)]
+        struct Helper {
+            branch: SerializableBranch,
+        }
+
         // Empty string should be rejected
-        let res_empty: Result<SerializableBranch, toml::de::Error> =
-            toml::from_str("branch = \"\"");
+        let res_empty: Result<Helper, toml::de::Error> = toml::from_str(r#"branch = """#);
         assert!(res_empty.is_err(), "expected error for empty branch value");
         let err_empty = res_empty.unwrap_err().to_string();
         assert!(
@@ -727,8 +733,7 @@ mod tests {
         );
 
         // Whitespace-only string should be rejected
-        let res_ws: Result<SerializableBranch, toml::de::Error> =
-            toml::from_str("branch = \"   \"");
+        let res_ws: Result<Helper, toml::de::Error> = toml::from_str(r#"branch = "   ""#);
         assert!(res_ws.is_err(), "expected error for whitespace-only branch value");
         let err_ws = res_ws.unwrap_err().to_string();
         assert!(
