@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2025 Adam Poulemanos <89049923+bashandbone@users.noreply.github.com>
 //
 // SPDX-License-Identifier: LicenseRef-PlainMIT OR MIT
+#![cfg_attr(coverage_nightly, feature(coverage_attribute))]
 //! A Rust CLI tool for managing Git submodules with enhanced features and user-friendly configuration.
 //! This module is exposed for integration testing; it is not intended for public use and may contain unstable APIs.
 

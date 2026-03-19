@@ -45,7 +45,7 @@ ignore = "dirty" # Override default ignore setting for all submodules
 #
 # ## `branch`
 # The submodule branch to check out. Defaults to the submodule's default branch (usually `main` or `master`). You may use `"."` (or aliases: `current`, `current-in-superproject`, `superproject`, `super`) to match the superproject branch. Do not use these as branch names in the submodule repository.
-# TODO: Submit an issue if you encounter a branch name conflict.
+# Submit an issue if you encounter a branch name conflict at https://github.com/bashandbone/submod/issues.
 #
 # ## `sparse_paths`
 # A list of relative paths or glob patterns to include in the sparse checkout. If omitted, includes all files.

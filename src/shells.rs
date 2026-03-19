@@ -96,6 +96,7 @@ impl TryFrom<AotShell> for Shell {
 }
 
 #[cfg(test)]
+#[cfg_attr(coverage_nightly, coverage(off))]
 mod tests {
     use super::*;
 

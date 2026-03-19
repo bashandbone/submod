@@ -1,0 +1,28 @@
+# Nextest configuration for submod
+#
+# With per-test git config isolation (GIT_CONFIG_GLOBAL/GIT_CONFIG_SYSTEM),
+# tests are safe to run in parallel. The serial-integration group is kept as
+# defense-in-depth: integration tests that create repos, add/remove submodules,
+# and shell out to git are serialized among themselves to avoid any residual
+# contention on shared git state (e.g. lock files in /tmp).
+
+[test-groups]
+serial-integration = { max-threads = 1 }
+
+[profile.default]
+fail-fast = false
+
+# Integration tests that create/modify git repos run serially within their
+# group. config_tests and command_contract_tests are safe to run in parallel
+# with everything (they use isolated temp dirs and per-test gitconfig).
+[[profile.default.overrides]]
+filter = 'binary_id(submod::integration_tests) | binary_id(submod::sparse_checkout_tests) | binary_id(submod::error_handling_tests) | binary_id(submod::performance_tests)'
+test-group = 'serial-integration'
+
+# CI profile: fail fast but still serialize integration tests
+[profile.ci]
+fail-fast = true
+
+[[profile.ci.overrides]]
+filter = 'binary_id(submod::integration_tests) | binary_id(submod::sparse_checkout_tests) | binary_id(submod::error_handling_tests) | binary_id(submod::performance_tests)'
+test-group = 'serial-integration'

@@ -102,6 +102,8 @@ unused = { level = "warn", priority = -1 }
 missing_docs = "warn"
 # Warn about unreachable code
 unreachable_code = "warn"
+# Allow cfg(coverage) and cfg(coverage_nightly) set by cargo-llvm-cov
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(coverage)', 'cfg(coverage_nightly)'] }
 
 [lints.clippy]
 # Cargo-specific lints
