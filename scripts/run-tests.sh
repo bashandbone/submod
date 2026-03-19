@@ -6,6 +6,10 @@
 
 # Test runner script for submod integration tests
 # This script runs the comprehensive test suite with proper reporting
+#
+# Test parallelism is managed by nextest test groups in .config/nextest.toml.
+# Integration tests that modify git repos run serially within their group;
+# other tests (unit, config, contract) run in parallel.
 
 set -e
 
@@ -81,133 +85,63 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-print_status "Starting submod integration test suite..."
+print_status "Starting submod test suite..."
 
 # Build the project first
 print_status "Building submod binary..."
+PROFILE="test"
+if [[ "$PERFORMANCE" == true ]]; then
+    PROFILE="bench"
+fi
+
 if $VERBOSE; then
-    cargo build --bin submod
+    cargo build --bin submod --profile "$PROFILE"
 else
-    cargo build --bin submod >/dev/null 2>&1
+    cargo build --bin submod --profile "$PROFILE" >/dev/null 2>&1
+fi
+print_success "Build completed successfully"
+
+# Build the nextest command
+NEXTEST_ARGS=(
+    nextest --manifest-path ./Cargo.toml run
+    --all-features
+    --no-fail-fast
+)
+
+# Build the filterset expression
+FILTERSET=""
+
+# Exclude performance tests unless explicitly requested
+if [[ "$PERFORMANCE" != true ]]; then
+    FILTERSET="not binary_id(submod::performance_tests)"
 fi
 
-# Test parallelism is managed by nextest test groups in .config/nextest.toml.
-# Integration tests that modify git repos run serially within their group;
-# other tests (config, contract) run in parallel.
-
-if [[ $? -eq 0 ]]; then
-    print_success "Build completed successfully"
-else
-    print_error "Build failed"
-    exit 1
-fi
-
-# Function to run a specific test module
-run_test_module() {
-    local module=$1
-    local description=$2
-
-    print_status "Running $description..."
-
-    local cmd="cargo test --test $module"
-    if [[ -n "$FILTER" ]]; then
-        cmd="$cmd $FILTER"
-    fi
-
-    if $VERBOSE; then
-        cmd="$cmd -- --nocapture"
-    fi
-
-    if eval "$cmd"; then
-        print_success "$description completed successfully"
-        return 0
+# Apply filter if provided
+if [[ -n "$FILTER" ]]; then
+    if [[ -n "$FILTERSET" ]]; then
+        FILTERSET="($FILTERSET) & test(/$FILTER/)"
     else
-        print_error "$description failed"
-        return 1
-    fi
-}
-
-# Track test results
-declare -a failed_tests=()
-total_tests=0
-
-# Core integration tests
-if [[ -z "$FILTER" ]] || [[ "integration_tests" =~ $FILTER ]]; then
-    total_tests=$((total_tests + 1))
-    if ! run_test_module "integration_tests" "Core integration tests"; then
-        failed_tests+=("integration_tests")
+        FILTERSET="test(/$FILTER/)"
     fi
 fi
 
-# Configuration tests
-if [[ -z "$FILTER" ]] || [[ "config_tests" =~ $FILTER ]]; then
-    total_tests=$((total_tests + 1))
-    if ! run_test_module "config_tests" "Configuration management tests"; then
-        failed_tests+=("config_tests")
-    fi
+if [[ -n "$FILTERSET" ]]; then
+    NEXTEST_ARGS+=(-E "$FILTERSET")
 fi
 
-# Sparse checkout tests
-if [[ -z "$FILTER" ]] || [[ "sparse_checkout_tests" =~ $FILTER ]]; then
-    total_tests=$((total_tests + 1))
-    if ! run_test_module "sparse_checkout_tests" "Sparse checkout functionality tests"; then
-        failed_tests+=("sparse_checkout_tests")
-    fi
+# Run the full suite in a single nextest invocation so that test groups
+# can schedule serial and parallel tests optimally.
+print_status "Running tests..."
+if $VERBOSE; then
+    print_status "cargo ${NEXTEST_ARGS[*]}"
 fi
 
-# Error handling tests
-if [[ -z "$FILTER" ]] || [[ "error_handling_tests" =~ $FILTER ]]; then
-    total_tests=$((total_tests + 1))
-    if ! run_test_module "error_handling_tests" "Error handling and edge case tests"; then
-        failed_tests+=("error_handling_tests")
-    fi
-fi
-
-# Performance tests (optional)
-if $PERFORMANCE; then
-    if [[ -z "$FILTER" ]] || [[ "performance_tests" =~ $FILTER ]]; then
-        total_tests=$((total_tests + 1))
-        print_warning "Running performance tests (this may take a while)..."
-        if ! run_test_module "performance_tests" "Performance and stress tests"; then
-            failed_tests+=("performance_tests")
-        fi
-    fi
-fi
-
-# Run unit tests as well
-if [[ -z "$FILTER" ]] || [[ "unit" =~ $FILTER ]]; then
-    print_status "Running unit tests..."
-    total_tests=$((total_tests + 1))
-
-    cmd="cargo test --lib"
-    if $VERBOSE; then
-        cmd="$cmd -- --nocapture"
-    fi
-
-    if eval "$cmd"; then
-        print_success "Unit tests completed successfully"
-    else
-        print_error "Unit tests failed"
-        failed_tests+=("unit_tests")
-    fi
-fi
-
-# Report results
-echo ""
-print_status "Test Suite Summary"
-echo "=================="
-
-if [[ ${#failed_tests[@]} -eq 0 ]]; then
-    print_success "All $total_tests test modules passed! 🎉"
+if cargo "${NEXTEST_ARGS[@]}"; then
     echo ""
-    echo "The submod tool is working correctly and ready for use."
+    print_success "All tests passed!"
     exit 0
 else
-    print_error "${#failed_tests[@]} out of $total_tests test modules failed:"
-    for test in "${failed_tests[@]}"; do
-        echo "  - $test"
-    done
     echo ""
-    echo "Please check the test output above for details on the failures."
+    print_error "Some tests failed. See output above for details."
     exit 1
 fi
