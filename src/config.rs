@@ -526,7 +526,8 @@ impl SubmoduleEntry {
             .get("ignore")
             .and_then(|i| SerializableIgnore::from_gitmodules(i).ok());
         let fetch_recurse = entries
-            .get("fetchRecurse")
+            .get("fetchRecurseSubmodules")
+            .or_else(|| entries.get("fetchRecurse"))
             .and_then(|fr| SerializableFetchRecurse::from_gitmodules(fr).ok());
         let update = entries
             .get("update")
