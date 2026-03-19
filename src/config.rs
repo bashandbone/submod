@@ -526,7 +526,8 @@ impl SubmoduleEntry {
             .get("ignore")
             .and_then(|i| SerializableIgnore::from_gitmodules(i).ok());
         let fetch_recurse = entries
-            .get("fetchRecurse")
+            .get("fetchRecurseSubmodules")
+            .or_else(|| entries.get("fetchRecurse"))
             .and_then(|fr| SerializableFetchRecurse::from_gitmodules(fr).ok());
         let update = entries
             .get("update")
@@ -1293,7 +1294,7 @@ mod tests {
         map.insert("branch".to_string(), "main".to_string());
         map.insert("ignore".to_string(), "dirty".to_string());
         map.insert("update".to_string(), "rebase".to_string());
-        map.insert("fetchRecurse".to_string(), "true".to_string());
+        map.insert("fetchRecurseSubmodules".to_string(), "true".to_string());
         map.insert("active".to_string(), "true".to_string());
         map.insert("shallow".to_string(), "true".to_string());
 
