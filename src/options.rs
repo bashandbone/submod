@@ -447,7 +447,10 @@ impl GitmodulesConvert for SerializableBranch {
             || options == "current-in-super-project"
             || options == "superproject"
             || options == "super"
-            || options == SerializableBranch::current_in_superproject().unwrap_or_default()
+            || SerializableBranch::current_in_superproject()
+                .ok()
+                .as_deref()
+                .map_or(false, |cur| cur == options)
         {
             return Ok(SerializableBranch::CurrentInSuperproject);
         }
@@ -462,6 +465,34 @@ impl GitmodulesConvert for SerializableBranch {
     fn from_gitmodules_bytes(options: &[u8]) -> Result<Self, ()> {
         let options_str = std::str::from_utf8(options).map_err(|_| ())?;
         Self::from_gitmodules(options_str)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::SerializableBranch;
+
+    #[test]
+    fn test_branch_deserialize_from_toml_rejects_empty_and_whitespace() {
+        // Empty string should be rejected
+        let res_empty: Result<SerializableBranch, toml::de::Error> =
+            toml::from_str(r#"branch = """"#);
+        assert!(res_empty.is_err(), "expected error for empty branch value");
+        let err_empty = res_empty.unwrap_err().to_string();
+        assert!(
+            err_empty.contains("invalid branch value"),
+            "error for empty branch value should contain context, got: {err_empty}"
+        );
+
+        // Whitespace-only string should be rejected
+        let res_ws: Result<SerializableBranch, toml::de::Error> =
+            toml::from_str(r#"branch = "   ""#);
+        assert!(res_ws.is_err(), "expected error for whitespace-only branch value");
+        let err_ws = res_ws.unwrap_err().to_string();
+        assert!(
+            err_ws.contains("invalid branch value"),
+            "error for whitespace-only branch value should contain context, got: {err_ws}"
+        );
     }
 }
 
