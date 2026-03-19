@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2025 Adam Poulemanos <89049923+bashandbone@users.noreply.github.com>
 //
 // SPDX-License-Identifier: LicenseRef-PlainMIT OR MIT
+#![cfg_attr(coverage_nightly, feature(coverage_attribute))]
 
 #![doc = r"
 Main entry point for the submod CLI tool.
@@ -36,6 +37,7 @@ use crate::utilities::{get_name, get_sparse_paths, set_path};
 use anyhow::Result;
 use clap::Parser;
 use clap_complete::generate;
+#[cfg_attr(coverage_nightly, coverage(off))]
 fn main() -> Result<()> {
     let cli = Cli::parse();
     // config-path is always set because it has a default value, "submod.toml"
@@ -101,7 +103,11 @@ fn main() -> Result<()> {
                 .map_err(|e| anyhow::anyhow!("Failed to create manager: {}", e))?;
 
             // Collect names first to avoid borrow conflict
-            let names: Vec<String> = manager.config().get_submodules().map(|(n, _)| n.clone()).collect();
+            let names: Vec<String> = manager
+                .config()
+                .get_submodules()
+                .map(|(n, _)| n.clone())
+                .collect();
             for name in &names {
                 manager
                     .init_submodule(name)
@@ -113,7 +119,11 @@ fn main() -> Result<()> {
                 .map_err(|e| anyhow::anyhow!("Failed to create manager: {}", e))?;
 
             // Collect names first to avoid borrow conflict
-            let names: Vec<String> = manager.config().get_submodules().map(|(n, _)| n.clone()).collect();
+            let names: Vec<String> = manager
+                .config()
+                .get_submodules()
+                .map(|(n, _)| n.clone())
+                .collect();
             if names.is_empty() {
                 println!("No submodules configured");
             } else {
@@ -164,7 +174,11 @@ fn main() -> Result<()> {
                 .map_err(|e| anyhow::anyhow!("Failed to check submodules: {}", e))?;
 
             // Collect names first to avoid borrow conflict
-            let names: Vec<String> = manager.config().get_submodules().map(|(n, _)| n.clone()).collect();
+            let names: Vec<String> = manager
+                .config()
+                .get_submodules()
+                .map(|(n, _)| n.clone())
+                .collect();
             for name in &names {
                 manager
                     .init_submodule(name)

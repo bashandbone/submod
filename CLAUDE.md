@@ -1,110 +1,93 @@
-<!--
-SPDX-FileCopyrightText: 2025 Adam Poulemanos <89049923+bashandbone@users.noreply.github.com>
-
-SPDX-License-Identifier: LicenseRef-PlainMIT OR MIT
--->
-
 # CLAUDE.md
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Project Overview
+## Commands
 
-`submod` is a Rust CLI tool for managing git submodules with advanced sparse checkout support. It uses `gitoxide` and `git2` libraries for high-performance git operations, with fallbacks to CLI git commands when needed.
+### Build & Run
+```bash
+cargo build                    # debug build
+cargo build --release          # release build
+mise run build                 # alias: mise run b
+```
 
-## Development Commands
+### Test
+```bash
+cargo nextest run --all-features --no-fail-fast         # run all tests (preferred)
+cargo test --test integration_tests                     # integration tests only
+cargo test --test command_contract_tests                # command contract tests only
+./scripts/run-tests.sh --verbose                        # comprehensive test runner with reporting
+./scripts/run-tests.sh --filter sparse_checkout         # filter to specific tests
+mise run test                                           # alias: mise run t (runs via hk)
+```
 
-### Building and Testing
+Integration tests that modify git repos are serialized via nextest test groups (`.config/nextest.toml`); other tests run in parallel. Each test gets an isolated git config via `GIT_CONFIG_GLOBAL` so tests never race on `~/.gitconfig`. The test suite is integration-test-focused; unit tests are minimal by design.
 
-- `cargo build` - Build the project
-- `cargo test` - Run unit tests
-- `./scripts/run-tests.sh` - Run comprehensive integration test suite
-- `./scripts/run-tests.sh --verbose` - Run tests with detailed output
-- `./scripts/run-tests.sh --performance` - Include performance tests
-- `./scripts/run-tests.sh --filter <pattern>` - Run specific test modules
+### Lint & Format
+```bash
+cargo fmt                      # format code
+cargo clippy --all-features    # lint
+hk run check                   # run all linters (fmt, clippy, deny, typos, pkl)
+hk fix                         # auto-fix where possible
+mise run lint                  # alias for hk run check
+```
 
-### Linting and Formatting
+### Full CI
+```bash
+mise run ci                    # build + lint + test
+hk run ci                      # same via hk (uses --fail-fast for tests)
+```
 
-- `cargo fmt` - Format code
-- `cargo clippy` - Run linter
-- `hk run check` - Run pre-commit checks via hk tool
-- `hk run fix` - Run auto-fixable linters
-
-### Mise Tasks (if using mise)
-
-- `mise run build` or `mise run b` - Build the CLI
-- `mise run test` - Run automated tests
-- `mise run lint` - Lint with clippy
-- `mise run ci` - Run CI tasks (build, lint, test)
-
-### Testing Philosophy
-
-The project follows integration-first testing. Focus on testing complete workflows and outputs rather than implementation details. Tests are run serially (`RUST_TEST_THREADS=1`) to avoid git submodule race conditions.
+### Git Hooks
+Managed by `hk` (configured in `hk.pkl`). Pre-commit runs: cargo fmt, clippy, check, nextest, typos, cargo-deny, pkl eval. Hooks install automatically with `mise install`.
 
 ## Architecture
 
-### Core Modules
+`submod` is a CLI tool for managing git submodules with TOML configuration and sparse checkout support. It exposes the library as `src/lib.rs` primarily for integration testing (the public API is not stable).
 
-- `src/main.rs` - CLI entry point, parses commands and dispatches to manager
-- `src/commands.rs` - Command-line argument definitions using clap
-- `src/config.rs` - TOML configuration parsing and submodule config management
-- `src/git_manager.rs` - Core submodule operations using gitoxide/git2
-- `src/lib.rs` - Library exports (not a stable API)
+### Layer Stack
 
-### Configuration System
+```
+CLI (commands.rs + main.rs)
+    ↓ clap parsing
+GitManager (git_manager.rs)          ← high-level submodule operations
+    ↓ delegates to
+GitOpsManager (git_ops/mod.rs)       ← unified backend with automatic fallback
+    ├── GixOperations (git_ops/gix_ops.rs)     ← gitoxide (preferred)
+    ├── Git2Operations (git_ops/git2_ops.rs)   ← libgit2 (fallback)
+    └── Git CLI                               ← last resort (spawned via std::process)
+Config (config.rs)                   ← figment-based TOML config loading/saving
+```
 
-- Uses TOML configuration files (default: `submod.toml`)
-- Supports global defaults with per-submodule overrides
-- Handles sparse checkout paths, git options, and submodule settings
+### Fallback Architecture
 
-### Git Operations Strategy
+The core design is a **gix-first, git2-fallback, CLI-last-resort** strategy, driven by the immaturity of gitoxide's submodule support. `GitOpsManager` wraps both backends behind the `GitOperations` trait and calls `try_with_fallback()` / `try_with_fallback_mut()` for every operation. When gix fails, it logs a warning and transparently retries with git2; `add_submodule` has an additional CLI fallback that also cleans up any partial state from the prior attempt.
 
-1. **Primary**: gitoxide library for performance
-2. **Fallback**: git2 library (optional feature `git2-support`)
-3. **Final fallback**: CLI git commands
+After destructive operations (delete, nuke), `GitOpsManager::reopen()` must be called to refresh the in-memory repository state. git2 reopen errors are fatal; gix reopen errors are warnings only.
 
-### Key Design Patterns
+### Configuration
 
-- Error handling with `anyhow` for application errors, `thiserror` for library errors
-- Comprehensive documentation for all public APIs
-- Strict linting configuration with pedantic clippy settings
-- Integration tests over unit tests
+`Config` uses [figment](https://docs.rs/figment) to load `submod.toml`. The schema has:
+- `[defaults]` → `SubmoduleDefaults` (global git options applied to all submodules)
+- `[<name>]` sections → `SubmoduleEntry` (per-submodule config, overrides defaults)
 
-## Configuration Files
+`SubmoduleEntry` merges `SubmoduleGitOptions` (ignore, fetch_recurse, branch, update) with submodule-specific fields (path, url, sparse_paths, active, shallow). Options are serialized to/from git-config-compatible strings via the `options.rs` newtype wrappers (`SerializableIgnore`, `SerializableUpdate`, etc.).
 
-### Key Files to Know
+### Key Conventions
 
-- `Cargo.toml` - Project configuration with strict linting rules
-- `hk.pkl` - Git hooks configuration (pre-commit, linting)
-- `mise.toml` - Development environment and task definitions
-- `sample_config/submod.toml` - Example configuration
-- `scripts/run-tests.sh` - Comprehensive test runner
+- **Unsafe code is forbidden** (`unsafe_code = "forbid"` in `Cargo.toml`)
+- Clippy is configured at `pedantic` + `nursery` warn level; `correctness` is deny
+- `missing_docs` is warn — public items need doc comments
+- `module_name_repetitions` and `too_many_lines` are allowed
+- All error handling uses `anyhow` for propagation and `thiserror` for defining error types
+- `simple_gix.rs` contains lightweight gix helpers used in `gix_ops.rs`
 
-### Test Structure
+### Testing Approach
 
-- `tests/integration_tests.rs` - Core functionality tests
-- `tests/config_tests.rs` - Configuration parsing tests
-- `tests/sparse_checkout_tests.rs` - Sparse checkout functionality
-- `tests/error_handling_tests.rs` - Error conditions and edge cases
-- `tests/performance_tests.rs` - Performance and stress tests
-
-## Working with the Codebase
-
-### Before Making Changes
-
-1. Run `./scripts/run-tests.sh` to ensure tests pass
-2. Check code formatting with `cargo fmt --check`
-3. Run linter with `cargo clippy`
-
-### When Adding Features
-
-- Add integration tests to appropriate test modules
-- Update configuration parsing if new config options are added
-- Follow existing error handling patterns
-- Document public APIs thoroughly
-
-### Code Quality Standards
-
-- Unsafe code is forbidden (`unsafe_code = "forbid"`)
-- All warnings treated seriously with comprehensive clippy configuration
-- Focus on clear, descriptive naming and comprehensive error messages
+Integration tests in `tests/` use a `TestHarness` (in `tests/common/mod.rs`) that creates temporary git repos and invokes the compiled binary. Test files:
+- `integration_tests.rs` — end-to-end CLI behavior
+- `command_contract_tests.rs` — CLI command argument contracts
+- `config_tests.rs` — configuration parsing/serialization
+- `sparse_checkout_tests.rs` — sparse checkout behavior
+- `error_handling_tests.rs` — error conditions and messages
+- `performance_tests.rs` — benchmarks (uses criterion)

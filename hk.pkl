@@ -20,7 +20,7 @@ local linters = new Mapping<String, Step> {
     ["cargo_test"] = new Step {
         workspace_indicator = "Cargo.toml"
         glob = "src/**/*.rs"
-        check = "cargo nextest --manifest-path {{ workspace_indicator }} run --all-features --no-fail-fast -j 1"
+        check = "cargo nextest --manifest-path {{ workspace_indicator }} run --all-features --no-fail-fast"
         env = new Mapping<String, String> {
             ["RUST_BACKTRACE"] = "1"
         }
@@ -45,7 +45,7 @@ local linters = new Mapping<String, Step> {
 
 local ci = (linters) {
     ["cargo_test"] {
-        check = "cargo nextest --manifest-path {{ workspace_indicator }} run --all-features --fail-fast -j 1"
+        check = "cargo nextest --manifest-path {{ workspace_indicator }} run --all-features --fail-fast -p ci"
     }
 }
 

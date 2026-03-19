@@ -386,7 +386,7 @@ impl std::fmt::Display for SerializableFetchRecurse {
 }
 
 /// Serializable enum for [`Branch`] config
-#[derive(Debug, Clone, Ord, PartialOrd, Eq, PartialEq, Hash, Serialize)]
+#[derive(Debug, Clone, Ord, PartialOrd, Eq, PartialEq, Hash)]
 pub enum SerializableBranch {
     /// Use the same name for remote's branch name as the name of the currently activate branch in the superproject.
     /// This is a special value in git's settings. In a .git/config or .gitmodules it's represented by a period: `.`.
@@ -395,16 +395,27 @@ pub enum SerializableBranch {
     Name(String),
 }
 
+impl Serialize for SerializableBranch {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        serializer.serialize_str(&self.to_gitmodules())
+    }
+}
+
 impl<'de> Deserialize<'de> for SerializableBranch {
     /// Deserialize from a plain string using the same logic as [`FromStr`].
-    /// Accepts `"."`, `"current"`, `"current-in-super-project"`, `"superproject"`, or `"super"`
-    /// as [`CurrentInSuperproject`](SerializableBranch::CurrentInSuperproject); all other strings
+    /// Accepts `"."`, `"current"`, `"current-in-super-project"`, `"current-in-superproject"`,
+    /// `"superproject"`, or `"super"` as
+    /// [`CurrentInSuperproject`](SerializableBranch::CurrentInSuperproject); all other strings
     /// become [`Name`](SerializableBranch::Name).
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         let s = String::deserialize(deserializer)?;
-        SerializableBranch::from_str(&s).map_err(|_| {
-            serde::de::Error::custom(format!("invalid branch value: {s}"))
-        })
+        let branch = match s.as_str() {
+            "." | "current" | "current-in-super-project" | "current-in-superproject" | "superproject" | "super" => {
+                SerializableBranch::CurrentInSuperproject
+            }
+            _ => SerializableBranch::Name(s),
+        };
+        Ok(branch)
     }
 }
 
@@ -696,6 +707,7 @@ impl GixGit2Convert for SerializableUpdate {
 }
 
 #[cfg(test)]
+#[cfg_attr(coverage_nightly, coverage(off))]
 mod tests {
     use super::*;
 
@@ -771,5 +783,579 @@ mod tests {
 
         // Invalid UTF-8
         assert!(SerializableIgnore::from_gitmodules_bytes(&[0xFF, 0xFE, 0xFD]).is_err());
+    }
+
+    // ================================================================
+    // SerializableIgnore: Display, OptionsChecks, TryFrom conversions
+    // ================================================================
+
+    #[test]
+    fn test_ignore_display() {
+        assert_eq!(format!("{}", SerializableIgnore::All), "all");
+        assert_eq!(format!("{}", SerializableIgnore::Dirty), "dirty");
+        assert_eq!(format!("{}", SerializableIgnore::Untracked), "untracked");
+        assert_eq!(format!("{}", SerializableIgnore::None), "none");
+        assert_eq!(format!("{}", SerializableIgnore::Unspecified), "");
+    }
+
+    #[test]
+    fn test_ignore_options_checks() {
+        assert!(SerializableIgnore::Unspecified.is_unspecified());
+        assert!(!SerializableIgnore::All.is_unspecified());
+        assert!(!SerializableIgnore::None.is_unspecified());
+
+        assert!(SerializableIgnore::None.is_default());
+        assert!(!SerializableIgnore::All.is_default());
+        assert!(!SerializableIgnore::Unspecified.is_default());
+    }
+
+    #[test]
+    fn test_ignore_gitmodules_key_path() {
+        assert_eq!(
+            SerializableIgnore::All.gitmodules_key_path("mymod"),
+            "submodule.mymod.ignore"
+        );
+    }
+
+    #[test]
+    fn test_ignore_tryfrom_git2_roundtrip() {
+        use git2::SubmoduleIgnore as G2;
+        // Our type → git2
+        let git2_all: G2 = SerializableIgnore::All.try_into().unwrap();
+        assert_eq!(git2_all, G2::All);
+        let git2_dirty: G2 = SerializableIgnore::Dirty.try_into().unwrap();
+        assert_eq!(git2_dirty, G2::Dirty);
+        let git2_untracked: G2 = SerializableIgnore::Untracked.try_into().unwrap();
+        assert_eq!(git2_untracked, G2::Untracked);
+        let git2_none: G2 = SerializableIgnore::None.try_into().unwrap();
+        assert_eq!(git2_none, G2::None);
+        let git2_unspec: G2 = SerializableIgnore::Unspecified.try_into().unwrap();
+        assert_eq!(git2_unspec, G2::Unspecified);
+
+        // git2 → our type
+        let ours: SerializableIgnore = G2::All.try_into().unwrap();
+        assert_eq!(ours, SerializableIgnore::All);
+        let ours: SerializableIgnore = G2::Dirty.try_into().unwrap();
+        assert_eq!(ours, SerializableIgnore::Dirty);
+        let ours: SerializableIgnore = G2::None.try_into().unwrap();
+        assert_eq!(ours, SerializableIgnore::None);
+        let ours: SerializableIgnore = G2::Unspecified.try_into().unwrap();
+        assert_eq!(ours, SerializableIgnore::Unspecified);
+    }
+
+    #[test]
+    fn test_ignore_tryfrom_gix_roundtrip() {
+        // Our type → gix
+        let gix_all: Ignore = SerializableIgnore::All.try_into().unwrap();
+        assert_eq!(gix_all, Ignore::All);
+        let gix_dirty: Ignore = SerializableIgnore::Dirty.try_into().unwrap();
+        assert_eq!(gix_dirty, Ignore::Dirty);
+        // Unspecified maps to None in gix
+        let gix_unspec: Ignore = SerializableIgnore::Unspecified.try_into().unwrap();
+        assert_eq!(gix_unspec, Ignore::None);
+
+        // gix → our type
+        let ours: SerializableIgnore = Ignore::All.try_into().unwrap();
+        assert_eq!(ours, SerializableIgnore::All);
+        let ours: SerializableIgnore = Ignore::None.try_into().unwrap();
+        assert_eq!(ours, SerializableIgnore::None);
+    }
+
+    #[test]
+    fn test_ignore_gixgit2convert() {
+        let from_git2 = SerializableIgnore::from_git2(git2::SubmoduleIgnore::All).unwrap();
+        assert_eq!(from_git2, SerializableIgnore::All);
+        let from_gix = SerializableIgnore::from_gix(Ignore::Dirty).unwrap();
+        assert_eq!(from_gix, SerializableIgnore::Dirty);
+    }
+
+    // ================================================================
+    // SerializableFetchRecurse: full coverage
+    // ================================================================
+
+    #[test]
+    fn test_fetch_recurse_gitmodules_key() {
+        assert_eq!(
+            SerializableFetchRecurse::OnDemand.gitmodules_key(),
+            "fetchRecurseSubmodules"
+        );
+    }
+
+    #[test]
+    fn test_fetch_recurse_to_gitmodules() {
+        assert_eq!(
+            SerializableFetchRecurse::OnDemand.to_gitmodules(),
+            "on-demand"
+        );
+        assert_eq!(SerializableFetchRecurse::Always.to_gitmodules(), "true");
+        assert_eq!(SerializableFetchRecurse::Never.to_gitmodules(), "false");
+        assert_eq!(
+            SerializableFetchRecurse::Unspecified.to_gitmodules(),
+            "on-demand"
+        );
+    }
+
+    #[test]
+    fn test_fetch_recurse_from_gitmodules() {
+        assert_eq!(
+            SerializableFetchRecurse::from_gitmodules("on-demand").unwrap(),
+            SerializableFetchRecurse::OnDemand
+        );
+        assert_eq!(
+            SerializableFetchRecurse::from_gitmodules("true").unwrap(),
+            SerializableFetchRecurse::Always
+        );
+        assert_eq!(
+            SerializableFetchRecurse::from_gitmodules("false").unwrap(),
+            SerializableFetchRecurse::Never
+        );
+        assert_eq!(
+            SerializableFetchRecurse::from_gitmodules("").unwrap(),
+            SerializableFetchRecurse::Unspecified
+        );
+        assert!(SerializableFetchRecurse::from_gitmodules("invalid").is_err());
+        assert!(SerializableFetchRecurse::from_gitmodules("ON-DEMAND").is_err());
+    }
+
+    #[test]
+    fn test_fetch_recurse_from_gitmodules_bytes() {
+        assert_eq!(
+            SerializableFetchRecurse::from_gitmodules_bytes(b"on-demand").unwrap(),
+            SerializableFetchRecurse::OnDemand
+        );
+        assert_eq!(
+            SerializableFetchRecurse::from_gitmodules_bytes(b"true").unwrap(),
+            SerializableFetchRecurse::Always
+        );
+        assert!(SerializableFetchRecurse::from_gitmodules_bytes(&[0xFF]).is_err());
+    }
+
+    #[test]
+    fn test_fetch_recurse_options_checks() {
+        assert!(SerializableFetchRecurse::Unspecified.is_unspecified());
+        assert!(!SerializableFetchRecurse::OnDemand.is_unspecified());
+
+        assert!(SerializableFetchRecurse::OnDemand.is_default());
+        assert!(!SerializableFetchRecurse::Always.is_default());
+    }
+
+    #[test]
+    fn test_fetch_recurse_display() {
+        assert_eq!(
+            format!("{}", SerializableFetchRecurse::OnDemand),
+            "on-demand"
+        );
+        assert_eq!(format!("{}", SerializableFetchRecurse::Always), "true");
+        assert_eq!(format!("{}", SerializableFetchRecurse::Never), "false");
+    }
+
+    #[test]
+    fn test_fetch_recurse_tryfrom_gix_roundtrip() {
+        let gix_od: FetchRecurse = SerializableFetchRecurse::OnDemand.try_into().unwrap();
+        assert_eq!(gix_od, FetchRecurse::OnDemand);
+        let gix_always: FetchRecurse = SerializableFetchRecurse::Always.try_into().unwrap();
+        assert_eq!(gix_always, FetchRecurse::Always);
+        let gix_never: FetchRecurse = SerializableFetchRecurse::Never.try_into().unwrap();
+        assert_eq!(gix_never, FetchRecurse::Never);
+        // Unspecified maps to OnDemand in gix
+        let gix_unspec: FetchRecurse = SerializableFetchRecurse::Unspecified.try_into().unwrap();
+        assert_eq!(gix_unspec, FetchRecurse::OnDemand);
+
+        let ours: SerializableFetchRecurse = FetchRecurse::OnDemand.try_into().unwrap();
+        assert_eq!(ours, SerializableFetchRecurse::OnDemand);
+        let ours: SerializableFetchRecurse = FetchRecurse::Always.try_into().unwrap();
+        assert_eq!(ours, SerializableFetchRecurse::Always);
+        let ours: SerializableFetchRecurse = FetchRecurse::Never.try_into().unwrap();
+        assert_eq!(ours, SerializableFetchRecurse::Never);
+    }
+
+    #[test]
+    fn test_fetch_recurse_gixgit2convert() {
+        let from_git2 = SerializableFetchRecurse::from_git2("on-demand".to_string()).unwrap();
+        assert_eq!(from_git2, SerializableFetchRecurse::OnDemand);
+        let from_git2 = SerializableFetchRecurse::from_git2("true".to_string()).unwrap();
+        assert_eq!(from_git2, SerializableFetchRecurse::Always);
+        assert!(SerializableFetchRecurse::from_git2("bogus".to_string()).is_err());
+
+        let from_gix = SerializableFetchRecurse::from_gix(FetchRecurse::Never).unwrap();
+        assert_eq!(from_gix, SerializableFetchRecurse::Never);
+    }
+
+    #[test]
+    fn test_fetch_recurse_gitmodules_key_path() {
+        assert_eq!(
+            SerializableFetchRecurse::Always.gitmodules_key_path("sub1"),
+            "submodule.sub1.fetchRecurseSubmodules"
+        );
+    }
+
+    // ================================================================
+    // SerializableBranch: comprehensive coverage
+    // ================================================================
+
+    #[test]
+    fn test_branch_from_str_aliases() {
+        assert_eq!(
+            SerializableBranch::from_str(".").unwrap(),
+            SerializableBranch::CurrentInSuperproject
+        );
+        assert_eq!(
+            SerializableBranch::from_str("current").unwrap(),
+            SerializableBranch::CurrentInSuperproject
+        );
+        assert_eq!(
+            SerializableBranch::from_str("current-in-super-project").unwrap(),
+            SerializableBranch::CurrentInSuperproject
+        );
+        assert_eq!(
+            SerializableBranch::from_str("superproject").unwrap(),
+            SerializableBranch::CurrentInSuperproject
+        );
+        assert_eq!(
+            SerializableBranch::from_str("super").unwrap(),
+            SerializableBranch::CurrentInSuperproject
+        );
+    }
+
+    #[test]
+    fn test_branch_from_str_named() {
+        assert_eq!(
+            SerializableBranch::from_str("main").unwrap(),
+            SerializableBranch::Name("main".to_string())
+        );
+        assert_eq!(
+            SerializableBranch::from_str("develop").unwrap(),
+            SerializableBranch::Name("develop".to_string())
+        );
+        assert_eq!(
+            SerializableBranch::from_str("feature/my-feature").unwrap(),
+            SerializableBranch::Name("feature/my-feature".to_string())
+        );
+    }
+
+    #[test]
+    fn test_branch_display() {
+        assert_eq!(
+            format!("{}", SerializableBranch::CurrentInSuperproject),
+            "."
+        );
+        assert_eq!(
+            format!("{}", SerializableBranch::Name("main".to_string())),
+            "main"
+        );
+    }
+
+    #[test]
+    fn test_branch_default() {
+        let default = SerializableBranch::default();
+        // Default should be a Name variant (either from gix default or "main" fallback)
+        match &default {
+            SerializableBranch::Name(_) => {} // expected
+            SerializableBranch::CurrentInSuperproject => {
+                // also acceptable if gix default is CurrentInSuperproject
+            }
+        }
+    }
+
+    #[test]
+    fn test_branch_to_gitmodules() {
+        assert_eq!(
+            SerializableBranch::CurrentInSuperproject.to_gitmodules(),
+            "."
+        );
+        assert_eq!(
+            SerializableBranch::Name("develop".to_string()).to_gitmodules(),
+            "develop"
+        );
+    }
+
+    #[test]
+    fn test_branch_gitmodules_key() {
+        assert_eq!(
+            SerializableBranch::CurrentInSuperproject.gitmodules_key(),
+            "branch"
+        );
+    }
+
+    #[test]
+    fn test_branch_from_gitmodules_aliases() {
+        assert_eq!(
+            SerializableBranch::from_gitmodules(".").unwrap(),
+            SerializableBranch::CurrentInSuperproject
+        );
+        assert_eq!(
+            SerializableBranch::from_gitmodules("current").unwrap(),
+            SerializableBranch::CurrentInSuperproject
+        );
+        assert_eq!(
+            SerializableBranch::from_gitmodules("superproject").unwrap(),
+            SerializableBranch::CurrentInSuperproject
+        );
+        assert_eq!(
+            SerializableBranch::from_gitmodules("super").unwrap(),
+            SerializableBranch::CurrentInSuperproject
+        );
+    }
+
+    #[test]
+    fn test_branch_from_gitmodules_named() {
+        assert_eq!(
+            SerializableBranch::from_gitmodules("main").unwrap(),
+            SerializableBranch::Name("main".to_string())
+        );
+    }
+
+    #[test]
+    fn test_branch_from_gitmodules_empty_is_err() {
+        assert!(SerializableBranch::from_gitmodules("").is_err());
+        assert!(SerializableBranch::from_gitmodules("   ").is_err());
+    }
+
+    #[test]
+    fn test_branch_from_gitmodules_bytes() {
+        assert_eq!(
+            SerializableBranch::from_gitmodules_bytes(b".").unwrap(),
+            SerializableBranch::CurrentInSuperproject
+        );
+        assert_eq!(
+            SerializableBranch::from_gitmodules_bytes(b"main").unwrap(),
+            SerializableBranch::Name("main".to_string())
+        );
+        assert!(SerializableBranch::from_gitmodules_bytes(&[0xFF]).is_err());
+    }
+
+    #[test]
+    fn test_branch_tryfrom_gix_roundtrip() {
+        let gix_cur: Branch = SerializableBranch::CurrentInSuperproject
+            .try_into()
+            .unwrap();
+        assert_eq!(gix_cur, Branch::CurrentInSuperproject);
+
+        let gix_name: Branch = SerializableBranch::Name("main".to_string())
+            .try_into()
+            .unwrap();
+        match gix_name {
+            Branch::Name(n) => assert_eq!(n.to_string(), "main"),
+            _ => panic!("Expected Branch::Name"),
+        }
+
+        let ours: SerializableBranch = Branch::CurrentInSuperproject.try_into().unwrap();
+        assert_eq!(ours, SerializableBranch::CurrentInSuperproject);
+    }
+
+    #[test]
+    fn test_branch_gixgit2convert() {
+        let from_git2 = SerializableBranch::from_git2("main".to_string()).unwrap();
+        assert_eq!(from_git2, SerializableBranch::Name("main".to_string()));
+
+        let from_git2 = SerializableBranch::from_git2(".".to_string()).unwrap();
+        assert_eq!(from_git2, SerializableBranch::CurrentInSuperproject);
+
+        let from_gix = SerializableBranch::from_gix(Branch::CurrentInSuperproject).unwrap();
+        assert_eq!(from_gix, SerializableBranch::CurrentInSuperproject);
+    }
+
+    #[test]
+    fn test_branch_set_branch_with_name() {
+        let result = SerializableBranch::set_branch(Some("develop".to_string())).unwrap();
+        assert_eq!(result, SerializableBranch::Name("develop".to_string()));
+    }
+
+    #[test]
+    fn test_branch_set_branch_with_alias() {
+        let result = SerializableBranch::set_branch(Some(".".to_string())).unwrap();
+        assert_eq!(result, SerializableBranch::CurrentInSuperproject);
+
+        let result = SerializableBranch::set_branch(Some("super".to_string())).unwrap();
+        assert_eq!(result, SerializableBranch::CurrentInSuperproject);
+    }
+
+    #[test]
+    fn test_branch_set_branch_empty_returns_default() {
+        let result = SerializableBranch::set_branch(Some("".to_string())).unwrap();
+        // Empty string → default
+        assert_eq!(result, SerializableBranch::default());
+    }
+
+    #[test]
+    fn test_branch_set_branch_none_returns_default() {
+        let result = SerializableBranch::set_branch(None).unwrap();
+        assert_eq!(result, SerializableBranch::default());
+    }
+
+    #[test]
+    fn test_branch_set_branch_trims_whitespace() {
+        let result = SerializableBranch::set_branch(Some("  main  ".to_string())).unwrap();
+        assert_eq!(result, SerializableBranch::Name("main".to_string()));
+    }
+
+    #[test]
+    fn test_branch_deserialize_from_toml() {
+        #[derive(Deserialize)]
+        struct TestConfig {
+            branch: SerializableBranch,
+        }
+        let toml_str = r#"branch = "main""#;
+        let config: TestConfig = toml::from_str(toml_str).unwrap();
+        assert_eq!(config.branch, SerializableBranch::Name("main".to_string()));
+
+        let toml_str = r#"branch = ".""#;
+        let config: TestConfig = toml::from_str(toml_str).unwrap();
+        assert_eq!(config.branch, SerializableBranch::CurrentInSuperproject);
+
+        let toml_str = r#"branch = "super""#;
+        let config: TestConfig = toml::from_str(toml_str).unwrap();
+        assert_eq!(config.branch, SerializableBranch::CurrentInSuperproject);
+    }
+
+    #[test]
+    fn test_branch_gitmodules_key_path() {
+        assert_eq!(
+            SerializableBranch::Name("main".to_string()).gitmodules_key_path("mymod"),
+            "submodule.mymod.branch"
+        );
+    }
+
+    // ================================================================
+    // SerializableUpdate: full coverage
+    // ================================================================
+
+    #[test]
+    fn test_update_gitmodules_key() {
+        assert_eq!(SerializableUpdate::Checkout.gitmodules_key(), "update");
+    }
+
+    #[test]
+    fn test_update_to_gitmodules() {
+        assert_eq!(SerializableUpdate::Checkout.to_gitmodules(), "checkout");
+        assert_eq!(SerializableUpdate::Rebase.to_gitmodules(), "rebase");
+        assert_eq!(SerializableUpdate::Merge.to_gitmodules(), "merge");
+        assert_eq!(SerializableUpdate::None.to_gitmodules(), "none");
+        assert_eq!(SerializableUpdate::Unspecified.to_gitmodules(), "");
+    }
+
+    #[test]
+    fn test_update_from_gitmodules() {
+        assert_eq!(
+            SerializableUpdate::from_gitmodules("checkout").unwrap(),
+            SerializableUpdate::Checkout
+        );
+        assert_eq!(
+            SerializableUpdate::from_gitmodules("rebase").unwrap(),
+            SerializableUpdate::Rebase
+        );
+        assert_eq!(
+            SerializableUpdate::from_gitmodules("merge").unwrap(),
+            SerializableUpdate::Merge
+        );
+        assert_eq!(
+            SerializableUpdate::from_gitmodules("none").unwrap(),
+            SerializableUpdate::None
+        );
+        assert_eq!(
+            SerializableUpdate::from_gitmodules("").unwrap(),
+            SerializableUpdate::Unspecified
+        );
+        assert!(SerializableUpdate::from_gitmodules("invalid").is_err());
+    }
+
+    #[test]
+    fn test_update_from_gitmodules_bytes() {
+        assert_eq!(
+            SerializableUpdate::from_gitmodules_bytes(b"checkout").unwrap(),
+            SerializableUpdate::Checkout
+        );
+        assert_eq!(
+            SerializableUpdate::from_gitmodules_bytes(b"rebase").unwrap(),
+            SerializableUpdate::Rebase
+        );
+        assert!(SerializableUpdate::from_gitmodules_bytes(&[0xFF]).is_err());
+    }
+
+    #[test]
+    fn test_update_options_checks() {
+        assert!(SerializableUpdate::Unspecified.is_unspecified());
+        assert!(!SerializableUpdate::Checkout.is_unspecified());
+
+        assert!(SerializableUpdate::Checkout.is_default());
+        assert!(!SerializableUpdate::Rebase.is_default());
+    }
+
+    #[test]
+    fn test_update_display() {
+        assert_eq!(format!("{}", SerializableUpdate::Checkout), "checkout");
+        assert_eq!(format!("{}", SerializableUpdate::Rebase), "rebase");
+        assert_eq!(format!("{}", SerializableUpdate::Merge), "merge");
+        assert_eq!(format!("{}", SerializableUpdate::None), "none");
+        assert_eq!(format!("{}", SerializableUpdate::Unspecified), "");
+    }
+
+    #[test]
+    fn test_update_tryfrom_git2_roundtrip() {
+        use git2::SubmoduleUpdate as G2U;
+        let git2_co: G2U = SerializableUpdate::Checkout.try_into().unwrap();
+        assert_eq!(git2_co, G2U::Checkout);
+        let git2_rebase: G2U = SerializableUpdate::Rebase.try_into().unwrap();
+        assert_eq!(git2_rebase, G2U::Rebase);
+        let git2_merge: G2U = SerializableUpdate::Merge.try_into().unwrap();
+        assert_eq!(git2_merge, G2U::Merge);
+        let git2_none: G2U = SerializableUpdate::None.try_into().unwrap();
+        assert_eq!(git2_none, G2U::None);
+        let git2_unspec: G2U = SerializableUpdate::Unspecified.try_into().unwrap();
+        assert_eq!(git2_unspec, G2U::Default);
+
+        let ours: SerializableUpdate = G2U::Checkout.try_into().unwrap();
+        assert_eq!(ours, SerializableUpdate::Checkout);
+        let ours: SerializableUpdate = G2U::Rebase.try_into().unwrap();
+        assert_eq!(ours, SerializableUpdate::Rebase);
+        let ours: SerializableUpdate = G2U::Default.try_into().unwrap();
+        assert_eq!(ours, SerializableUpdate::Unspecified);
+    }
+
+    #[test]
+    fn test_update_tryfrom_gix_roundtrip() {
+        let gix_co: Update = SerializableUpdate::Checkout.try_into().unwrap();
+        assert_eq!(gix_co, Update::Checkout);
+        let gix_rebase: Update = SerializableUpdate::Rebase.try_into().unwrap();
+        assert_eq!(gix_rebase, Update::Rebase);
+        let gix_merge: Update = SerializableUpdate::Merge.try_into().unwrap();
+        assert_eq!(gix_merge, Update::Merge);
+        let gix_none: Update = SerializableUpdate::None.try_into().unwrap();
+        assert_eq!(gix_none, Update::None);
+        // Unspecified maps to Checkout in gix
+        let gix_unspec: Update = SerializableUpdate::Unspecified.try_into().unwrap();
+        assert_eq!(gix_unspec, Update::Checkout);
+
+        let ours: SerializableUpdate = Update::Checkout.try_into().unwrap();
+        assert_eq!(ours, SerializableUpdate::Checkout);
+        let ours: SerializableUpdate = Update::Rebase.try_into().unwrap();
+        assert_eq!(ours, SerializableUpdate::Rebase);
+        let ours: SerializableUpdate = Update::None.try_into().unwrap();
+        assert_eq!(ours, SerializableUpdate::None);
+    }
+
+    #[test]
+    fn test_update_gix_command_variant_maps_to_unspecified() {
+        // Update::Command is not serializable; it should map to Unspecified
+        let cmd = Update::Command("!echo hello".into());
+        let ours: SerializableUpdate = cmd.try_into().unwrap();
+        assert_eq!(ours, SerializableUpdate::Unspecified);
+    }
+
+    #[test]
+    fn test_update_gixgit2convert() {
+        let from_git2 = SerializableUpdate::from_git2(git2::SubmoduleUpdate::Merge).unwrap();
+        assert_eq!(from_git2, SerializableUpdate::Merge);
+
+        let from_gix = SerializableUpdate::from_gix(Update::Rebase).unwrap();
+        assert_eq!(from_gix, SerializableUpdate::Rebase);
+    }
+
+    #[test]
+    fn test_update_gitmodules_key_path() {
+        assert_eq!(
+            SerializableUpdate::Checkout.gitmodules_key_path("sub1"),
+            "submodule.sub1.update"
+        );
     }
 }

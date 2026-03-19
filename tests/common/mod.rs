@@ -18,6 +18,8 @@ pub struct TestHarness {
     pub submod_bin: PathBuf,
     /// Working directory within `temp_dir`
     pub work_dir: PathBuf,
+    /// Per-test git global config file (isolates tests from each other and from the user's ~/.gitconfig)
+    git_config_global: PathBuf,
 }
 
 impl TestHarness {
@@ -34,26 +36,49 @@ impl TestHarness {
         // causing all subprocess-based tests to report zero coverage.
         let submod_bin = PathBuf::from(env!("CARGO_BIN_EXE_submod"));
 
+        // Create a per-test global gitconfig so parallel tests don't race on ~/.gitconfig.
+        // Pre-populate with protocol.file.allow=always (required for file:// submodule URLs).
+        let git_config_global = temp_dir.path().join("gitconfig");
+        fs::write(
+            &git_config_global,
+            "[protocol \"file\"]\n\tallow = always\n",
+        )?;
+
         Ok(Self {
             temp_dir,
             submod_bin,
             work_dir,
+            git_config_global,
         })
+    }
+
+    /// Return a `Command` for git with per-test config isolation.
+    ///
+    /// Sets `GIT_CONFIG_GLOBAL` to a test-local file and `GIT_CONFIG_SYSTEM` to
+    /// `/dev/null` so that tests never read or write the real user/system config.
+    fn git_cmd(&self) -> Command {
+        let mut cmd = Command::new("git");
+        cmd.env("GIT_CONFIG_GLOBAL", &self.git_config_global);
+        cmd.env("GIT_CONFIG_SYSTEM", "/dev/null");
+        cmd
     }
 
     /// Initialize a git repository in the working directory
     pub fn init_git_repo(&self) -> Result<(), Box<dyn std::error::Error>> {
         // Use git commands for cleanup instead of direct filesystem operations
-        let _ = Command::new("git")
+        let _ = self
+            .git_cmd()
             .args(["submodule", "deinit", "--all", "-f"])
             .current_dir(&self.work_dir)
             .output();
 
-        let _ = Command::new("git")
+        let _ = self
+            .git_cmd()
             .args(["clean", "-fdx"])
             .current_dir(&self.work_dir)
             .output();
-        let output = Command::new("git")
+        let output = self
+            .git_cmd()
             .args(["init"])
             .current_dir(&self.work_dir)
             .output()?;
@@ -64,42 +89,38 @@ impl TestHarness {
         }
 
         // Ensure we're on the main branch
-        Command::new("git")
+        self.git_cmd()
             .args(["checkout", "-b", "main"])
             .current_dir(&self.work_dir)
             .output()?;
 
         // Configure git user for tests
-        Command::new("git")
+        self.git_cmd()
             .args(["config", "user.name", "Test User"])
             .current_dir(&self.work_dir)
             .output()?;
 
-        Command::new("git")
+        self.git_cmd()
             .args(["config", "user.email", "test@example.com"])
             .current_dir(&self.work_dir)
             .output()?;
 
-        // Configure git to allow file protocol for tests (both local and global)
-        Command::new("git")
+        // protocol.file.allow=always is set in the per-test global gitconfig
+        // (created in TestHarness::new), so no --global write needed here.
+        self.git_cmd()
             .args(["config", "protocol.file.allow", "always"])
-            .current_dir(&self.work_dir)
-            .output()?;
-
-        Command::new("git")
-            .args(["config", "--global", "protocol.file.allow", "always"])
             .current_dir(&self.work_dir)
             .output()?;
 
         // Create initial commit
         fs::write(self.work_dir.join("README.md"), "# Test Repository\n")?;
 
-        Command::new("git")
+        self.git_cmd()
             .args(["add", "README.md"])
             .current_dir(&self.work_dir)
             .output()?;
 
-        Command::new("git")
+        self.git_cmd()
             .args(["commit", "-m", "Initial commit"])
             .current_dir(&self.work_dir)
             .output()?;
@@ -112,32 +133,32 @@ impl TestHarness {
         let remote_dir = self.temp_dir.path().join(format!("{name}.git"));
 
         // Initialize bare repository
-        Command::new("git")
+        self.git_cmd()
             .args(["init", "--bare"])
             .arg(&remote_dir)
             .output()?;
 
         // Set the default branch to main for the bare repository
-        Command::new("git")
+        self.git_cmd()
             .args(["symbolic-ref", "HEAD", "refs/heads/main"])
             .current_dir(&remote_dir)
             .output()?;
 
         // Create a working copy to add content
         let work_copy = self.temp_dir.path().join(format!("{name}_work"));
-        Command::new("git")
+        self.git_cmd()
             .args(["init"])
             .arg(&work_copy)
             .output()?;
 
         // Set the default branch to main for the working copy
-        Command::new("git")
+        self.git_cmd()
             .args(["checkout", "-b", "main"])
             .current_dir(&work_copy)
             .output()?;
 
         // Set up remote
-        Command::new("git")
+        self.git_cmd()
             .args(["remote", "add", "origin", remote_dir.to_str().unwrap()])
             .current_dir(&work_copy)
             .output()?;
@@ -162,27 +183,28 @@ impl TestHarness {
         fs::write(work_copy.join("LICENSE"), "MIT License\n")?;
 
         // Configure git and commit
-        Command::new("git")
+        self.git_cmd()
             .args(["config", "user.name", "Test User"])
             .current_dir(&work_copy)
             .output()?;
 
-        Command::new("git")
+        self.git_cmd()
             .args(["config", "user.email", "test@example.com"])
             .current_dir(&work_copy)
             .output()?;
 
-        Command::new("git")
+        self.git_cmd()
             .args(["add", "."])
             .current_dir(&work_copy)
             .output()?;
 
-        Command::new("git")
+        self.git_cmd()
             .args(["commit", "-m", "Add test content"])
             .current_dir(&work_copy)
             .output()?;
 
-        let push_output = Command::new("git")
+        let push_output = self
+            .git_cmd()
             .args(["push", "--no-verify", "origin", "main"])
             .current_dir(&work_copy)
             .output()?;
@@ -216,6 +238,8 @@ impl TestHarness {
         let output = Command::new(&self.submod_bin)
             .args(args)
             .current_dir(&self.work_dir)
+            .env("GIT_CONFIG_GLOBAL", &self.git_config_global)
+            .env("GIT_CONFIG_SYSTEM", "/dev/null")
             .output()?;
 
         Ok(output)
@@ -344,113 +368,114 @@ impl TestHarness {
         let remote_dir = self.temp_dir.path().join(format!("{name}.git"));
 
         // Initialize bare repository
-        std::process::Command::new("git")
+        self.git_cmd()
             .args(["init", "--bare"])
             .arg(&remote_dir)
             .output()?;
 
         // Set the default branch to main for the bare repository
-        std::process::Command::new("git")
+        self.git_cmd()
             .args(["symbolic-ref", "HEAD", "refs/heads/main"])
             .current_dir(&remote_dir)
             .output()?;
 
         // Create a working copy to add content
         let work_copy = self.temp_dir.path().join(format!("{name}_work"));
-        std::process::Command::new("git")
+        self.git_cmd()
             .args(["init"])
             .arg(&work_copy)
             .output()?;
 
         // Set up the main branch and remote
-        std::process::Command::new("git")
+        self.git_cmd()
             .args(["checkout", "-b", "main"])
             .current_dir(&work_copy)
             .output()?;
 
-        std::process::Command::new("git")
+        self.git_cmd()
             .args(["remote", "add", "origin", remote_dir.to_str().unwrap()])
             .current_dir(&work_copy)
             .output()?;
 
         // Configure git
-        std::process::Command::new("git")
+        self.git_cmd()
             .args(["config", "user.name", "Test User"])
             .current_dir(&work_copy)
             .output()?;
 
-        std::process::Command::new("git")
+        self.git_cmd()
             .args(["config", "user.email", "test@example.com"])
             .current_dir(&work_copy)
             .output()?;
 
         // Create main branch content
-        std::fs::create_dir_all(work_copy.join("src"))?;
-        std::fs::create_dir_all(work_copy.join("docs"))?;
-        std::fs::create_dir_all(work_copy.join("tests"))?;
-        std::fs::create_dir_all(work_copy.join("examples"))?;
+        fs::create_dir_all(work_copy.join("src"))?;
+        fs::create_dir_all(work_copy.join("docs"))?;
+        fs::create_dir_all(work_copy.join("tests"))?;
+        fs::create_dir_all(work_copy.join("examples"))?;
 
-        std::fs::write(
+        fs::write(
             work_copy.join("src").join("lib.rs"),
             "// Main library code\npub fn hello() { println!(\"Hello!\"); }\n",
         )?;
-        std::fs::write(
+        fs::write(
             work_copy.join("docs").join("API.md"),
             "# API Documentation\n",
         )?;
-        std::fs::write(
+        fs::write(
             work_copy.join("tests").join("test.rs"),
             "// Tests\n#[test]\nfn test_basic() { assert!(true); }\n",
         )?;
-        std::fs::write(
+        fs::write(
             work_copy.join("examples").join("basic.rs"),
             "// Example\nfn main() { println!(\"Example\"); }\n",
         )?;
-        std::fs::write(
+        fs::write(
             work_copy.join("Cargo.toml"),
             "[package]\nname = \"test-lib\"\nversion = \"0.1.0\"\n",
         )?;
-        std::fs::write(work_copy.join("README.md"), "# Test Library\n")?;
+        fs::write(work_copy.join("README.md"), "# Test Library\n")?;
 
-        std::process::Command::new("git")
+        self.git_cmd()
             .args(["add", "."])
             .current_dir(&work_copy)
             .output()?;
 
-        std::process::Command::new("git")
+        self.git_cmd()
             .args(["commit", "-m", "Initial commit"])
             .current_dir(&work_copy)
             .output()?;
 
         // Create a development branch
-        std::process::Command::new("git")
+        self.git_cmd()
             .args(["checkout", "-b", "develop"])
             .current_dir(&work_copy)
             .output()?;
 
-        std::fs::write(
+        fs::write(
             work_copy.join("src").join("dev.rs"),
             "// Development code\npub fn dev_feature() {}\n",
         )?;
 
-        std::process::Command::new("git")
+        self.git_cmd()
             .args(["add", "."])
             .current_dir(&work_copy)
             .output()?;
 
-        std::process::Command::new("git")
+        self.git_cmd()
             .args(["commit", "-m", "Add dev features"])
             .current_dir(&work_copy)
             .output()?;
 
         // Create a tag
-        std::process::Command::new("git")
+        self.git_cmd()
             .args(["tag", "v0.1.0"])
             .current_dir(&work_copy)
             .output()?;
 
         // Push everything with error checking
-        let push_main = std::process::Command::new("git")
+        let push_main = self
+            .git_cmd()
             .args(["push", "origin", "main"])
             .current_dir(&work_copy)
             .output()?;
@@ -460,7 +485,8 @@ impl TestHarness {
             return Err(format!("Failed to push main branch: {stderr}").into());
         }
 
-        let push_develop = std::process::Command::new("git")
+        let push_develop = self
+            .git_cmd()
             .args(["push", "origin", "develop"])
             .current_dir(&work_copy)
             .output()?;
@@ -470,7 +496,8 @@ impl TestHarness {
             return Err(format!("Failed to push develop branch: {stderr}").into());
         }
 
-        let push_tags = std::process::Command::new("git")
+        let push_tags = self
+            .git_cmd()
             .args(["push", "origin", "--tags"])
             .current_dir(&work_copy)
             .output()?;

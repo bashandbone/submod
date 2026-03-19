@@ -96,6 +96,7 @@ impl TryFrom<AotShell> for Shell {
 }
 
 #[cfg(test)]
+#[cfg_attr(coverage_nightly, coverage(off))]
 mod tests {
     use super::*;
 
@@ -124,7 +125,10 @@ mod tests {
         // or paths that parse as expected on Unix.
         assert_eq!(Shell::from_path("powershell.exe"), Some(Shell::PowerShell));
         assert_eq!(Shell::from_path("/usr/bin/pwsh"), Some(Shell::PowerShell));
-        assert_eq!(Shell::from_path("powershell_ise.exe"), Some(Shell::PowerShell));
+        assert_eq!(
+            Shell::from_path("powershell_ise.exe"),
+            Some(Shell::PowerShell)
+        );
     }
 
     #[test]
@@ -157,6 +161,178 @@ mod tests {
 
         // .bash file stem is ".bash" which won't match "bash", so it should be None.
         assert_eq!(Shell::from_path(".bash"), None);
+    }
+
+    // ================================================================
+    // Shell::from_str and Display
+    // ================================================================
+
+    #[test]
+    fn test_shell_from_str() {
+        assert_eq!(
+            <Shell as std::str::FromStr>::from_str("bash").unwrap(),
+            Shell::Bash
+        );
+        assert_eq!(
+            <Shell as std::str::FromStr>::from_str("zsh").unwrap(),
+            Shell::Zsh
+        );
+        assert_eq!(
+            <Shell as std::str::FromStr>::from_str("fish").unwrap(),
+            Shell::Fish
+        );
+        assert_eq!(
+            <Shell as std::str::FromStr>::from_str("powershell").unwrap(),
+            Shell::PowerShell
+        );
+        assert_eq!(
+            <Shell as std::str::FromStr>::from_str("elvish").unwrap(),
+            Shell::Elvish
+        );
+        assert_eq!(
+            <Shell as std::str::FromStr>::from_str("nushell").unwrap(),
+            Shell::Nushell
+        );
+    }
+
+    #[test]
+    fn test_shell_from_str_alias() {
+        assert_eq!(
+            <Shell as std::str::FromStr>::from_str("pwsh").unwrap(),
+            Shell::PowerShell
+        );
+    }
+
+    #[test]
+    fn test_shell_from_str_invalid() {
+        assert!(<Shell as std::str::FromStr>::from_str("cmd").is_err());
+        assert!(<Shell as std::str::FromStr>::from_str("").is_err());
+        assert!(<Shell as std::str::FromStr>::from_str("BASH").is_err()); // case-sensitive
+    }
+
+    #[test]
+    fn test_shell_display() {
+        assert_eq!(format!("{}", Shell::Bash), "bash");
+        assert_eq!(format!("{}", Shell::Zsh), "zsh");
+        assert_eq!(format!("{}", Shell::Fish), "fish");
+        assert_eq!(format!("{}", Shell::PowerShell), "powershell");
+        assert_eq!(format!("{}", Shell::Elvish), "elvish");
+        assert_eq!(format!("{}", Shell::Nushell), "nushell");
+    }
+
+    // ================================================================
+    // TryFrom conversions: AotShell ↔ Shell ↔ NushellShell
+    // ================================================================
+
+    #[test]
+    fn test_shell_to_aotshell() {
+        let aot: AotShell = Shell::Bash.try_into().unwrap();
+        assert_eq!(aot, AotShell::Bash);
+        let aot: AotShell = Shell::Zsh.try_into().unwrap();
+        assert_eq!(aot, AotShell::Zsh);
+        let aot: AotShell = Shell::Fish.try_into().unwrap();
+        assert_eq!(aot, AotShell::Fish);
+        let aot: AotShell = Shell::PowerShell.try_into().unwrap();
+        assert_eq!(aot, AotShell::PowerShell);
+        let aot: AotShell = Shell::Elvish.try_into().unwrap();
+        assert_eq!(aot, AotShell::Elvish);
+    }
+
+    #[test]
+    fn test_nushell_to_aotshell_fails() {
+        let result: Result<AotShell, _> = Shell::Nushell.try_into();
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_aotshell_to_shell() {
+        let shell: Shell = AotShell::Bash.try_into().unwrap();
+        assert_eq!(shell, Shell::Bash);
+        let shell: Shell = AotShell::Zsh.try_into().unwrap();
+        assert_eq!(shell, Shell::Zsh);
+        let shell: Shell = AotShell::Fish.try_into().unwrap();
+        assert_eq!(shell, Shell::Fish);
+        let shell: Shell = AotShell::PowerShell.try_into().unwrap();
+        assert_eq!(shell, Shell::PowerShell);
+        let shell: Shell = AotShell::Elvish.try_into().unwrap();
+        assert_eq!(shell, Shell::Elvish);
+    }
+
+    #[test]
+    fn test_shell_to_nushell_shell() {
+        // NushellShell doesn't implement PartialEq/Debug, so just check it doesn't panic
+        let _nu: NushellShell = Shell::Nushell.try_into().unwrap();
+    }
+
+    #[test]
+    fn test_non_nushell_to_nushell_shell_fails() {
+        let result: Result<NushellShell, _> = Shell::Bash.try_into();
+        assert!(result.is_err());
+        let result: Result<NushellShell, _> = Shell::Zsh.try_into();
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_nushell_shell_to_shell() {
+        let shell: Shell = NushellShell.try_into().unwrap();
+        assert_eq!(shell, Shell::Nushell);
+    }
+
+    // ================================================================
+    // try_to_clap_complete
+    // ================================================================
+
+    #[test]
+    fn test_try_to_clap_complete_all_variants() {
+        // All shell variants should successfully convert
+        assert!(Shell::Bash.try_to_clap_complete().is_ok());
+        assert!(Shell::Zsh.try_to_clap_complete().is_ok());
+        assert!(Shell::Fish.try_to_clap_complete().is_ok());
+        assert!(Shell::PowerShell.try_to_clap_complete().is_ok());
+        assert!(Shell::Elvish.try_to_clap_complete().is_ok());
+        assert!(Shell::Nushell.try_to_clap_complete().is_ok());
+    }
+
+    // ================================================================
+    // ValueEnum
+    // ================================================================
+
+    #[test]
+    fn test_value_variants_count() {
+        assert_eq!(Shell::value_variants().len(), 6);
+    }
+
+    #[test]
+    fn test_to_possible_value_all_some() {
+        for variant in Shell::value_variants() {
+            assert!(variant.to_possible_value().is_some());
+        }
+    }
+
+    // ================================================================
+    // Generator: file_name and try_generate
+    // ================================================================
+
+    #[test]
+    fn test_generator_file_name() {
+        let bash_name = <Shell as Generator>::file_name(&Shell::Bash, "submod");
+        assert!(!bash_name.is_empty());
+
+        let nu_name = <Shell as Generator>::file_name(&Shell::Nushell, "submod");
+        assert!(nu_name.contains("submod"));
+    }
+
+    #[test]
+    fn test_generator_try_generate_produces_output() {
+        use clap::Command;
+
+        for shell in Shell::value_variants() {
+            let mut cmd = Command::new("test-cmd").subcommand(Command::new("sub1"));
+            let mut buf = Vec::new();
+            // clap_complete::generate sets bin_name internally
+            clap_complete::generate(*shell, &mut cmd, "test-cmd", &mut buf);
+            assert!(!buf.is_empty(), "Empty output for {:?}", shell);
+        }
     }
 }
 

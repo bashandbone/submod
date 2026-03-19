@@ -202,8 +202,9 @@ impl GitOpsManager {
             .to_path_buf();
 
         // git2 is the required backend — propagate its reopen error.
-        self.git2_ops = Git2Operations::new(Some(&workdir))
-            .with_context(|| format!("Failed to reopen git2 repository at {}", workdir.display()))?;
+        self.git2_ops = Git2Operations::new(Some(&workdir)).with_context(|| {
+            format!("Failed to reopen git2 repository at {}", workdir.display())
+        })?;
 
         // gix is an optional optimistic backend — log failures but don't fail.
         match GixOperations::new(Some(&workdir)) {
@@ -302,7 +303,9 @@ impl GitOperations for GitOpsManager {
             |git2| git2.add_submodule(opts),
         )
         .or_else(|git2_err| {
-            let workdir = self.git2_ops.workdir()
+            let workdir = self
+                .git2_ops
+                .workdir()
                 .ok_or_else(|| anyhow::anyhow!("Repository has no working directory"))?;
 
             // Clean up potentially partially initialized submodule path before fallback
@@ -337,14 +340,22 @@ impl GitOperations for GitOpsManager {
             if gitconfig_path.exists() {
                 // Remove by name (our submodule name)
                 let _ = std::process::Command::new("git")
-                    .args(["config", "--remove-section", &format!("submodule.{}", opts.name)])
+                    .args([
+                        "config",
+                        "--remove-section",
+                        &format!("submodule.{}", opts.name),
+                    ])
                     .current_dir(workdir)
                     .output();
                 // Remove by path (git2 uses path as key when name != path)
                 let path_key = opts.path.display().to_string();
                 if path_key != opts.name {
                     let _ = std::process::Command::new("git")
-                        .args(["config", "--remove-section", &format!("submodule.{path_key}")])
+                        .args([
+                            "config",
+                            "--remove-section",
+                            &format!("submodule.{path_key}"),
+                        ])
                         .current_dir(workdir)
                         .output();
                 }
