@@ -5,22 +5,21 @@
 name: Release
 
 on:
-    push:
-        tags:
-            - "v*"
-    workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
 
 env:
-    CARGO_TERM_COLOR: always
-    GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  CARGO_TERM_COLOR: always
 
 jobs:
-	permissions:
-		contents: write
   create-release:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: taiki-e/create-gh-release-action@v1
         if: github.event_name != 'workflow_dispatch'
         with:
@@ -31,8 +30,8 @@ jobs:
   build:
     runs-on: ${{ matrix.os }}
     needs: [create-release]
-		permissions: 
-			contents: write
+    permissions:
+      contents: write
     strategy:
       fail-fast: false
       matrix:
@@ -54,6 +53,10 @@ jobs:
             build-tool: cargo
     steps:
       - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+          lfs: false
       - uses: Swatinem/rust-cache@v2
         with:
           shared-key: rust-${{ matrix.target }}
@@ -67,49 +70,38 @@ jobs:
           features: git2/vendored-libgit2,git2/vendored-openssl
           dry-run: ${{ github.event_name == 'workflow_dispatch' }}
 
-  github_release:
-      name: Create GitHub Release
-      needs: [build, publish]
-      runs-on: ubuntu-latest
-	    permissions:
-				contents: write
-      steps:
-          - uses: actions/checkout@v6
-
-          - name: Download all artifacts
-            uses: actions/download-artifact@v4
-
-          - name: Create Release
-            uses: softprops/action-gh-release@v2
-            with:
-                files: |
-                    submod-linux-x86_64/submod
-                    submod-linux-x86_64-musl/submod
-                    submod-windows-x86_64.exe/submod.exe
-                    submod-macos-aarch64/submod
-                body_path: CHANGELOG.md
-                draft: false
-                prerelease: false
-            env:
-                GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
   publish:
-      name: Publish to crates.io
-      needs: [build]
-      runs-on: ubuntu-latest
-      environment: cratesio
-		  permissions:
-				contents: read
-				id-token: write
-      steps:
-          - uses: actions/checkout@v6
-            with:
-                submodules: recursive
-          - uses: actions-rs/toolchain@v1
-            with:
-                toolchain: stable
-                override: true
-          - uses: katyo/publish-crates@v2
-            with:
-                token: ${{ secrets.GITHUB_TOKEN }}
-                args: --allow-dirty
+    name: Publish to crates.io
+    needs: [build]
+    runs-on: ubuntu-latest
+    environment: cratesio
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: katyo/publish-crates@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          args: --allow-dirty
+          ignore-unpublished-changes: true
+
+  github_release:
+    name: Publish GitHub Release
+    needs: [build, publish]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v6
+      - name: Publish Release
+        uses: softprops/action-gh-release@v2
+        with:
+          body_path: CHANGELOG.md
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
