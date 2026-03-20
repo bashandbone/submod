@@ -2,6 +2,8 @@
 SPDX-FileCopyrightText: 2026 Adam Poulemanos <89049923+bashandbone@users.noreply.github.com>
 SPDX-License-Identifier: LicenseRef-PlainMIT OR MIT
 
+Git-cliff generates this file from the git commit history. The configuration for how it generates this file is in `cliff.toml`. Please edit that file, not this one.
+
 commit hashes cause false-positives for the spellchecker:
 spellchecker:off
 -->
@@ -11,13 +13,24 @@ We document all important changes below.
 
 Submod follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.2.2] - 2026-03-19
+## [0.2.3] - 2026-03-20
+### Fix
 
+- Gix submodule resolution bug, verbose output (added --verbose flag)([`17a4877`](https://github.com/bashandbone/submod/commit/17a4877a17ada5aaf51a86ba898ef6c85ba10cae))
+
+### Miscellaneous
+
+- Bump to v0.2.3([`bec2d46`](https://github.com/bashandbone/submod/commit/bec2d46cdd1d071ba682743a9ef63be3b3e71f28))
+
+
+## [0.2.2] - 2026-03-20
 ### Bug Fixes
 
 - Correct name to cargo-nextest in ci.yml([`e9251c6`](https://github.com/bashandbone/submod/commit/e9251c6a4e089c23039847ace7268e6a1f4ca8fa))
 
 - Incorrect key in ci.yml GH Action([`2d4d09e`](https://github.com/bashandbone/submod/commit/2d4d09e9050d082d2f63851b3ea7dd1f31feda11))
+
+- (**release**) Repair release.yml — YAML syntax errors, wrong action versions, broken permissions and tokens (#40)([`d0f764a`](https://github.com/bashandbone/submod/commit/d0f764a57b6711fec83c551139c918dbc5c32a6e))
 
 ### Feat
 
@@ -31,6 +44,8 @@ Submod follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and uses
 
 - (**testing**) Add coverage macros across codebase where appropriate; Add/update nextest config to use test groups to prevent race conditions vice running all tests on a single thread serially.([`b6f09f2`](https://github.com/bashandbone/submod/commit/b6f09f2a24361278153ef12ffce12d9876f284d6))
 
+- Add changelog configuration and update commit parsing rules in cliff.toml([`9b4e72d`](https://github.com/bashandbone/submod/commit/9b4e72dbea2824f091afbfaa0b6885a6b99bd07b))
+
 ### Fix
 
 - Serialization/Deserialization bug; significantly expand testing in core areas. (#33)([`bce7bf8`](https://github.com/bashandbone/submod/commit/bce7bf850793df5d3e9392ed639dc47de26a8d8f))
@@ -41,11 +56,14 @@ Submod follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and uses
 
 - Update CI workflow for coverage and install nextest; modify dependencies in Cargo.toml and Cargo.lock([`5fdfe24`](https://github.com/bashandbone/submod/commit/5fdfe249b8f6fd2e28992c17498a5e0349dd430f))
 
-- Update Rust version to 1.89 in Cargo.toml and mise.toml([`2f82a2a`](https://github.com/bashandbone/submod/commit/2f82a2a4971adc40b1903ee13c68e900ae7bf12d))
+- Update Rust version to 1.89 in Cargo.toml and mise.toml([`b7739c1`](https://github.com/bashandbone/submod/commit/b7739c11f911cd182988d1f3967ecd58789a0542))
+
+- Bump version to 0.2.2 in Cargo.toml and Cargo.lock([`f1bb973`](https://github.com/bashandbone/submod/commit/f1bb973c669614ca861df0ffb750d4250ed00974))
+
+- Bump version to 0.2.2 in Cargo.toml and Cargo.lock([`a4f34ad`](https://github.com/bashandbone/submod/commit/a4f34ad9ed532264769472ab37334274bb43a43d))
 
 
 ## [0.2.1] - 2026-03-18
-
 ### Bug Fixes
 
 - (**git_manager**) Improve success message for submodule updates([`3030474`](https://github.com/bashandbone/submod/commit/3030474c9fa4b4fdae42d23c7a2a1966a974bd53))
