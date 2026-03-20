@@ -1,7 +1,7 @@
 <!--
 SPDX-FileCopyrightText: 2026 Adam Poulemanos and contributors
 
-SPDX-License-Identifier: MIT OR Apache-2.0
+SPDX-License-Identifier: LicenseRef-PlainMIT or MIT
 -->
 # CLAUDE.md
 
