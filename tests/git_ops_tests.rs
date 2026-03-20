@@ -53,7 +53,9 @@ mod git2_ops_tests {
 
     #[test]
     fn test_new_from_invalid_path() {
-        let ops = Git2Operations::new(Some(std::path::Path::new("/nonexistent_submod_test_path")));
+        let harness = TestHarness::new().expect("harness");
+        let non_repo_path = harness.temp_dir.path().join("not-a-repo");
+        let ops = Git2Operations::new(Some(&non_repo_path));
         assert!(ops.is_err(), "should fail for a non-repo path");
     }
 
@@ -420,8 +422,9 @@ mod gix_ops_tests {
 
     #[test]
     fn test_new_from_invalid_path() {
-        let ops =
-            GixOperations::new(Some(std::path::Path::new("/nonexistent_submod_gix_test_path")));
+        let harness = TestHarness::new().expect("harness");
+        let non_repo_path = harness.temp_dir.path().join("not-a-repo");
+        let ops = GixOperations::new(Some(&non_repo_path));
         assert!(ops.is_err(), "should fail for a non-repo path");
     }
 
@@ -749,7 +752,9 @@ mod git_ops_manager_tests {
 
     #[test]
     fn test_new_from_invalid_path() {
-        let mgr = GitOpsManager::new(Some(std::path::Path::new("/nonexistent_submod_mgr_path")));
+        let harness = TestHarness::new().expect("harness");
+        let invalid_path = harness.temp_dir.path().join("not-a-repo");
+        let mgr = GitOpsManager::new(Some(&invalid_path));
         assert!(mgr.is_err(), "should fail for an invalid path");
     }
 
