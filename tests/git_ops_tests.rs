@@ -520,12 +520,17 @@ mod gix_ops_tests {
         let harness = TestHarness::new().expect("harness");
         harness.init_git_repo().expect("init repo");
         let ops = GixOperations::new(Some(&harness.work_dir)).expect("ops");
-        // set_config_value reads the existing config and then calls write_git_config.
-        // The existing local config contains 2-part keys (e.g. user.name) that gix
-        // cannot round-trip, so this call will fail.  We call it here to exercise
-        // the full code path for coverage; the return value is intentionally ignored.
-        let _ =
+        // set_config_value reads the existing config then calls write_git_config.
+        // The existing local config contains 2-part keys (e.g. user.name) that
+        // gix cannot round-trip through write_git_config, so this always fails.
+        // The test exists to exercise the set_config_value → read → merge → write
+        // code path for coverage.
+        let result =
             ops.set_config_value("remote.gixremote.url", "https://gix.example.com", ConfigLevel::Local);
+        assert!(
+            result.is_err(),
+            "expected failure: existing 2-part config keys cannot be round-tripped by gix"
+        );
     }
 
     #[test]
