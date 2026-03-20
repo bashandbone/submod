@@ -4,22 +4,20 @@
 
 [tools]
 act = "latest"
-bun = "latest"   # We use bun to run mcp tool development servers. Totally optional, but helpful.
 cargo-binstall = "latest"
 "cargo:cargo-audit" = "latest" # For auditing dependencies for security vulnerabilities.
 "cargo:cargo-deny" = "latest" # For checking licenses and other policies.
+"cargo:git-cliff" = "latest"
 "cargo:cargo-edit" = "latest"
 "cargo:cargo-nextest" = "latest" # For running tests in parallel.
+"cargo:cargo-smart-release" = "latest" # For automating releases.
 "cargo:cargo-watch" = "latest" # For watching files and rerunning commands.
-gh = "latest"
 hk = "latest"  # Handles git hooks, like pre-commit.
 jq = "latest"
 "pipx:reuse" = "latest"
 pkl = "latest"  # pkl for `hk`, which handles git hooks
-ripgrep = "latest"
-rust = "1.87"   # The minimum Rust version we support; mise just makes sure it's there.
+rust = "1.89"   # The minimum Rust version we support; mise just makes sure it's there.
 typos = "latest"
-uv = "latest"  # Another runner for MCP servers.
 
 [env]
 CARGO_TARGET_DIR = "target"

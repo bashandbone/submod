@@ -6,7 +6,7 @@
 name = "submod"
 version = "0.2.1"
 edition = "2024"
-rust-version = "1.87"
+rust-version = "1.89"
 description = "A headache-free submodule management tool, built on top of gitoxide. Manage sparse checkouts, submodule updates, and adding/removing submodules with ease."
 license-file = "LICENSE.md"
 repository = "https://github.com/bashandbone/submod"
