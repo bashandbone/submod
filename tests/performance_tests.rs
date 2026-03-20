@@ -60,7 +60,7 @@ mod tests {
         // Test check performance
         let check_start = Instant::now();
         harness
-            .run_submod_success(&["check"])
+            .run_submod_success(&["check", "--verbose"])
             .expect("Failed to run check");
         let check_duration = check_start.elapsed();
         println!("Check time for 10 submodules: {check_duration:?}");
@@ -125,7 +125,7 @@ ignore = "all"
         // Test parsing performance
         let parse_start = Instant::now();
         harness
-            .run_submod_success(&["check"])
+            .run_submod_success(&["check", "--verbose"])
             .expect("Failed to run check");
         let parse_duration = parse_start.elapsed();
         println!("Large config parse time: {parse_duration:?}");
@@ -320,7 +320,7 @@ ignore = "all"
         let start_time = Instant::now();
         for _ in 0..10 {
             harness
-                .run_submod_success(&["check"])
+                .run_submod_success(&["check", "--verbose"])
                 .expect("Failed to run check");
         }
         let duration = start_time.elapsed();
@@ -367,7 +367,7 @@ ignore = "all"
         let start_time = Instant::now();
 
         harness
-            .run_submod_success(&["check"])
+            .run_submod_success(&["check", "--verbose"])
             .expect("Failed to run check");
         harness
             .run_submod_success(&["update"])
@@ -420,7 +420,7 @@ ignore = "all"
 
         // Run check (FS scanning)
         harness
-            .run_submod_success(&["check"])
+            .run_submod_success(&["check", "--verbose"])
             .expect("Failed to run check");
 
         let duration = start_time.elapsed();
@@ -461,7 +461,7 @@ active = true
             .expect("Failed to create unicode config");
 
         let stdout = harness
-            .run_submod_success(&["check"])
+            .run_submod_success(&["check", "--verbose"])
             .expect("Failed to run check");
         let duration = start_time.elapsed();
 

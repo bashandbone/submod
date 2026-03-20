@@ -217,18 +217,22 @@ mod tests {
         );
 
         // Now init it
-        let init_stdout = harness
+        let _init_stdout = harness
             .run_submod_success(&["init"])
             .expect("Failed to run init");
 
         assert!(
-            init_stdout.contains("lazy-lib") || init_stdout.contains("Initializing"),
-            "Init should mention the submodule; got: {init_stdout}"
-        );
-
-        assert!(
             harness.file_exists("lib/lazy/.git"),
             "After init the submodule should exist"
+        );
+
+        // Verbose init should mention the submodule
+        let init_verbose = harness
+            .run_submod_success(&["init", "--verbose"])
+            .expect("Failed to run init --verbose");
+        assert!(
+            init_verbose.contains("lazy-lib") || init_verbose.contains("already initialized"),
+            "Verbose init should mention the submodule; got: {init_verbose}"
         );
     }
 
@@ -955,13 +959,22 @@ mod tests {
             .create_config("# empty\n")
             .expect("Failed to create config");
 
+        // Default (non-verbose) check with no submodules produces minimal output
         let stdout = harness
             .run_submod_success(&["check"])
             .expect("Failed to run check");
-
         assert!(
-            stdout.contains("Checking submodule configurations"),
-            "check output should say 'Checking submodule configurations'; got: {stdout}"
+            !stdout.contains("FAIL"),
+            "check output should not contain errors; got: {stdout}"
+        );
+
+        // Verbose check should show the detailed header
+        let stdout_verbose = harness
+            .run_submod_success(&["check", "--verbose"])
+            .expect("Failed to run check --verbose");
+        assert!(
+            stdout_verbose.contains("Checking submodule configurations"),
+            "verbose check should say 'Checking submodule configurations'; got: {stdout_verbose}"
         );
     }
 
@@ -981,13 +994,18 @@ mod tests {
             .create_config(&config_content)
             .expect("Failed to create config");
 
-        let stdout = harness
+        // Default init succeeds silently
+        let _stdout = harness
             .run_submod_success(&["init"])
             .expect("Failed to run init");
 
+        // Verbose init should mention initialization
+        let stdout_verbose = harness
+            .run_submod_success(&["init", "--verbose"])
+            .expect("Failed to run init --verbose");
         assert!(
-            stdout.contains("Initializing") || stdout.contains("initialized"),
-            "init output should mention initialization; got: {stdout}"
+            stdout_verbose.contains("Initializing") || stdout_verbose.contains("initialized"),
+            "verbose init output should mention initialization; got: {stdout_verbose}"
         );
     }
 
@@ -1039,17 +1057,26 @@ mod tests {
             .create_config(&config_content)
             .expect("Failed to create config");
 
+        // Default sync shows concise output
         let stdout = harness
             .run_submod_success(&["sync"])
             .expect("Failed to run sync");
-
         assert!(
-            stdout.contains("Running full sync"),
-            "sync output should say 'Running full sync'; got: {stdout}"
+            stdout.contains("Syncing submodules:"),
+            "sync output should say 'Syncing submodules:'; got: {stdout}"
         );
         assert!(
             stdout.contains("Sync complete"),
             "sync output should say 'Sync complete'; got: {stdout}"
+        );
+
+        // Verbose sync shows detailed output
+        let stdout_verbose = harness
+            .run_submod_success(&["sync", "--verbose"])
+            .expect("Failed to run sync --verbose");
+        assert!(
+            stdout_verbose.contains("Running full sync"),
+            "verbose sync should say 'Running full sync'; got: {stdout_verbose}"
         );
     }
 

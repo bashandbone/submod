@@ -73,6 +73,10 @@ pub struct Cli {
     /// Path to the configuration file (default: submod.toml).
     #[arg(long = "config", global = true, default_value = "submod.toml", value_parser = clap::value_parser!(PathBuf), value_hint = clap::ValueHint::FilePath, help = "Optionally provide a different configuration file path. Defaults to submod.toml in the current directory.")]
     pub config: PathBuf,
+
+    /// Enable verbose output with detailed status information.
+    #[arg(long, short, global = true)]
+    pub verbose: bool,
 }
 
 /// Supported commands for the `submod` tool.

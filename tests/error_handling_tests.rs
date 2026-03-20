@@ -274,9 +274,9 @@ active = true
             .create_config(&config_content)
             .expect("Failed to modify config");
 
-        // Run check to see if it handles the externally modified config
+        // Run check (verbose) to see if it handles the externally modified config
         let stdout = harness
-            .run_submod_success(&["check"])
+            .run_submod_success(&["check", "--verbose"])
             .expect("Failed to run check");
         assert!(stdout.contains("concurrent-test"));
         assert!(stdout.contains("external-addition"));

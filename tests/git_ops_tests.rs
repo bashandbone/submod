@@ -746,7 +746,7 @@ mod git_ops_manager_tests {
     fn test_new_from_valid_path() {
         let harness = TestHarness::new().expect("harness");
         harness.init_git_repo().expect("init repo");
-        let mgr = GitOpsManager::new(Some(&harness.work_dir));
+        let mgr = GitOpsManager::new(Some(&harness.work_dir), false);
         assert!(mgr.is_ok(), "manager creation from valid path should succeed");
     }
 
@@ -754,7 +754,7 @@ mod git_ops_manager_tests {
     fn test_new_from_invalid_path() {
         let harness = TestHarness::new().expect("harness");
         let invalid_path = harness.temp_dir.path().join("not-a-repo");
-        let mgr = GitOpsManager::new(Some(&invalid_path));
+        let mgr = GitOpsManager::new(Some(&invalid_path), false);
         assert!(mgr.is_err(), "should fail for an invalid path");
     }
 
@@ -762,7 +762,7 @@ mod git_ops_manager_tests {
     fn test_workdir_is_some() {
         let harness = TestHarness::new().expect("harness");
         harness.init_git_repo().expect("init repo");
-        let mgr = GitOpsManager::new(Some(&harness.work_dir)).expect("mgr");
+        let mgr = GitOpsManager::new(Some(&harness.work_dir), false).expect("mgr");
         assert!(mgr.workdir().is_some(), "workdir should be present");
     }
 
@@ -770,7 +770,7 @@ mod git_ops_manager_tests {
     fn test_reopen() {
         let harness = TestHarness::new().expect("harness");
         harness.init_git_repo().expect("init repo");
-        let mut mgr = GitOpsManager::new(Some(&harness.work_dir)).expect("mgr");
+        let mut mgr = GitOpsManager::new(Some(&harness.work_dir), false).expect("mgr");
         let result = mgr.reopen();
         assert!(result.is_ok(), "reopen should succeed: {:?}", result.err());
     }
@@ -779,7 +779,7 @@ mod git_ops_manager_tests {
     fn test_read_gitmodules_empty_repo() {
         let harness = TestHarness::new().expect("harness");
         harness.init_git_repo().expect("init repo");
-        let mgr = GitOpsManager::new(Some(&harness.work_dir)).expect("mgr");
+        let mgr = GitOpsManager::new(Some(&harness.work_dir), false).expect("mgr");
         let entries = mgr.read_gitmodules().expect("read_gitmodules");
         assert_eq!(entries.submodule_iter().count(), 0);
     }
@@ -788,7 +788,7 @@ mod git_ops_manager_tests {
     fn test_list_submodules_empty_repo() {
         let harness = TestHarness::new().expect("harness");
         harness.init_git_repo().expect("init repo");
-        let mgr = GitOpsManager::new(Some(&harness.work_dir)).expect("mgr");
+        let mgr = GitOpsManager::new(Some(&harness.work_dir), false).expect("mgr");
         let subs = mgr.list_submodules().expect("list_submodules");
         assert!(subs.is_empty());
     }
@@ -797,7 +797,7 @@ mod git_ops_manager_tests {
     fn test_read_git_config_local() {
         let harness = TestHarness::new().expect("harness");
         harness.init_git_repo().expect("init repo");
-        let mgr = GitOpsManager::new(Some(&harness.work_dir)).expect("mgr");
+        let mgr = GitOpsManager::new(Some(&harness.work_dir), false).expect("mgr");
         let result = mgr.read_git_config(ConfigLevel::Local);
         assert!(result.is_ok(), "should read local config: {:?}", result.err());
     }
@@ -806,7 +806,7 @@ mod git_ops_manager_tests {
     fn test_write_and_read_git_config() {
         let harness = TestHarness::new().expect("harness");
         harness.init_git_repo().expect("init repo");
-        let mgr = GitOpsManager::new(Some(&harness.work_dir)).expect("mgr");
+        let mgr = GitOpsManager::new(Some(&harness.work_dir), false).expect("mgr");
 
         let mut entries = HashMap::new();
         entries.insert("submod.mgrkey".to_string(), "mgrvalue".to_string());
@@ -832,7 +832,7 @@ mod git_ops_manager_tests {
     fn test_set_config_value() {
         let harness = TestHarness::new().expect("harness");
         harness.init_git_repo().expect("init repo");
-        let mgr = GitOpsManager::new(Some(&harness.work_dir)).expect("mgr");
+        let mgr = GitOpsManager::new(Some(&harness.work_dir), false).expect("mgr");
         let result =
             mgr.set_config_value("submod.mgrsetkey", "mgrsetval", ConfigLevel::Local);
         assert!(
@@ -846,7 +846,7 @@ mod git_ops_manager_tests {
     fn test_apply_sparse_checkout_fallback_chain() {
         let harness = TestHarness::new().expect("harness");
         harness.init_git_repo().expect("init repo");
-        let mgr = GitOpsManager::new(Some(&harness.work_dir)).expect("mgr");
+        let mgr = GitOpsManager::new(Some(&harness.work_dir), false).expect("mgr");
         // gix → git2 → CLI fallback; will ultimately fail since no submodule/path exists.
         let result = mgr.apply_sparse_checkout("nonexistent_path_xyz");
         assert!(
@@ -859,7 +859,7 @@ mod git_ops_manager_tests {
     fn test_write_gitmodules_via_manager() {
         let harness = TestHarness::new().expect("harness");
         harness.init_git_repo().expect("init repo");
-        let mut mgr = GitOpsManager::new(Some(&harness.work_dir)).expect("mgr");
+        let mut mgr = GitOpsManager::new(Some(&harness.work_dir), false).expect("mgr");
         mgr.write_gitmodules(&SubmoduleEntries::default())
             .expect("write empty gitmodules via manager");
     }
@@ -882,7 +882,7 @@ mod git_ops_manager_tests {
             ])
             .expect("add submodule");
 
-        let mgr = GitOpsManager::new(Some(&harness.work_dir)).expect("mgr");
+        let mgr = GitOpsManager::new(Some(&harness.work_dir), false).expect("mgr");
         let subs = mgr.list_submodules().expect("list_submodules");
         assert!(!subs.is_empty(), "should find the added submodule");
 

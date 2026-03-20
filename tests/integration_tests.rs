@@ -23,7 +23,7 @@ mod tests {
 
         // Run check command without config file
         let output = harness
-            .run_submod(&["check"])
+            .run_submod(&["check", "--verbose"])
             .expect("Failed to run submod");
 
         // Should succeed but show no submodules
@@ -41,7 +41,7 @@ mod tests {
             .expect("Failed to create config");
 
         let output = harness
-            .run_submod(&["check"])
+            .run_submod(&["check", "--verbose"])
             .expect("Failed to run submod");
 
         assert!(output.status.success());
@@ -148,9 +148,9 @@ sparse_paths = ["src"]
             .create_config(&config_content)
             .expect("Failed to create config");
 
-        // Run init command
+        // Run init command (verbose to verify status messages)
         let stdout = harness
-            .run_submod_success(&["init"])
+            .run_submod_success(&["init", "--verbose"])
             .expect("Failed to run init");
 
         assert!(stdout.contains("Initializing init-lib"));
@@ -313,9 +313,9 @@ active = true
             .create_config(&config_content)
             .expect("Failed to create config");
 
-        // Run sync command (should check, init, and update)
+        // Run sync command (verbose to verify status messages)
         let stdout = harness
-            .run_submod_success(&["sync"])
+            .run_submod_success(&["sync", "--verbose"])
             .expect("Failed to run sync");
 
         assert!(stdout.contains("Running full sync"));
@@ -355,7 +355,7 @@ active = true
 
         // Run check to see if defaults are applied
         let stdout = harness
-            .run_submod_success(&["check"])
+            .run_submod_success(&["check", "--verbose"])
             .expect("Failed to run check");
 
         assert!(stdout.contains("Checking submodule configurations"));
@@ -374,9 +374,9 @@ active = true
         )
         .expect("Failed to create custom config");
 
-        // Run with custom config file
+        // Run with custom config file (verbose to verify output)
         let stdout = harness
-            .run_submod_success(&["--config", "custom.toml", "check"])
+            .run_submod_success(&["--config", "custom.toml", "check", "--verbose"])
             .expect("Failed to run with custom config");
 
         assert!(stdout.contains("Checking submodule configurations"));
@@ -389,7 +389,7 @@ active = true
 
         // Should fail when not in a git repository
         let output = harness
-            .run_submod(&["check"])
+            .run_submod(&["check", "--verbose"])
             .expect("Failed to run submod");
         assert!(!output.status.success());
 
@@ -451,7 +451,7 @@ active = true
 
         // Run check command
         let stdout = harness
-            .run_submod_success(&["check"])
+            .run_submod_success(&["check", "--verbose"])
             .expect("Failed to run check");
 
         assert!(stdout.contains("Sparse checkout mismatch"));

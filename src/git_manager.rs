@@ -147,6 +147,8 @@ pub struct GitManager {
     config: Config,
     /// Path to the configuration file
     config_path: PathBuf,
+    /// Whether to print verbose output
+    verbose: bool,
 }
 
 impl GitManager {
@@ -296,7 +298,8 @@ impl GitManager {
         Ok(())
     }
 
-    /// Creates a new `GitManager` by loading configuration from the given path.
+    /// Creates a new `GitManager` by loading configuration from the given path
+    /// with default (non-verbose) output.
     ///
     /// # Arguments
     ///
@@ -306,9 +309,15 @@ impl GitManager {
     ///
     /// Returns `SubmoduleError::RepositoryError` if the repository cannot be discovered,
     /// or `SubmoduleError::ConfigError` if the configuration fails to load.
+    #[allow(dead_code)]
     pub fn new(config_path: PathBuf) -> Result<Self, SubmoduleError> {
+        Self::with_verbose(config_path, false)
+    }
+
+    /// Creates a new `GitManager` with the specified verbosity level.
+    pub fn with_verbose(config_path: PathBuf, verbose: bool) -> Result<Self, SubmoduleError> {
         // Use GitOpsManager for repository detection and operations
-        let git_ops = GitOpsManager::new(Some(Path::new(".")))
+        let git_ops = GitOpsManager::new(Some(Path::new(".")), verbose)
             .map_err(|_| SubmoduleError::RepositoryError)?;
 
         let config = Config::default()
@@ -319,6 +328,7 @@ impl GitManager {
             git_ops,
             config,
             config_path,
+            verbose,
         })
     }
 
@@ -628,7 +638,9 @@ impl GitManager {
                 SubmoduleError::GitoxideError(format!("GitOpsManager update failed: {e}"))
             })?;
 
-        println!("✅ Updated {name} successfully");
+        if self.verbose {
+            println!("✅ Updated {name} successfully");
+        }
         Ok(())
     }
 
@@ -694,7 +706,9 @@ impl GitManager {
         let submodule_path = Path::new(path_str);
 
         if submodule_path.exists() && submodule_path.join(".git").exists() {
-            println!("✅ {name} already initialized");
+            if self.verbose {
+                println!("✅ {name} already initialized");
+            }
             // Even if already initialized, check if we need to configure sparse checkout
             let sparse_paths_opt = self
                 .config
@@ -707,7 +721,9 @@ impl GitManager {
             return Ok(());
         }
 
-        println!("🔄 Initializing {name}...");
+        if self.verbose {
+            println!("🔄 Initializing {name}...");
+        }
 
         let workdir = std::path::Path::new(".");
 
@@ -748,7 +764,9 @@ impl GitManager {
                 .map_err(Self::map_git_ops_error)?;
         }
 
-        println!("  ✅ Initialized using git submodule commands: {path_str}");
+        if self.verbose {
+            println!("  ✅ Initialized using git submodule commands: {path_str}");
+        }
 
         // Configure sparse checkout if specified
         if let Some(sparse_checkouts) = submodules.sparse_checkouts() {
@@ -757,28 +775,31 @@ impl GitManager {
             }
         }
 
-        println!("✅ {name} initialized");
+        if self.verbose {
+            println!("✅ {name} initialized");
+        }
         Ok(())
     }
 
     /// Check all submodules using gitoxide APIs where possible
     pub fn check_all_submodules(&self) -> Result<(), SubmoduleError> {
-        println!("Checking submodule configurations...");
+        if self.verbose {
+            println!("Checking submodule configurations...");
+        }
 
         for (submodule_name, submodule) in self.config.get_submodules() {
-            println!("\n📁 {submodule_name}");
-
             // Handle missing path gracefully - report but don't fail
             let path_str = if let Some(path) = submodule.path.as_ref() {
                 path
             } else {
-                println!("  ❌ Configuration error: No path configured");
+                // Always show errors regardless of verbosity
+                println!("  ❌ {submodule_name}: No path configured");
                 continue;
             };
 
             // Handle missing URL gracefully - report but don't fail
             if submodule.url.is_none() {
-                println!("  ❌ Configuration error: No URL configured");
+                println!("  ❌ {submodule_name}: No URL configured");
                 continue;
             }
 
@@ -786,56 +807,78 @@ impl GitManager {
             let git_path = submodule_path.join(".git");
 
             if !submodule_path.exists() {
-                println!("  ❌ Folder missing: {path_str}");
+                println!("  ❌ {submodule_name}: Folder missing ({path_str})");
                 continue;
             }
 
             if !git_path.exists() {
-                println!("  ❌ Not a git repository");
+                println!("  ❌ {submodule_name}: Not a git repository");
                 continue;
             }
 
             // GITOXIDE API: Use gix::open and status check
             match self.check_submodule_repository_status(path_str, submodule_name) {
                 Ok(status) => {
-                    println!("  ✅ Git repository exists");
+                    if self.verbose {
+                        println!("\n📁 {submodule_name}");
+                        println!("  ✅ Git repository exists");
 
-                    if status.is_clean {
-                        println!("  ��� Working tree is clean");
+                        if status.is_clean {
+                            println!("  ✅ Working tree is clean");
+                        } else {
+                            println!("  ⚠️  Working tree has changes");
+                        }
+
+                        if let Some(commit) = &status.current_commit {
+                            println!("  ✅ Current commit: {}", &commit[..8]);
+                        }
+
+                        if status.has_remotes {
+                            println!("  ✅ Has remotes configured");
+                        } else {
+                            println!("  ⚠️  No remotes configured");
+                        }
+
+                        match &status.sparse_status {
+                            SparseStatus::NotEnabled => {}
+                            SparseStatus::NotConfigured => {
+                                println!("  ❌ Sparse checkout not configured");
+                            }
+                            SparseStatus::Correct => {
+                                println!("  ✅ Sparse checkout configured correctly");
+                            }
+                            SparseStatus::Mismatch { expected, actual } => {
+                                println!("  ❌ Sparse checkout mismatch");
+                                println!("    Expected: {expected:?}");
+                                println!("    Current: {actual:?}");
+                            }
+                        }
+
+                        // Show effective settings
+                        self.show_effective_settings(submodule_name, submodule);
                     } else {
-                        println!("  ⚠️  Working tree has changes");
-                    }
-
-                    if let Some(commit) = &status.current_commit {
-                        println!("  ✅ Current commit: {}", &commit[..8]);
-                    }
-
-                    if status.has_remotes {
-                        println!("  ✅ Has remotes configured");
-                    } else {
-                        println!("  ⚠️  No remotes configured");
-                    }
-
-                    match status.sparse_status {
-                        SparseStatus::NotEnabled => {}
-                        SparseStatus::NotConfigured => {
-                            println!("  ❌ Sparse checkout not configured");
+                        // Non-verbose: only print warnings/problems
+                        if !status.is_clean {
+                            println!("  ⚠️  {submodule_name}: Working tree has changes");
                         }
-                        SparseStatus::Correct => {
-                            println!("  ✅ Sparse checkout configured correctly");
+                        if !status.has_remotes {
+                            println!("  ⚠️  {submodule_name}: No remotes configured");
                         }
-                        SparseStatus::Mismatch { expected, actual } => {
-                            println!("  ❌ Sparse checkout mismatch");
-                            println!("    Expected: {expected:?}");
-                            println!("    Current: {actual:?}");
+                        match &status.sparse_status {
+                            SparseStatus::NotEnabled | SparseStatus::Correct => {}
+                            SparseStatus::NotConfigured => {
+                                println!("  ❌ {submodule_name}: Sparse checkout not configured");
+                            }
+                            SparseStatus::Mismatch { expected, actual } => {
+                                println!("  ❌ {submodule_name}: Sparse checkout mismatch");
+                                println!("    Expected: {expected:?}");
+                                println!("    Current: {actual:?}");
+                            }
                         }
                     }
-
-                    // Show effective settings
-                    self.show_effective_settings(submodule_name, submodule);
                 }
                 Err(e) => {
-                    println!("  ❌ Cannot analyze repository: {e}");
+                    println!("  ❌ {submodule_name}: Cannot analyze repository: {e}");
                 }
             }
         }
@@ -847,13 +890,13 @@ impl GitManager {
         println!("  📋 Effective settings:");
 
         if let Some(ignore) = &config.ignore {
-            println!("     ignore = {:?}", ignore);
+            println!("     ignore = {ignore:?}");
         }
         if let Some(update) = &config.update {
-            println!("     update = {:?}", update);
+            println!("     update = {update:?}");
         }
         if let Some(branch) = &config.branch {
-            println!("     branch = {:?}", branch);
+            println!("     branch = {branch:?}");
         }
     }
     /// Get reference to the underlying config
@@ -1648,8 +1691,9 @@ impl GitManager {
 
         if from_setup {
             // Read .gitmodules from the repo and convert to our config format
-            let git_ops = crate::git_ops::GitOpsManager::new(Some(std::path::Path::new(".")))
-                .map_err(|_| SubmoduleError::RepositoryError)?;
+            let git_ops =
+                crate::git_ops::GitOpsManager::new(Some(std::path::Path::new(".")), false)
+                    .map_err(|_| SubmoduleError::RepositoryError)?;
             let entries = git_ops.read_gitmodules().map_err(|e| {
                 SubmoduleError::ConfigError(format!("Failed to read .gitmodules: {e}"))
             })?;
@@ -1662,6 +1706,7 @@ impl GitManager {
                 git_ops,
                 config,
                 config_path: output.to_path_buf(),
+                verbose: false,
             };
             tmp_manager.write_full_config()?;
             println!(

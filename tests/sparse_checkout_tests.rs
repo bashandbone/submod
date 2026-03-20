@@ -302,9 +302,9 @@ sparse_paths = ["src", "docs", "*.md"]
             ])
             .expect("Failed to add submodule");
 
-        // Run check to see status reporting
+        // Run check (verbose) to see status reporting
         let stdout = harness
-            .run_submod_success(&["check"])
+            .run_submod_success(&["check", "--verbose"])
             .expect("Failed to run check");
 
         // Should show different status for each submodule

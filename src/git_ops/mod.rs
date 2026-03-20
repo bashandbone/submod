@@ -170,17 +170,22 @@ pub trait GitOperations {
 pub struct GitOpsManager {
     gix_ops: Option<GixOperations>,
     git2_ops: Git2Operations,
+    verbose: bool,
 }
 
 /// Implement GitOperations for GitOpsManager, using gix first and falling back to git2 if gix fails
 impl GitOpsManager {
-    /// Create a new GitOpsManager with automatic fallback
-    pub fn new(repo_path: Option<&Path>) -> Result<Self> {
+    /// Create a new `GitOpsManager` with automatic fallback
+    pub fn new(repo_path: Option<&Path>, verbose: bool) -> Result<Self> {
         let gix_ops = GixOperations::new(repo_path).ok();
         let git2_ops = Git2Operations::new(repo_path)
             .with_context(|| "Failed to initialize git2 operations")?;
 
-        Ok(Self { gix_ops, git2_ops })
+        Ok(Self {
+            gix_ops,
+            git2_ops,
+            verbose,
+        })
     }
 
     /// Return the working directory of the underlying git repository, if any.
@@ -212,11 +217,13 @@ impl GitOpsManager {
                 self.gix_ops = Some(new_gix);
             }
             Err(e) => {
-                eprintln!(
-                    "Warning: failed to reopen gix repository at {}: {}",
-                    workdir.display(),
-                    e
-                );
+                if self.verbose {
+                    eprintln!(
+                        "Warning: failed to reopen gix repository at {}: {}",
+                        workdir.display(),
+                        e
+                    );
+                }
             }
         }
 
@@ -233,7 +240,9 @@ impl GitOpsManager {
             match gix_op(gix) {
                 Ok(result) => return Ok(result),
                 Err(e) => {
-                    eprintln!("gix operation failed, falling back to git2: {}", e);
+                    if self.verbose {
+                        eprintln!("gix operation failed, falling back to git2: {e}");
+                    }
                 }
             }
         }
@@ -251,7 +260,9 @@ impl GitOpsManager {
             match gix_op(gix) {
                 Ok(result) => return Ok(result),
                 Err(e) => {
-                    eprintln!("gix operation failed, falling back to git2: {}", e);
+                    if self.verbose {
+                        eprintln!("gix operation failed, falling back to git2: {e}");
+                    }
                 }
             }
         }

@@ -50,7 +50,7 @@ sparse_paths = ["src/", "docs/"]
 
         // Run a command that loads and potentially saves the config
         let stdout = harness
-            .run_submod_success(&["check"])
+            .run_submod_success(&["check", "--verbose"])
             .expect("Failed to run check");
         assert!(stdout.contains("Checking submodule configurations"));
 
@@ -92,7 +92,7 @@ active = true
 
         // Run check to see effective settings
         let stdout = harness
-            .run_submod_success(&["check"])
+            .run_submod_success(&["check", "--verbose"])
             .expect("Failed to run check");
 
         assert!(stdout.contains("Checking submodule configurations"));
@@ -116,7 +116,7 @@ url = "https://github.com/example/test.git"
 
         // Should fail gracefully with a meaningful error
         let output = harness
-            .run_submod(&["check"])
+            .run_submod(&["check", "--verbose"])
             .expect("Failed to run submod");
         assert!(!output.status.success());
 
@@ -151,7 +151,7 @@ fetchRecurse = "always"
             .expect("Failed to create config");
 
         let stdout = harness
-            .run_submod_success(&["check"])
+            .run_submod_success(&["check", "--verbose"])
             .expect("Failed to run check");
         assert!(stdout.contains("Checking submodule configurations"));
 
@@ -238,7 +238,7 @@ active = true
             .expect("Failed to create config");
 
         let stdout = harness
-            .run_submod_success(&["check"])
+            .run_submod_success(&["check", "--verbose"])
             .expect("Failed to run check");
         assert!(stdout.contains("Checking submodule configurations"));
     }
@@ -284,7 +284,7 @@ active = false  # Not active by default
             .expect("Failed to create config");
 
         let stdout = harness
-            .run_submod_success(&["check"])
+            .run_submod_success(&["check", "--verbose"])
             .expect("Failed to run check");
         assert!(stdout.contains("Checking submodule configurations"));
 
@@ -311,7 +311,7 @@ active = true
 
         // Should handle missing fields gracefully
         let stdout = harness
-            .run_submod_success(&["check"])
+            .run_submod_success(&["check", "--verbose"])
             .expect("Failed to run check");
         assert!(stdout.contains("Checking submodule configurations"));
         // The check should report issues with incomplete configuration
@@ -334,7 +334,7 @@ sparse_paths = ["src/**", "docs/*", "*.{md,txt,rst}"]
             .expect("Failed to create config");
 
         let stdout = harness
-            .run_submod_success(&["check"])
+            .run_submod_success(&["check", "--verbose"])
             .expect("Failed to run check");
         assert!(stdout.contains("Checking submodule configurations"));
     }
