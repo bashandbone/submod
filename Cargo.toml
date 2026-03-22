@@ -47,10 +47,11 @@ gix = { version = "0.81.0", default-features = false, features = [
   "parallel",
   "max-performance",
   "status",
-  "worktree-mutation"
+  "worktree-mutation",
+  "sha1"
 ] }
-gitoxide-core = { version = "0.55.0", default-features = false, features = ["blocking-client"]}
-gix-submodule = "0.28.0"
+gitoxide-core = { version = "0.55.0", default-features = false, features = ["blocking-client", "sha1"]}
+gix-submodule = { version = "0.28.0", features = ["sha1"]}
 
 # CLI
 clap = { version = "4.6.0", features = [
