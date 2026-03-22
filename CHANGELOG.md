@@ -12,10 +12,10 @@ spellchecker:off
 We document all important changes below.
 
 Submod follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
-## [0.2.5] - 2026-03-22
+## [0.2.6] - 2026-03-22
 ### Bug Fixes
 
-- Missing https transport causes fetch to fail with gix([`d3ab3a3`](https://github.com/bashandbone/submod/commit/d3ab3a3c6d0e3dfe660f1d32b7f68f371b68d9ee))
+- Missing https transport causes fetch to fail with gix([`cbd01d2`](https://github.com/bashandbone/submod/commit/cbd01d23fe111a3aa743e2bf1d4ebfcc17de3afb))
 
 
 ## [0.2.4] - 2026-03-22
