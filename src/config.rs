@@ -1259,6 +1259,14 @@ mod tests {
 
         entry.url = None;
         assert!(!entry.is_remote());
+
+        // Protocol not at start
+        entry.url = Some("/path/to/https://repo".to_string());
+        assert!(!entry.is_remote());
+
+        // Minimal protocol
+        entry.url = Some("https://".to_string());
+        assert!(entry.is_remote());
     }
 
     #[test]
@@ -2109,5 +2117,25 @@ active = true
         let config = Config::default();
         let data = config.data();
         assert!(data.is_ok());
+    }
+
+    #[test]
+    fn test_config_submodule_remote_check() {
+        let mut config = Config::default();
+        let entry = SubmoduleEntry::new(
+            Some("https://github.com/user/repo".to_string()),
+            Some("libs/repo".to_string()),
+            None,
+            None,
+            None,
+            None,
+            Some(true),
+            None,
+            None,
+        );
+        config.add_submodule("repo".to_string(), entry);
+
+        let retrieved = config.get_submodule("repo").expect("submodule should exist");
+        assert!(retrieved.is_remote());
     }
 }
