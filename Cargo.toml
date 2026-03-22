@@ -4,7 +4,7 @@
 #:tombi schema.strict = false
 [package]
 name = "submod"
-version = "0.2.5"
+version = "0.2.6"
 edition = "2024"
 rust-version = "1.89"
 description = "A headache-free submodule management tool, built on top of gitoxide. Manage sparse checkouts, submodule updates, and adding/removing submodules with ease."
@@ -43,7 +43,7 @@ rustdoc-args = ["--cfg", "docsrs"]
 # Gitoxide ops
 gix = { version = "0.81.0", default-features = false, features = [
   "blocking-network-client",
-  "blocking-http-transport-curl",
+  "blocking-http-transport-curl-rustls",
   "parallel",
   "max-performance",
   "status",

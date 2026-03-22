@@ -15,13 +15,19 @@ Submod follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and uses
 ## [0.2.5] - 2026-03-22
 ### Bug Fixes
 
-- Fix fetch failing with "no configured ref-specs" by letting gix resolve the default remote instead of passing a raw URL([`4041947`](https://github.com/bashandbone/submod/commit/404194740563cdfeb5fd1992247afb0ccd5d04d0))
+- Missing https transport causes fetch to fail with gix([`d3ab3a3`](https://github.com/bashandbone/submod/commit/d3ab3a3c6d0e3dfe660f1d32b7f68f371b68d9ee))
 
 
 ## [0.2.4] - 2026-03-22
 ### Bug Fixes
 
 - Fix issue with https not compiled into gix([`9e5b20d`](https://github.com/bashandbone/submod/commit/9e5b20df2cf09be2f59ac67d579ede5e6d9c8a25))
+
+- Update dependencies for http transport([`5918721`](https://github.com/bashandbone/submod/commit/5918721b23abf807f9ef05f8b344a9f05ffafd2e))
+
+- Update dependencies for http transport([`a868953`](https://github.com/bashandbone/submod/commit/a86895313bf25983001d824ce5dce9a9b46157e2))
+
+- Update dependencies for http transport([`ae5d6cd`](https://github.com/bashandbone/submod/commit/ae5d6cd1ca99d6a9153b07f0880bdfa3fd5bb501))
 
 
 ## [0.2.3] - 2026-03-20
