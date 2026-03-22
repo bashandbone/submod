@@ -12,6 +12,11 @@ spellchecker:off
 We document all important changes below.
 
 Submod follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+## [0.2.4] - 2026-03-22
+### Bug Fixes
+
+- Fix issue with https not compiled into gix([`9e5b20d`](https://github.com/bashandbone/submod/commit/9e5b20df2cf09be2f59ac67d579ede5e6d9c8a25))
+
 
 ## [0.2.3] - 2026-03-20
 ### Fix
@@ -21,6 +26,8 @@ Submod follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and uses
 ### Miscellaneous
 
 - Bump to v0.2.3([`bec2d46`](https://github.com/bashandbone/submod/commit/bec2d46cdd1d071ba682743a9ef63be3b3e71f28))
+
+- Update changelog([`fd3c0bb`](https://github.com/bashandbone/submod/commit/fd3c0bb07d15bc2bf8f137feb5be94eb36c00c09))
 
 
 ## [0.2.2] - 2026-03-20
