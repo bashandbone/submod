@@ -452,14 +452,10 @@ impl GitOperations for GixOperations {
             }
         } else {
             // Submodule exists — fetch updates using sync fetch_repo
+            // Pass None to let gix resolve the default remote (which has refspecs configured).
+            // Passing the URL string would create a bare remote without refspecs.
             let submodule_repo = gix::open(&submodule_path)?;
-            let remote_url = {
-                submodule_repo
-                    .find_default_remote(gix::remote::Direction::Fetch)
-                    .and_then(|r| r.ok())
-                    .and_then(|r| r.url(gix::remote::Direction::Fetch).map(|u| u.to_string()))
-            };
-            fetch_repo(submodule_repo, remote_url, entry.shallow == Some(true))
+            fetch_repo(submodule_repo, None, entry.shallow == Some(true))
                 .map_err(|e| anyhow::anyhow!("Failed to fetch submodule: {}", e))?;
             match opts.strategy {
                 crate::options::SerializableUpdate::Checkout
@@ -690,14 +686,9 @@ impl GitOperations for GixOperations {
         })
     }
     fn fetch_submodule(&self, _path: &str) -> Result<()> {
+        // Pass None to let gix resolve the default remote (which has refspecs configured).
         let submodule_repo = utilities::repo_from_path(&std::path::PathBuf::from(_path))?;
-        let remote_url = {
-            submodule_repo
-                .find_default_remote(gix::remote::Direction::Fetch)
-                .and_then(|r| r.ok())
-                .and_then(|r| r.url(gix::remote::Direction::Fetch).map(|u| u.to_string()))
-        };
-        fetch_repo(submodule_repo, remote_url, false)
+        fetch_repo(submodule_repo, None, false)
             .map_err(|e| anyhow::anyhow!("Failed to fetch submodule: {}", e))
     }
 

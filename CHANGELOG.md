@@ -12,6 +12,12 @@ spellchecker:off
 We document all important changes below.
 
 Submod follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+## [0.2.5] - 2026-03-22
+### Bug Fixes
+
+- Fix fetch failing with "no configured ref-specs" by letting gix resolve the default remote instead of passing a raw URL([`4041947`](https://github.com/bashandbone/submod/commit/404194740563cdfeb5fd1992247afb0ccd5d04d0))
+
+
 ## [0.2.4] - 2026-03-22
 ### Bug Fixes
 
