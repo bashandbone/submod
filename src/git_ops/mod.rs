@@ -322,9 +322,10 @@ impl GitOperations for GitOpsManager {
                 if let Ok(content) = std::fs::read_to_string(&gitmodules_path) {
                     let mut new_content = String::new();
                     let mut in_target_section = false;
+                    let target_name = format!("\"{}\"", opts.name);
                     for line in content.lines() {
                         if line.starts_with("[submodule \"") {
-                            in_target_section = line.contains(&format!("\"{}\"", opts.name));
+                            in_target_section = line.contains(&target_name);
                         }
                         if !in_target_section {
                             new_content.push_str(line);
