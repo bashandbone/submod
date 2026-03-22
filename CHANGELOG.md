@@ -12,6 +12,20 @@ spellchecker:off
 We document all important changes below.
 
 Submod follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+## [0.2.7] - 2026-03-22
+### Bug Fixes
+
+- Propagate fetch errors from gix to enable git2 fallback([`3162a2c`](https://github.com/bashandbone/submod/commit/3162a2cc02577d0cfd04f5c23d5b12f663fe9cbf))
+
+### Miscellaneous
+
+- (**deps**) Bump rustls-webpki in the cargo group across 1 directory (#41)([`8ddb5cd`](https://github.com/bashandbone/submod/commit/8ddb5cd6b8b8f0e25a859215212a1053b3064137))
+
+### Performance
+
+- Hoist format! call out of loop in src/git_ops/mod.rs (#43)([`f1994e2`](https://github.com/bashandbone/submod/commit/f1994e2ff8285f0f32ce7d6667c7003ff8aebb6a))
+
+
 ## [0.2.6] - 2026-03-22
 ### Bug Fixes
 
