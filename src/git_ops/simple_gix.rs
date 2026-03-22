@@ -46,15 +46,15 @@ pub fn progress_tree(trace: bool) -> std::sync::Arc<prodash::tree::Root> {
 }
 
 /// Run a function with progress tracking, capturing output to stdout and stderr.
-pub fn get_progress(
+pub fn get_progress<T>(
     func_name: &str,
     range: Option<std::ops::RangeInclusive<u8>>,
     run: impl FnOnce(
         progress::DoOrDiscard<prodash::tree::Item>,
         &mut dyn std::io::Write,
         &mut dyn std::io::Write,
-    ),
-) -> Result<()> {
+    ) -> T,
+) -> Result<T> {
     let standard_range = 2..=2;
     let range = range.unwrap_or_else(|| standard_range.clone());
     let progress = progress_tree(false);
@@ -65,7 +65,7 @@ pub fn get_progress(
     let mut out = Vec::<u8>::new();
     let mut err = Vec::<u8>::new();
 
-    let _res = gix::trace::coarse!("run").into_scope(|| {
+    let result = gix::trace::coarse!("run").into_scope(|| {
         run(
             progress::DoOrDiscard::from(Some(sub_progress)),
             &mut out,
@@ -76,7 +76,7 @@ pub fn get_progress(
     handle.shutdown_and_wait();
     std::io::Write::write_all(&mut stdout(), &out)?;
     std::io::Write::write_all(&mut stderr(), &err)?;
-    Ok(())
+    Ok(result)
 }
 
 /// Fetch options for the `fetch` command, with an option for shallow fetching.
@@ -100,16 +100,15 @@ fn fetch_options(remote: Option<String>, shallow: bool) -> FetchOptions {
 
 /// Fetch updates from a remote repository.
 pub fn fetch_repo(repo: gix::Repository, remote: Option<String>, shallow: bool) -> Result<()> {
-    get_progress("fetch", Some(FetchProgressRange), |progress, out, err| {
-        if let Err(e) = gitoxide_core::repository::fetch(
-            repo,
-            progress,
-            out,
-            err,
-            fetch_options(remote, shallow),
-        ) {
-            // Optionally print error to stderr directly
-            eprintln!("Fetch failed: {:?}", e);
-        }
-    })
+    let inner_result =
+        get_progress("fetch", Some(FetchProgressRange), |progress, out, err| {
+            gitoxide_core::repository::fetch(
+                repo,
+                progress,
+                out,
+                err,
+                fetch_options(remote, shallow),
+            )
+        })?;
+    inner_result.map_err(|e| anyhow::anyhow!("Fetch failed: {e}"))
 }
