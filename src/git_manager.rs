@@ -1694,9 +1694,26 @@ impl GitManager {
             let git_ops =
                 crate::git_ops::GitOpsManager::new(Some(std::path::Path::new(".")), false)
                     .map_err(|_| SubmoduleError::RepositoryError)?;
-            let entries = git_ops.read_gitmodules().map_err(|e| {
+            let mut entries = git_ops.read_gitmodules().map_err(|e| {
                 SubmoduleError::ConfigError(format!("Failed to read .gitmodules: {e}"))
             })?;
+
+            // Populate sparse_paths from the actual sparse-checkout config for each submodule.
+            // Sparse checkout patterns are not stored in .gitmodules; they live in each
+            // submodule's .git/info/sparse-checkout file.
+            let names_and_paths: Vec<(String, String)> = entries
+                .submodule_iter()
+                .filter_map(|(name, entry)| {
+                    entry.path.as_ref().map(|path| (name.clone(), path.clone()))
+                })
+                .collect();
+            for (name, path) in names_and_paths {
+                if let Ok(patterns) = git_ops.get_sparse_patterns(&path) {
+                    if !patterns.is_empty() {
+                        entries.set_sparse_paths_for(&name, patterns);
+                    }
+                }
+            }
 
             // Build a Config from the SubmoduleEntries
             let config = Config::new(crate::config::SubmoduleDefaults::default(), entries);
