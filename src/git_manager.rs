@@ -1710,11 +1710,7 @@ impl GitManager {
             for (name, path) in names_and_paths {
                 if let Ok(patterns) = git_ops.get_sparse_patterns(&path) {
                     if !patterns.is_empty() {
-                        if let Some(entry) = entries.get(&name).cloned() {
-                            let mut updated = entry;
-                            updated.sparse_paths = Some(patterns);
-                            entries.update_entry(name, updated);
-                        }
+                        entries.set_sparse_paths_for(&name, patterns);
                     }
                 }
             }

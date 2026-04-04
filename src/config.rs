@@ -905,6 +905,17 @@ impl SubmoduleEntries {
             }
         }
     }
+
+    /// Set sparse paths for an existing submodule entry in-place, keeping `sparse_checkouts` in sync.
+    ///
+    /// Does nothing if no submodule with `name` exists.
+    pub fn set_sparse_paths_for(&mut self, name: &str, paths: Vec<String>) {
+        if let Some(entry) = self.submodules.as_mut().and_then(|m| m.get_mut(name)) {
+            entry.sparse_paths = Some(paths.clone());
+        }
+        let sparse_map = self.sparse_checkouts.get_or_insert_with(HashMap::new);
+        sparse_map.insert(name.to_string(), paths);
+    }
 }
 
 impl IntoIterator for SubmoduleEntries {
