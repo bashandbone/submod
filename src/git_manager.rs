@@ -33,7 +33,10 @@ Provides core logic for managing git submodules using the [`gitoxide`](https://g
 ## Sparse Checkout Support
 
 - Checks and configures sparse checkout for each submodule based on the TOML config.
-- Writes sparse-checkout patterns and applies them using the Git CLI.
+- Uses a **deny-all-by-default** (modified cone pattern) model: the `!/*` pattern is
+  automatically prepended to the user-supplied patterns so that _only_ the explicitly
+  listed paths are checked out.  Users simply list what they want to include; no
+  knowledge of git's pattern ordering rules is required.
 
 ## Error Handling
 
@@ -56,6 +59,13 @@ use crate::options::{
 };
 use std::fs;
 use std::path::{Path, PathBuf};
+
+/// The deny-all pattern prepended to every sparse-checkout file.
+///
+/// Placing `!/*` as the first line ensures that all paths are excluded by
+/// default and only the explicitly listed include patterns are checked out
+/// (the "modified cone pattern" model).
+const SPARSE_DENY_ALL: &str = "!/*";
 
 /// Custom error types for submodule operations
 #[derive(Debug, thiserror::Error)]
@@ -415,16 +425,29 @@ impl GitManager {
             .map(std::string::ToString::to_string)
             .collect();
 
-        let matches = expected_paths
+        // Filter the auto-managed deny-all prefix from both sides so that comparison
+        // reflects only the user-specified include patterns.
+        let configured_user: Vec<String> = configured_paths
             .iter()
-            .all(|path| configured_paths.contains(path));
+            .filter(|p| p.as_str() != SPARSE_DENY_ALL)
+            .cloned()
+            .collect();
+        let expected_user: Vec<String> = expected_paths
+            .iter()
+            .filter(|p| p.as_str() != SPARSE_DENY_ALL)
+            .cloned()
+            .collect();
+
+        let matches = expected_user
+            .iter()
+            .all(|path| configured_user.contains(path));
 
         if matches {
             Ok(SparseStatus::Correct)
         } else {
             Ok(SparseStatus::Mismatch {
-                expected: expected_paths.to_vec(),
-                actual: configured_paths,
+                expected: expected_user,
+                actual: configured_user,
             })
         }
     }
@@ -547,6 +570,10 @@ impl GitManager {
         submodule_path: &str,
         patterns: &[String],
     ) -> Result<(), SubmoduleError> {
+        // Normalize to the deny-all-by-default model: prepend `!/*` so that only
+        // explicitly listed paths are checked out (modified cone pattern approach).
+        let normalized = Self::build_deny_all_sparse_patterns(patterns);
+
         self.git_ops
             .enable_sparse_checkout(submodule_path)
             .map_err(|e| {
@@ -554,7 +581,7 @@ impl GitManager {
             })?;
 
         self.git_ops
-            .set_sparse_patterns(submodule_path, patterns)
+            .set_sparse_patterns(submodule_path, &normalized)
             .map_err(|e| {
                 SubmoduleError::GitoxideError(format!("Set sparse patterns failed: {e}"))
             })?;
@@ -568,6 +595,34 @@ impl GitManager {
         println!("Configured sparse checkout");
 
         Ok(())
+    }
+
+    /// Build a deny-all-by-default sparse pattern list.
+    ///
+    /// Prepends `!/*` as the first pattern when it is not already present, implementing
+    /// the "modified cone pattern" approach: all paths are denied by default and only
+    /// the explicitly listed patterns are checked out. This makes the intent clear and
+    /// avoids surprises from git's default include-everything behaviour.
+    ///
+    /// Blank entries (empty or whitespace-only strings) are stripped before processing.
+    /// If no non-blank patterns remain, or if the first non-blank pattern is already
+    /// `!/*`, the list is returned as-is.
+    fn build_deny_all_sparse_patterns(patterns: &[String]) -> Vec<String> {
+        // Strip blank entries that can arrive from empty CLI values (e.g., --sparse-paths "").
+        let non_empty: Vec<&String> = patterns
+            .iter()
+            .filter(|p| !p.trim().is_empty())
+            .collect();
+        if non_empty.is_empty()
+            || non_empty.first().map(|p| p.as_str()) == Some(SPARSE_DENY_ALL)
+        {
+            non_empty.into_iter().cloned().collect()
+        } else {
+            let mut result = Vec::with_capacity(non_empty.len() + 1);
+            result.push(SPARSE_DENY_ALL.to_string());
+            result.extend(non_empty.into_iter().cloned());
+            result
+        }
     }
 
     /// Get the actual git directory path, handling gitlinks in submodules

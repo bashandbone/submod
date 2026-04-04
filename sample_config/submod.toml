@@ -49,14 +49,21 @@ ignore = "dirty" # Override default ignore setting for all submodules
 #
 # ## `sparse_paths`
 # A list of relative paths or glob patterns to include in the sparse checkout. If omitted, includes all files.
-# If set, git prepends:
-# ```git
-# /*
-# !/*/
+# **Deny-all by default:** `submod` automatically prepends `!/*` as the first pattern,
+# so _only_ the paths you list are checked out. You declare what you want; everything
+# else is excluded. No manual negation rules are needed for the common case.
+# Example — check out only `src/`, `include/`, and markdown files at the root:
+# ```toml
+# sparse_paths = ["src/", "include/", "*.md"]
 # ```
-# This includes only files in the root directory, excluding subdirectories.
-# To exclude root files, prefix with `!` (e.g., `!/README.md`).
-# To include subdirectories, add paths like `/src/`.
+# This writes the following patterns to git's sparse-checkout file:
+# ```
+# !/*        ← deny all by default (added automatically)
+# src/       ← include src/
+# include/   ← include include/
+# *.md       ← include markdown files at any level
+# ```
+# If the first pattern in your list is already `!/*`, it will not be added again.
 #
 # ## `shallow`
 #
