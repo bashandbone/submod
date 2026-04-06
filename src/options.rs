@@ -158,9 +158,9 @@ impl GitmodulesConvert for SerializableIgnore {
             "all" => Ok(Self::All),
             "dirty" => Ok(Self::Dirty),
             "untracked" => Ok(Self::Untracked),
-            "none" => Ok(Self::None), // Default is None
+            "none" => Ok(Self::None),    // Default is None
             "" => Ok(Self::Unspecified), // Empty string is treated as unspecified
-            _ => Err(()),                           // Handle unsupported options
+            _ => Err(()),                // Handle unsupported options
         }
     }
 
@@ -299,9 +299,7 @@ impl GitmodulesConvert for SerializableFetchRecurse {
     /// Convert to gitmodules string (what you would get from the .gitmodules or .git/config)
     fn to_gitmodules(&self) -> String {
         match self {
-            Self::OnDemand | Self::Unspecified => {
-                "on-demand".to_string()
-            }
+            Self::OnDemand | Self::Unspecified => "on-demand".to_string(),
             Self::Always => "true".to_string(),
             Self::Never => "false".to_string(),
         }
@@ -314,7 +312,7 @@ impl GitmodulesConvert for SerializableFetchRecurse {
             "true" => Ok(Self::Always),
             "false" => Ok(Self::Never),
             "" => Ok(Self::Unspecified), // Empty string is treated as unspecified
-            _ => Err(()),                                    // Handle unsupported options
+            _ => Err(()),                // Handle unsupported options
         }
     }
 
@@ -525,8 +523,7 @@ impl FromStr for SerializableBranch {
 impl Default for SerializableBranch {
     fn default() -> Self {
         let default_branch = gix_submodule::config::Branch::default();
-        Self::try_from(default_branch)
-            .unwrap_or_else(|()| Self::Name("main".to_string()))
+        Self::try_from(default_branch).unwrap_or_else(|()| Self::Name("main".to_string()))
     }
 }
 
@@ -539,8 +536,7 @@ impl SerializableBranch {
                 Some(Ok(Self::default()))
             } else {
                 Some(
-                    Self::from_str(b.trim())
-                        .map_err(|()| anyhow::anyhow!("Invalid branch string")),
+                    Self::from_str(b.trim()).map_err(|()| anyhow::anyhow!("Invalid branch string")),
                 )
             }
         } else {
@@ -620,9 +616,9 @@ impl GitmodulesConvert for SerializableUpdate {
             "checkout" => Ok(Self::Checkout),
             "rebase" => Ok(Self::Rebase),
             "merge" => Ok(Self::Merge),
-            "none" => Ok(Self::None), // Default is None
+            "none" => Ok(Self::None),    // Default is None
             "" => Ok(Self::Unspecified), // Empty string is treated as unspecified
-            _ => Err(()),                           // Handle unsupported options
+            _ => Err(()),                // Handle unsupported options
         }
     }
 
@@ -720,6 +716,7 @@ mod tests {
         // SerializableBranch appears as a field value in real config files.
         #[derive(Debug, serde::Deserialize)]
         struct Helper {
+            #[serde(flatten)]
             branch: SerializableBranch,
         }
 

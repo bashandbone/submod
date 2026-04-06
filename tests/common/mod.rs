@@ -261,6 +261,7 @@ impl TestHarness {
     }
 
     /// Create a config file with given content
+    #[allow(dead_code)] // Used by integration tests; required for test harness
     pub fn create_config(&self, content: &str) -> Result<(), Box<dyn std::error::Error>> {
         fs::write(self.config_path(), content)?;
         Ok(())
