@@ -17,7 +17,7 @@
         "ignore": { "$ref": "#/$defs/ignoreValue" },
         "update": { "$ref": "#/$defs/updateValue" },
         "fetch":  { "$ref": "#/$defs/fetchValue" },
-        "use_git_default_sparse_checkout": { "$ref": "#/$defs/useGitDefaultSparseCheckoutValue" }
+        ""
       },
       "additionalProperties": false
     }
@@ -44,11 +44,6 @@
       "default": "on-demand",
       "description": "When to fetch submodule updates from the remote.\n- \"on-demand\": fetch only when needed (default)\n- \"always\": fetch on every operation\n- \"never\": never fetch automatically\nhttps://docs.rs/submod/latest/submod/options/"
     },
-    "useGitDefaultSparseCheckoutValue": {
-      "type": "boolean",
-      "default": false,
-      "description": "If true, uses git's default sparse checkout behavior for the submodule. This means all files are included by default, and any specified sparse_paths are added to the checkout rather than replacing it. If false (the default), specifying sparse_paths replaces the default behavior and only the specified paths are included. We think our approach is more intuitive, but this option allows you to opt in to git's behavior if you prefer it or need it for compatibility reasons."
-    },
     "submodule": {
       "type": "object",
       "description": "Configuration for a single submodule. The section name is your local alias for the submodule; submod maps it to the full relative path in .gitmodules and .git/config.",
@@ -69,7 +64,7 @@
         "sparse_paths": {
           "type": "array",
           "items": { "type": "string" },
-          "description": "Relative paths or glob patterns to include in a sparse checkout. By default, **no** paths are included when sparse_paths -- only those explicitly listed will be included. This is different from git's default sparse checkout behavior, which includes all files by default and adds specified paths to the checkout. We think our approach is more intuitive, but if you prefer git's behavior or need it for compatibility reasons, you can set use_git_default_sparse_checkout to true globally or for this submodule to have specified paths added to the default checkout rather than replacing it."
+          "description": "Relative paths or glob patterns to include in a sparse checkout. If omitted, all files are checked out.\nWhen set, git prepends:\n  /*\n  !/*/\nThis includes only root-level files by default. To include subdirectories, add paths like \"src/\". To exclude root files, prefix with \"!\" (e.g., \"!/README.md\")."
         },
         "shallow": {
           "type": "boolean",
@@ -78,8 +73,7 @@
         },
         "ignore": { "$ref": "#/$defs/ignoreValue" },
         "update": { "$ref": "#/$defs/updateValue" },
-        "fetch":  { "$ref": "#/$defs/fetchValue" },
-        "use_git_default_sparse_checkout": { "$ref": "#/$defs/useGitDefaultSparseCheckoutValue" }
+        "fetch":  { "$ref": "#/$defs/fetchValue" }
       },
       "additionalProperties": false
     }
