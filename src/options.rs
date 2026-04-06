@@ -716,7 +716,7 @@ mod tests {
         // SerializableBranch appears as a field value in real config files.
         #[derive(Debug, serde::Deserialize)]
         struct Helper {
-            #[serde(flatten)]
+            #[expect(dead_code)]
             branch: SerializableBranch,
         }
 
