@@ -64,6 +64,7 @@ impl Git2Operations {
             shallow: Some(shallow),
             no_init: Some(false), // not used here
             sparse_paths: None,
+            use_git_default_sparse_checkout: None,
         };
         Ok((name, entry))
     }

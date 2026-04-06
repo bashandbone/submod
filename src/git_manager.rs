@@ -60,11 +60,15 @@ use crate::options::{
 use std::fs;
 use std::path::{Path, PathBuf};
 
-/// The deny-all pattern prepended to every sparse-checkout file.
+/// The deny-all pattern prepended to sparse-checkout files in deny-all-by-default mode.
 ///
 /// Placing `!/*` as the first line ensures that all paths are excluded by
 /// default and only the explicitly listed include patterns are checked out
 /// (the "modified cone pattern" model).
+///
+/// This pattern is **not** written when there are no include patterns (i.e., when the
+/// caller passes an empty list or a list consisting entirely of blank strings), and it
+/// is **not** written when the submodule opts out via `use_git_default_sparse_checkout`.
 const SPARSE_DENY_ALL: &str = "!/*";
 
 /// Custom error types for submodule operations
@@ -453,6 +457,7 @@ impl GitManager {
     }
 
     /// Add a submodule using the fallback chain: gitoxide -> git2 -> CLI
+    #[allow(clippy::too_many_arguments)]
     pub fn add_submodule(
         &mut self,
         name: String,
@@ -465,6 +470,7 @@ impl GitManager {
         update: Option<SerializableUpdate>,
         shallow: Option<bool>,
         no_init: bool,
+        use_git_default_sparse_checkout: Option<bool>,
     ) -> Result<(), SubmoduleError> {
         if no_init {
             self.update_toml_config(
@@ -480,6 +486,7 @@ impl GitManager {
                     shallow,
                     no_init: Some(no_init),
                     sparse_paths: None,
+                    use_git_default_sparse_checkout,
                 },
                 sparse_paths.clone(),
             )?;
@@ -507,7 +514,25 @@ impl GitManager {
             .map_err(Self::map_git_ops_error)
         {
             Ok(()) => {
-                // Configure after successful submodule creation (clone/init handled by the underlying backend, currently the git CLI)
+                // Store the opt-out flag in config before configuring sparse checkout
+                // so that the helper can resolve it.
+                {
+                    let entry = SubmoduleEntry {
+                        path: Some(path.clone()),
+                        url: Some(url.clone()),
+                        branch: branch.clone(),
+                        ignore: ignore.clone(),
+                        update: update.clone(),
+                        fetch_recurse: fetch_recurse.clone(),
+                        active: Some(!no_init),
+                        shallow,
+                        no_init: Some(no_init),
+                        sparse_paths: None,
+                        use_git_default_sparse_checkout,
+                    };
+                    self.config.add_submodule(name.clone(), entry);
+                }
+                // Configure after successful submodule creation
                 self.configure_submodule_post_creation(&name, &path, sparse_paths.clone())?;
                 self.update_toml_config(
                     name.clone(),
@@ -522,6 +547,7 @@ impl GitManager {
                         shallow,
                         no_init: Some(no_init),
                         sparse_paths: None, // stored separately via configure_submodule_post_creation
+                        use_git_default_sparse_checkout,
                     },
                     sparse_paths,
                 )?;
@@ -549,7 +575,7 @@ impl GitManager {
     /// Configure submodule for post-creation setup
     fn configure_submodule_post_creation(
         &mut self,
-        _name: &str,
+        name: &str,
         path: &str,
         sparse_paths: Option<Vec<String>>,
     ) -> Result<(), SubmoduleError> {
@@ -558,21 +584,46 @@ impl GitManager {
         let submodule_exists = std::path::Path::new(path).exists();
         if submodule_exists {
             if let Some(patterns) = sparse_paths {
-                self.configure_sparse_checkout(path, &patterns)?;
+                let use_git_default = self.effective_use_git_default_sparse_checkout(name);
+                self.configure_sparse_checkout(path, &patterns, use_git_default)?;
             }
         }
         Ok(())
     }
 
-    /// Configure sparse checkout using basic file operations
+    /// Configure sparse checkout using basic file operations.
+    ///
+    /// By default (`use_git_default = false`) the deny-all-by-default model is applied:
+    /// `!/*` is prepended so only the explicitly listed `patterns` are checked out, and a
+    /// one-time informational message is printed to help users understand the behaviour and
+    /// opt out if needed.
+    ///
+    /// When `use_git_default = true` the patterns are written as-is, matching git's own
+    /// sparse-checkout semantics.
     pub fn configure_sparse_checkout(
         &mut self,
         submodule_path: &str,
         patterns: &[String],
+        use_git_default: bool,
     ) -> Result<(), SubmoduleError> {
-        // Normalize to the deny-all-by-default model: prepend `!/*` so that only
-        // explicitly listed paths are checked out (modified cone pattern approach).
-        let normalized = Self::build_deny_all_sparse_patterns(patterns);
+        let effective_patterns = if use_git_default {
+            // Pass through unchanged — caller opts out of the deny-all model.
+            patterns.to_vec()
+        } else {
+            // Normalize to the deny-all-by-default model.
+            let normalized = Self::build_deny_all_sparse_patterns(patterns);
+            if !normalized.is_empty() {
+                eprintln!(
+                    "ℹ️  submod uses a deny-all-by-default sparse-checkout model: `!/*` is \
+                     automatically prepended so only the paths you list are checked out.\n\
+                     To use git's default behaviour instead, set \
+                     `use_git_default_sparse_checkout = true` in your submod.toml (globally \
+                     under `[defaults]` or per submodule) or pass \
+                     `--use-git-default-sparse-checkout`."
+                );
+            }
+            normalized
+        };
 
         self.git_ops
             .enable_sparse_checkout(submodule_path)
@@ -581,7 +632,7 @@ impl GitManager {
             })?;
 
         self.git_ops
-            .set_sparse_patterns(submodule_path, &normalized)
+            .set_sparse_patterns(submodule_path, &effective_patterns)
             .map_err(|e| {
                 SubmoduleError::GitoxideError(format!("Set sparse patterns failed: {e}"))
             })?;
@@ -597,31 +648,57 @@ impl GitManager {
         Ok(())
     }
 
-    /// Build a deny-all-by-default sparse pattern list.
+    /// Normalizes the input by stripping blank entries and removing any existing `!/*`
+    /// entries, then prepends a single `!/*` when at least one include pattern remains.
     ///
-    /// Prepends `!/*` as the first pattern when it is not already present, implementing
-    /// the "modified cone pattern" approach: all paths are denied by default and only
-    /// the explicitly listed patterns are checked out. This makes the intent clear and
-    /// avoids surprises from git's default include-everything behaviour.
+    /// This implements the "modified cone pattern" approach: all paths are denied by
+    /// default and only the explicitly listed patterns are checked out. This makes the
+    /// intent clear and avoids surprises from git's default include-everything behaviour.
     ///
     /// Blank entries (empty or whitespace-only strings) are stripped before processing.
-    /// If no non-blank patterns remain, or if the first non-blank pattern is already
-    /// `!/*`, the list is returned as-is.
+    /// If no non-blank include patterns remain after normalization, an empty list is
+    /// returned (no sparse-checkout file is written for an empty pattern list).
     fn build_deny_all_sparse_patterns(patterns: &[String]) -> Vec<String> {
         // Strip blank entries that can arrive from empty CLI values (e.g., --sparse-paths "").
-        let non_empty: Vec<&String> = patterns
+        // Also remove any existing deny-all markers so we can prepend a single canonical one.
+        let includes: Vec<String> = patterns
             .iter()
-            .filter(|p| !p.trim().is_empty())
+            .filter_map(|p| {
+                let trimmed = p.trim();
+                if trimmed.is_empty() || trimmed == SPARSE_DENY_ALL {
+                    None
+                } else {
+                    Some(p.clone())
+                }
+            })
             .collect();
-        if non_empty.is_empty()
-            || non_empty.first().map(|p| p.as_str()) == Some(SPARSE_DENY_ALL)
-        {
-            non_empty.into_iter().cloned().collect()
+
+        if includes.is_empty() {
+            Vec::new()
         } else {
-            let mut result = Vec::with_capacity(non_empty.len() + 1);
+            let mut result = Vec::with_capacity(includes.len() + 1);
             result.push(SPARSE_DENY_ALL.to_string());
-            result.extend(non_empty.into_iter().cloned());
+            result.extend(includes);
             result
+        }
+    }
+
+    /// Resolve the effective `use_git_default_sparse_checkout` setting for a submodule.
+    ///
+    /// The per-submodule entry takes precedence over the global `[defaults]` setting.
+    /// When neither is set, `false` is returned (submod's deny-all-by-default model).
+    fn effective_use_git_default_sparse_checkout(&self, submodule_name: &str) -> bool {
+        let per_submodule = self
+            .config
+            .get_submodule(submodule_name)
+            .and_then(|e| e.use_git_default_sparse_checkout);
+        match per_submodule {
+            Some(v) => v,
+            None => self
+                .config
+                .defaults
+                .use_git_default_sparse_checkout
+                .unwrap_or(false),
         }
     }
 
@@ -771,7 +848,8 @@ impl GitManager {
                 .sparse_checkouts()
                 .and_then(|sparse_checkouts| sparse_checkouts.get(name).cloned());
             if let Some(sparse_paths) = sparse_paths_opt {
-                self.configure_sparse_checkout(path_str, &sparse_paths)?;
+                let use_git_default = self.effective_use_git_default_sparse_checkout(name);
+                self.configure_sparse_checkout(path_str, &sparse_paths, use_git_default)?;
             }
             return Ok(());
         }
@@ -826,7 +904,8 @@ impl GitManager {
         // Configure sparse checkout if specified
         if let Some(sparse_checkouts) = submodules.sparse_checkouts() {
             if let Some(sparse_paths) = sparse_checkouts.get(name) {
-                self.configure_sparse_checkout(path_str, sparse_paths)?;
+                let use_git_default = self.effective_use_git_default_sparse_checkout(name);
+                self.configure_sparse_checkout(path_str, sparse_paths, use_git_default)?;
             }
         }
 
@@ -1383,8 +1462,13 @@ impl GitManager {
         ignore: Option<SerializableIgnore>,
         fetch_recurse: Option<SerializableFetchRecurse>,
         update: Option<SerializableUpdate>,
+        use_git_default_sparse_checkout: Option<bool>,
     ) -> Result<(), SubmoduleError> {
-        if ignore.is_none() && fetch_recurse.is_none() && update.is_none() {
+        if ignore.is_none()
+            && fetch_recurse.is_none()
+            && update.is_none()
+            && use_git_default_sparse_checkout.is_none()
+        {
             return Err(SubmoduleError::ConfigError(
                 "No settings provided to change.".to_string(),
             ));
@@ -1397,6 +1481,9 @@ impl GitManager {
         }
         if let Some(u) = update {
             self.config.defaults.update = Some(u);
+        }
+        if let Some(v) = use_git_default_sparse_checkout {
+            self.config.defaults.use_git_default_sparse_checkout = Some(v);
         }
         self.write_full_config()
     }
@@ -1515,6 +1602,7 @@ impl GitManager {
         shallow: Option<bool>,
         url: Option<String>,
         active: Option<bool>,
+        use_git_default_sparse_checkout: Option<bool>,
     ) -> Result<(), SubmoduleError> {
         let entry = self
             .config
@@ -1565,6 +1653,8 @@ impl GitManager {
                 let effective_update = update.or(entry.update);
                 // Preserve shallow/active from entry unless caller explicitly set them
                 let effective_shallow = shallow.or(entry.shallow);
+                let effective_git_default =
+                    use_git_default_sparse_checkout.or(entry.use_git_default_sparse_checkout);
 
                 self.add_submodule(
                     name.to_string(),
@@ -1577,6 +1667,7 @@ impl GitManager {
                     effective_update,
                     effective_shallow,
                     false,
+                    effective_git_default,
                 )?;
                 return Ok(());
             }
@@ -1617,6 +1708,9 @@ impl GitManager {
             }
             if let Some(s) = shallow {
                 updated.shallow = Some(s);
+            }
+            if let Some(v) = use_git_default_sparse_checkout {
+                updated.use_git_default_sparse_checkout = Some(v);
             }
 
             // Update sparse paths
@@ -1713,6 +1807,7 @@ impl GitManager {
                     entry.update,
                     entry.shallow,
                     false,
+                    entry.use_git_default_sparse_checkout,
                 )?;
             }
         }

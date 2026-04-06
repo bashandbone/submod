@@ -52,7 +52,7 @@ ignore = "dirty" # Override default ignore setting for all submodules
 # **Deny-all by default:** `submod` automatically prepends `!/*` as the first pattern,
 # so _only_ the paths you list are checked out. You declare what you want; everything
 # else is excluded. No manual negation rules are needed for the common case.
-# Example — check out only `src/`, `include/`, and markdown files at the root:
+# Example — check out only `src/`, `include/`, and markdown files at any depth:
 # ```toml
 # sparse_paths = ["src/", "include/", "*.md"]
 # ```
@@ -61,9 +61,15 @@ ignore = "dirty" # Override default ignore setting for all submodules
 # !/*        ← deny all by default (added automatically)
 # src/       ← include src/
 # include/   ← include include/
-# *.md       ← include markdown files at any level
+# *.md       ← include markdown files at any depth
 # ```
-# If the first pattern in your list is already `!/*`, it will not be added again.
+# To match markdown files only at the repository root use `/*.md` instead.
+# Any `!/*` entries you add yourself are de-duplicated automatically.
+#
+# ## `use_git_default_sparse_checkout`
+# Set to `true` to opt out of submod's deny-all-by-default model for this submodule
+# and use git's standard sparse-checkout semantics instead (no automatic `!/*` prefix).
+# Can also be set globally under `[defaults]`.
 #
 # ## `shallow`
 #
@@ -80,7 +86,7 @@ url = "https://github.com/example/utils.git"
 sparse_paths = [
     "src/",      # All files in src directory
     "include/",  # All files in include directory
-    "*.md"       # All markdown files in submodule root
+    "*.md"       # All markdown files at any depth
 ]
 ignore = "all"   # Override default ignore setting
 

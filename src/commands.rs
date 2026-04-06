@@ -121,6 +121,15 @@ pub enum Commands {
         sparse_paths: Option<Vec<String>>,
 
         #[arg(
+            long = "use-git-default-sparse-checkout",
+            num_args = 0..=1,
+            value_parser = clap::value_parser!(bool),
+            default_missing_value = "true",
+            help = "Opt out of submod's deny-all-by-default sparse-checkout model and use git's built-in behaviour instead. When set, the `!/*` prefix is NOT prepended automatically."
+        )]
+        use_git_default_sparse_checkout: Option<bool>,
+
+        #[arg(
             short = 'f',
             long = "fetch",
             help = "Sets the recursive fetch behavior for the submodule (like, if we should fetch its submodules)."
@@ -165,6 +174,15 @@ pub enum Commands {
 
         #[arg(requires("sparse_paths"), short = 'a', long = "append", value_parser = clap::value_parser!(bool), default_value = "false", default_missing_value = "true", help = "If given, appends the new sparse paths to the existing ones.")]
         append: bool,
+
+        #[arg(
+            long = "use-git-default-sparse-checkout",
+            num_args = 0..=1,
+            value_parser = clap::value_parser!(bool),
+            default_missing_value = "true",
+            help = "Opt out of submod's deny-all-by-default sparse-checkout model and use git's built-in behaviour instead."
+        )]
+        use_git_default_sparse_checkout: Option<bool>,
 
         #[arg(
             short = 'i',
@@ -224,6 +242,15 @@ pub enum Commands {
             help = "Sets the default update behavior for all submodules in this repository. This will override any individual submodule settings."
         )]
         update: Option<Update>,
+
+        #[arg(
+            long = "use-git-default-sparse-checkout",
+            num_args = 0..=1,
+            value_parser = clap::value_parser!(bool),
+            default_missing_value = "true",
+            help = "Set the global default for sparse-checkout mode. When true, all submodules use git's built-in behaviour instead of submod's deny-all-by-default model (unless overridden per-submodule)."
+        )]
+        use_git_default_sparse_checkout: Option<bool>,
     },
 
     #[command(
