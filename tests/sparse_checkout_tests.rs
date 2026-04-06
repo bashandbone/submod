@@ -16,6 +16,10 @@ use common::TestHarness;
 mod tests {
     use super::*;
 
+    /// The deny-all pattern that submod automatically prepends to every
+    /// sparse-checkout file (mirrors `SPARSE_DENY_ALL` in `git_manager.rs`).
+    const SPARSE_DENY_ALL: &str = "!/*";
+
     #[test]
     fn test_sparse_checkout_basic_setup() {
         let harness = TestHarness::new().expect("Failed to create test harness");
@@ -391,5 +395,155 @@ sparse_paths = ["src", "docs", "README.md"]
         assert!(harness.dir_exists("lib/sparse-sync/src"));
         assert!(harness.dir_exists("lib/sparse-sync/docs"));
         assert!(harness.file_exists("lib/sparse-sync/README.md"));
+    }
+
+    /// Verify that the deny-all-by-default (modified cone) pattern `!/*` is
+    /// automatically prepended to the sparse-checkout file when paths are configured.
+    /// Only the explicitly listed paths should be present in the working tree.
+    #[test]
+    fn test_sparse_checkout_deny_all_prefix() {
+        let harness = TestHarness::new().expect("Failed to create test harness");
+        harness.init_git_repo().expect("Failed to init git repo");
+
+        let remote_repo = harness
+            .create_complex_remote("sparse_deny_all")
+            .expect("Failed to create remote");
+        let remote_url = format!("file://{}", remote_repo.display());
+
+        harness
+            .run_submod_success(&[
+                "add",
+                &remote_url,
+                "--name",
+                "sparse-deny-all",
+                "--path",
+                "lib/sparse-deny-all",
+                "--sparse-paths",
+                "src,docs",
+            ])
+            .expect("Failed to add submodule");
+
+        // The sparse-checkout file must start with `!/*` (deny-all prefix).
+        let sparse_file = harness.get_sparse_checkout_file_path("lib/sparse-deny-all");
+        assert!(sparse_file.exists(), "sparse-checkout file should exist");
+
+        let sparse_content =
+            fs::read_to_string(&sparse_file).expect("Failed to read sparse file");
+        let first_line = sparse_content
+            .lines()
+            .next()
+            .expect("sparse-checkout file should not be empty");
+        assert_eq!(
+            first_line, SPARSE_DENY_ALL,
+            "First pattern must be `{SPARSE_DENY_ALL}` (deny all by default)"
+        );
+
+        // User-specified include patterns must also be present as exact lines.
+        assert!(
+            sparse_content.lines().any(|l| l.trim() == "src"),
+            "src pattern must be present"
+        );
+        assert!(
+            sparse_content.lines().any(|l| l.trim() == "docs"),
+            "docs pattern must be present"
+        );
+
+        // Only the declared directories should exist in the working tree.
+        assert!(harness.dir_exists("lib/sparse-deny-all/src"));
+        assert!(harness.dir_exists("lib/sparse-deny-all/docs"));
+        assert!(!harness.dir_exists("lib/sparse-deny-all/tests"));
+        assert!(!harness.dir_exists("lib/sparse-deny-all/examples"));
+    }
+
+    /// Verify that user-supplied patterns that already start with `!/*` are not
+    /// duplicated — the deny-all prefix should appear exactly once.
+    #[test]
+    fn test_sparse_checkout_deny_all_not_duplicated() {
+        let harness = TestHarness::new().expect("Failed to create test harness");
+        harness.init_git_repo().expect("Failed to init git repo");
+
+        let remote_repo = harness
+            .create_complex_remote("sparse_no_dup")
+            .expect("Failed to create remote");
+        let remote_url = format!("file://{}", remote_repo.display());
+
+        // The user explicitly starts their list with `!/*`.
+        harness
+            .run_submod_success(&[
+                "add",
+                &remote_url,
+                "--name",
+                "sparse-no-dup",
+                "--path",
+                "lib/sparse-no-dup",
+                "--sparse-paths",
+                "!/*,src,docs",
+            ])
+            .expect("Failed to add submodule");
+
+        let sparse_file = harness.get_sparse_checkout_file_path("lib/sparse-no-dup");
+        let sparse_content =
+            fs::read_to_string(&sparse_file).expect("Failed to read sparse file");
+
+        let deny_count = sparse_content
+            .lines()
+            .filter(|l| *l == SPARSE_DENY_ALL)
+            .count();
+        assert_eq!(
+            deny_count, 1,
+            "`{SPARSE_DENY_ALL}` should appear exactly once in sparse-checkout file"
+        );
+    }
+
+    /// Verify that setting `use_git_default_sparse_checkout = true` in the TOML config
+    /// suppresses the automatic `!/*` prefix.
+    #[test]
+    fn test_sparse_checkout_opt_out_via_config() {
+        let harness = TestHarness::new().expect("Failed to create test harness");
+        harness.init_git_repo().expect("Failed to init git repo");
+
+        let remote_repo = harness
+            .create_complex_remote("sparse_opt_out")
+            .expect("Failed to create remote");
+        let remote_url = format!("file://{}", remote_repo.display());
+
+        // Create config that opts out of the deny-all model for this submodule.
+        let config_content = format!(
+            r#"[sparse-opt-out]
+path = "lib/sparse-opt-out"
+url = "{remote_url}"
+active = true
+sparse_paths = ["src", "docs"]
+use_git_default_sparse_checkout = true
+"#
+        );
+        harness
+            .create_config(&config_content)
+            .expect("Failed to create config");
+
+        harness
+            .run_submod_success(&["init"])
+            .expect("Failed to run init");
+
+        let sparse_file = harness.get_sparse_checkout_file_path("lib/sparse-opt-out");
+        assert!(sparse_file.exists(), "sparse-checkout file should exist");
+
+        let sparse_content =
+            fs::read_to_string(&sparse_file).expect("Failed to read sparse file");
+
+        // The deny-all prefix must NOT be present when the opt-out flag is set.
+        assert!(
+            !sparse_content.lines().any(|l| l.trim() == SPARSE_DENY_ALL),
+            "`{SPARSE_DENY_ALL}` must not be present when use_git_default_sparse_checkout = true"
+        );
+        // User patterns must still be written.
+        assert!(
+            sparse_content.lines().any(|l| l.trim() == "src"),
+            "src pattern must be present"
+        );
+        assert!(
+            sparse_content.lines().any(|l| l.trim() == "docs"),
+            "docs pattern must be present"
+        );
     }
 }

@@ -51,6 +51,7 @@ fn main() -> Result<()> {
             url,
             branch,
             sparse_paths,
+            use_git_default_sparse_checkout,
             ignore,
             update,
             fetch,
@@ -89,6 +90,7 @@ fn main() -> Result<()> {
                     update,
                     Some(shallow),
                     no_init,
+                    use_git_default_sparse_checkout,
                 )
                 .map_err(|e| anyhow::anyhow!("Failed to add submodule: {}", e))?;
         }
@@ -215,6 +217,7 @@ fn main() -> Result<()> {
             branch,
             sparse_paths,
             append,
+            use_git_default_sparse_checkout,
             ignore,
             fetch,
             update,
@@ -237,6 +240,7 @@ fn main() -> Result<()> {
                     Some(shallow),
                     url,
                     active,
+                    use_git_default_sparse_checkout,
                 )
                 .map_err(|e| anyhow::anyhow!("Failed to change submodule: {}", e))?;
         }
@@ -244,11 +248,12 @@ fn main() -> Result<()> {
             ignore,
             fetch,
             update,
+            use_git_default_sparse_checkout,
         } => {
             let mut manager = GitManager::with_verbose(config_path, verbose)
                 .map_err(|e| anyhow::anyhow!("Failed to create manager: {}", e))?;
             manager
-                .update_global_defaults(ignore, fetch, update)
+                .update_global_defaults(ignore, fetch, update, use_git_default_sparse_checkout)
                 .map_err(|e| anyhow::anyhow!("Failed to update global settings: {}", e))?;
         }
         Commands::List { recursive } => {

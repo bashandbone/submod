@@ -166,6 +166,11 @@ pub struct SubmoduleDefaults {
     pub fetch_recurse: Option<SerializableFetchRecurse>,
     /// [`Update`][SerializableUpdate] setting for submodules
     pub update: Option<SerializableUpdate>,
+    /// When `true`, use git's built-in sparse-checkout behaviour (no `!/*` prefix is
+    /// prepended). Defaults to `false`, which uses submod's deny-all-by-default model.
+    /// Individual submodules can override this per-entry.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub use_git_default_sparse_checkout: Option<bool>,
 }
 
 impl Iterator for SubmoduleDefaults {
@@ -204,6 +209,7 @@ impl SubmoduleDefaults {
                     .fetch_recurse
                     .or_else(|| Some(SerializableFetchRecurse::default())),
                 update: update.or_else(|| Some(SerializableUpdate::default())),
+                use_git_default_sparse_checkout: mut_self.use_git_default_sparse_checkout,
             }
         }
     }
@@ -248,6 +254,7 @@ impl SubmoduleAddOptions {
             active: Some(!self.no_init), // we're adding so unless we have a 'no_init" flag, we can assume active
             no_init: Some(self.no_init),
             sparse_paths: None,
+            use_git_default_sparse_checkout: None,
         }
     }
 
@@ -460,6 +467,10 @@ pub struct SubmoduleEntry {
     /// Sparse checkout paths for this submodule (optional)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub sparse_paths: Option<Vec<String>>,
+    /// When `true`, use git's built-in sparse-checkout behaviour instead of submod's
+    /// deny-all-by-default model.  Overrides the global `[defaults]` setting.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub use_git_default_sparse_checkout: Option<bool>,
 }
 
 #[allow(dead_code)]
@@ -487,6 +498,7 @@ impl SubmoduleEntry {
             shallow: shallow,
             no_init: no_init,
             sparse_paths: None,
+            use_git_default_sparse_checkout: None,
         }
     }
 
@@ -666,6 +678,7 @@ impl From<OtherSubmoduleSettings> for SubmoduleEntry {
             update: default_git_options.update,
             no_init: Some(other.no_init),
             sparse_paths: None,
+            use_git_default_sparse_checkout: None,
         }
     }
 }
@@ -1152,11 +1165,13 @@ mod tests {
             ignore: Some(SerializableIgnore::All),
             fetch_recurse: Some(SerializableFetchRecurse::Always),
             update: Some(SerializableUpdate::Rebase),
+            use_git_default_sparse_checkout: None,
         };
         let other = SubmoduleDefaults {
             ignore: Some(SerializableIgnore::Dirty),
             fetch_recurse: None,
             update: Some(SerializableUpdate::Merge),
+            use_git_default_sparse_checkout: None,
         };
         let merged = base.merge_from(other);
         // other.ignore overrides
@@ -1173,6 +1188,7 @@ mod tests {
             ignore: Some(SerializableIgnore::All),
             fetch_recurse: Some(SerializableFetchRecurse::Never),
             update: Some(SerializableUpdate::Checkout),
+            use_git_default_sparse_checkout: None,
         };
         let other = SubmoduleDefaults::default();
         let merged = base.merge_from(other);
@@ -1189,6 +1205,7 @@ mod tests {
             ignore: Some(SerializableIgnore::Dirty),
             fetch_recurse: Some(SerializableFetchRecurse::Always),
             update: Some(SerializableUpdate::Merge),
+            use_git_default_sparse_checkout: None,
         };
         let merged = base.merge_from(other);
         assert_eq!(merged.ignore, Some(SerializableIgnore::Dirty));
@@ -1572,6 +1589,7 @@ mod tests {
             shallow: None,
             no_init: None,
             sparse_paths: Some(vec!["src/".to_string()]),
+            use_git_default_sparse_checkout: None,
         };
         entries.update_entry("repo".to_string(), entry);
 
@@ -1597,6 +1615,7 @@ mod tests {
             shallow: None,
             no_init: None,
             sparse_paths: Some(vec!["src/".to_string()]),
+            use_git_default_sparse_checkout: None,
         };
         entries.update_entry("repo".to_string(), entry_with_sparse);
         assert!(entries.sparse_checkouts().unwrap().contains_key("repo"));
@@ -1613,6 +1632,7 @@ mod tests {
             shallow: None,
             no_init: None,
             sparse_paths: None,
+            use_git_default_sparse_checkout: None,
         };
         entries.update_entry("repo".to_string(), entry_no_sparse);
         assert!(!entries.sparse_checkouts().unwrap().contains_key("repo"));
@@ -1779,6 +1799,7 @@ mod tests {
             ignore: Some(SerializableIgnore::Dirty),
             fetch_recurse: Some(SerializableFetchRecurse::Always),
             update: Some(SerializableUpdate::Rebase),
+            use_git_default_sparse_checkout: None,
         };
         let entry = SubmoduleEntry::new(
             Some("url".to_string()),
@@ -1808,6 +1829,7 @@ mod tests {
             ignore: Some(SerializableIgnore::Dirty),
             fetch_recurse: Some(SerializableFetchRecurse::Always),
             update: Some(SerializableUpdate::Rebase),
+            use_git_default_sparse_checkout: None,
         };
         let entry = SubmoduleEntry::new(
             Some("url".to_string()),
@@ -1900,6 +1922,7 @@ mod tests {
             shallow: None,
             no_init: None,
             sparse_paths: None,
+            use_git_default_sparse_checkout: None,
         };
         let opts = SubmoduleAddOptions::from_submodule_entries_tuple(("mymod".to_string(), entry));
         // url fallback: path
@@ -1920,6 +1943,7 @@ mod tests {
             shallow: None,
             no_init: None,
             sparse_paths: None,
+            use_git_default_sparse_checkout: None,
         };
         let opts = SubmoduleAddOptions::from_submodule_entries_tuple(("mymod".to_string(), entry));
         // Falls back to name for both url and path
@@ -1972,6 +1996,7 @@ mod tests {
             shallow: Some(false),
             no_init: None,
             sparse_paths: Some(vec!["src/".to_string()]),
+            use_git_default_sparse_checkout: None,
         };
         entries = entries.add_submodule("mymod".to_string(), entry);
 
