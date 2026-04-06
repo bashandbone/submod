@@ -171,7 +171,7 @@ impl GitManager {
         SubmoduleError::ConfigError(format!("Git operation failed: {err}"))
     }
 
-    /// Restore update_toml_config method
+    /// Restore `update_toml_config` method
     fn update_toml_config(
         &mut self,
         name: String,
@@ -286,13 +286,12 @@ impl GitManager {
                 if let Some(active) = entry.active {
                     output.push_str(&format!("active = {active}\n"));
                 }
-                if let Some(shallow) = entry.shallow {
-                    if shallow {
+                if let Some(shallow) = entry.shallow
+                    && shallow {
                         output.push_str("shallow = true\n");
                     }
-                }
-                if let Some(sparse_paths) = &entry.sparse_paths {
-                    if !sparse_paths.is_empty() {
+                if let Some(sparse_paths) = &entry.sparse_paths
+                    && !sparse_paths.is_empty() {
                         let joined = sparse_paths
                             .iter()
                             .map(|p| {
@@ -302,7 +301,6 @@ impl GitManager {
                             .join(", ");
                         output.push_str(&format!("sparse_paths = [{joined}]\n"));
                     }
-                }
             }
         }
 
@@ -393,7 +391,7 @@ impl GitManager {
         // Check if submodule has its own submodules
         let has_submodules = submodule_repo
             .submodules()
-            .map(|subs| subs.map_or(false, |mut iter| iter.next().is_some()))
+            .map(|subs| subs.is_some_and(|mut iter| iter.next().is_some()))
             .unwrap_or(false);
 
         Ok(SubmoduleStatus {
@@ -477,18 +475,18 @@ impl GitManager {
                 name.clone(),
                 SubmoduleEntry {
                     path: Some(path.clone()),
-                    url: Some(url.clone()),
-                    branch: branch.clone(),
-                    ignore: ignore.clone(),
-                    update: update.clone(),
-                    fetch_recurse: fetch_recurse.clone(),
+                    url: Some(url),
+                    branch,
+                    ignore,
+                    update,
+                    fetch_recurse,
                     active: Some(!no_init),
                     shallow,
                     no_init: Some(no_init),
                     sparse_paths: None,
                     use_git_default_sparse_checkout,
                 },
-                sparse_paths.clone(),
+                sparse_paths,
             )?;
             // When requested, only update configuration without touching repository state.
             return Ok(());
@@ -502,9 +500,9 @@ impl GitManager {
             path: std::path::PathBuf::from(&path),
             url: url.clone(),
             branch: branch.clone(),
-            ignore: ignore.clone(),
+            ignore,
             update: update.clone(),
-            fetch_recurse: fetch_recurse.clone(),
+            fetch_recurse,
             shallow: shallow.unwrap_or(false),
             no_init,
         };
@@ -521,9 +519,9 @@ impl GitManager {
                         path: Some(path.clone()),
                         url: Some(url.clone()),
                         branch: branch.clone(),
-                        ignore: ignore.clone(),
+                        ignore,
                         update: update.clone(),
-                        fetch_recurse: fetch_recurse.clone(),
+                        fetch_recurse,
                         active: Some(!no_init),
                         shallow,
                         no_init: Some(no_init),
@@ -564,10 +562,10 @@ impl GitManager {
         // These operations may fail if the submodule doesn't exist yet, which is fine,
         // but other errors (permissions, corruption, etc.) should at least be visible.
         if let Err(e) = self.git_ops.deinit_submodule(path, true) {
-            eprintln!("Warning: failed to deinit submodule at '{}': {:?}", path, e);
+            eprintln!("Warning: failed to deinit submodule at '{path}': {e:?}");
         }
         if let Err(e) = self.git_ops.delete_submodule(path) {
-            eprintln!("Warning: failed to delete submodule at '{}': {:?}", path, e);
+            eprintln!("Warning: failed to delete submodule at '{path}': {e:?}");
         }
         Ok(())
     }
@@ -582,12 +580,11 @@ impl GitManager {
         // Only configure git-level sparse checkout if the submodule directory exists
         // (it may not exist yet if --no-init was used)
         let submodule_exists = std::path::Path::new(path).exists();
-        if submodule_exists {
-            if let Some(patterns) = sparse_paths {
+        if submodule_exists
+            && let Some(patterns) = sparse_paths {
                 let use_git_default = self.effective_use_git_default_sparse_checkout(name);
                 self.configure_sparse_checkout(path, &patterns, use_git_default)?;
             }
-        }
         Ok(())
     }
 
@@ -795,7 +792,7 @@ impl GitManager {
         // Step 1: Stash changes
         println!("  📦 Stashing working changes...");
         match self.git_ops.stash_submodule(submodule_path, true) {
-            Ok(_) => {}
+            Ok(()) => {}
             Err(e) => println!("  ⚠️  Stash warning: {e}"),
         }
 
@@ -876,9 +873,9 @@ impl GitManager {
                 path: std::path::PathBuf::from(path_str),
                 url: url_str.to_string(),
                 branch: config.branch.clone(),
-                ignore: config.ignore.clone(),
+                ignore: config.ignore,
                 update: config.update.clone(),
-                fetch_recurse: config.fetch_recurse.clone(),
+                fetch_recurse: config.fetch_recurse,
                 shallow: config.shallow.unwrap_or(false),
                 no_init: false,
             };
@@ -902,12 +899,11 @@ impl GitManager {
         }
 
         // Configure sparse checkout if specified
-        if let Some(sparse_checkouts) = submodules.sparse_checkouts() {
-            if let Some(sparse_paths) = sparse_checkouts.get(name) {
+        if let Some(sparse_checkouts) = submodules.sparse_checkouts()
+            && let Some(sparse_paths) = sparse_checkouts.get(name) {
                 let use_git_default = self.effective_use_git_default_sparse_checkout(name);
                 self.configure_sparse_checkout(path_str, sparse_paths, use_git_default)?;
             }
-        }
 
         if self.verbose {
             println!("✅ {name} initialized");
@@ -1113,13 +1109,12 @@ impl GitManager {
         if let Some(active) = entry.active {
             kv.push(("active".into(), active.to_string()));
         }
-        if let Some(shallow) = entry.shallow {
-            if shallow {
+        if let Some(shallow) = entry.shallow
+            && shallow {
                 kv.push(("shallow".into(), "true".into()));
             }
-        }
-        if let Some(sparse_paths) = &entry.sparse_paths {
-            if !sparse_paths.is_empty() {
+        if let Some(sparse_paths) = &entry.sparse_paths
+            && !sparse_paths.is_empty() {
                 let joined = sparse_paths
                     .iter()
                     .map(|p| format!("\"{}\"", p.replace('\\', "\\\\").replace('"', "\\\"")))
@@ -1127,7 +1122,6 @@ impl GitManager {
                     .join(", ");
                 kv.push(("sparse_paths".into(), format!("[{joined}]")));
             }
-        }
         kv
     }
 
@@ -1156,12 +1150,10 @@ impl GitManager {
         }
         for key in known_keys {
             // Match "key =" or "key=" at start of trimmed line
-            if trimmed.starts_with(key) {
-                let rest = &trimmed[key.len()..];
-                if rest.starts_with('=') || rest.starts_with(" =") {
+            if let Some(rest) = trimmed.strip_prefix(key)
+                && (rest.starts_with('=') || rest.starts_with(" =")) {
                     return Some(key);
                 }
-            }
         }
         None
     }
@@ -1413,7 +1405,9 @@ impl GitManager {
             return Ok(());
         }
 
-        if !submodules.is_empty() {
+        if submodules.is_empty() {
+            println!("No submodules configured.");
+        } else {
             println!("Submodules:");
             for (name, entry) in &submodules {
                 let path = entry.path.as_deref().unwrap_or("<no path>");
@@ -1424,8 +1418,6 @@ impl GitManager {
                 println!("    path: {path}");
                 println!("    url:  {url}");
             }
-        } else {
-            println!("No submodules configured.");
         }
 
         if recursive {
@@ -1504,7 +1496,7 @@ impl GitManager {
         let _ = self.git_ops.deinit_submodule(&path, false);
 
         // Update the entry in config
-        let mut updated = entry.clone();
+        let mut updated = entry;
         updated.active = Some(false);
         self.config
             .submodules
@@ -1658,7 +1650,7 @@ impl GitManager {
 
                 self.add_submodule(
                     name.to_string(),
-                    np.clone().into(),
+                    np.clone(),
                     sub_url,
                     effective_sparse,
                     Some(effective_branch),
@@ -1798,7 +1790,7 @@ impl GitManager {
                 let sparse = entry.sparse_paths.clone().filter(|paths| !paths.is_empty());
                 self.add_submodule(
                     name.clone(),
-                    path.into(),
+                    path,
                     url,
                     sparse,
                     entry.branch.clone(),
@@ -1858,18 +1850,17 @@ impl GitManager {
                 })
                 .collect();
             for (name, path) in names_and_paths {
-                if let Ok(patterns) = git_ops.get_sparse_patterns(&path) {
-                    if !patterns.is_empty() {
+                if let Ok(patterns) = git_ops.get_sparse_patterns(&path)
+                    && !patterns.is_empty() {
                         entries.set_sparse_paths_for(&name, patterns);
                     }
-                }
             }
 
             // Build a Config from the SubmoduleEntries
             let config = Config::new(crate::config::SubmoduleDefaults::default(), entries);
 
             // Serialize using write_full_config logic but to the output path
-            let tmp_manager = GitManager {
+            let tmp_manager = Self {
                 git_ops,
                 config,
                 config_path: output.to_path_buf(),

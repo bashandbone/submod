@@ -173,7 +173,7 @@ pub struct GitOpsManager {
     verbose: bool,
 }
 
-/// Implement GitOperations for GitOpsManager, using gix first and falling back to git2 if gix fails
+/// Implement `GitOperations` for `GitOpsManager`, using gix first and falling back to git2 if gix fails
 impl GitOpsManager {
     /// Create a new `GitOpsManager` with automatic fallback
     pub fn new(repo_path: Option<&Path>, verbose: bool) -> Result<Self> {
@@ -270,10 +270,10 @@ impl GitOpsManager {
     }
 }
 
-/// Implement GitOperations for GitOpsManager, using gix first and falling back to git2 if gix fails
+/// Implement `GitOperations` for `GitOpsManager`, using gix first and falling back to git2 if gix fails
 impl GitOperations for GitOpsManager {
     fn read_gitmodules(&self) -> Result<SubmoduleEntries> {
-        self.try_with_fallback(|gix| gix.read_gitmodules(), |git2| git2.read_gitmodules())
+        self.try_with_fallback(GitOperations::read_gitmodules, GitOperations::read_gitmodules)
     }
 
     fn write_gitmodules(&mut self, config: &SubmoduleEntries) -> Result<()> {
@@ -465,7 +465,7 @@ impl GitOperations for GitOpsManager {
     }
 
     fn list_submodules(&self) -> Result<Vec<String>> {
-        self.try_with_fallback(|gix| gix.list_submodules(), |git2| git2.list_submodules())
+        self.try_with_fallback(GitOperations::list_submodules, GitOperations::list_submodules)
     }
 
     fn fetch_submodule(&self, path: &str) -> Result<()> {

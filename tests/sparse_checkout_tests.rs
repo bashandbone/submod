@@ -427,8 +427,7 @@ sparse_paths = ["src", "docs", "README.md"]
         let sparse_file = harness.get_sparse_checkout_file_path("lib/sparse-deny-all");
         assert!(sparse_file.exists(), "sparse-checkout file should exist");
 
-        let sparse_content =
-            fs::read_to_string(&sparse_file).expect("Failed to read sparse file");
+        let sparse_content = fs::read_to_string(&sparse_file).expect("Failed to read sparse file");
         let first_line = sparse_content
             .lines()
             .next()
@@ -482,8 +481,7 @@ sparse_paths = ["src", "docs", "README.md"]
             .expect("Failed to add submodule");
 
         let sparse_file = harness.get_sparse_checkout_file_path("lib/sparse-no-dup");
-        let sparse_content =
-            fs::read_to_string(&sparse_file).expect("Failed to read sparse file");
+        let sparse_content = fs::read_to_string(&sparse_file).expect("Failed to read sparse file");
 
         let deny_count = sparse_content
             .lines()
@@ -528,8 +526,7 @@ use_git_default_sparse_checkout = true
         let sparse_file = harness.get_sparse_checkout_file_path("lib/sparse-opt-out");
         assert!(sparse_file.exists(), "sparse-checkout file should exist");
 
-        let sparse_content =
-            fs::read_to_string(&sparse_file).expect("Failed to read sparse file");
+        let sparse_content = fs::read_to_string(&sparse_file).expect("Failed to read sparse file");
 
         // The deny-all prefix must NOT be present when the opt-out flag is set.
         assert!(

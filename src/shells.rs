@@ -25,7 +25,7 @@ pub enum Shell {
     PowerShell,
     /// Z `SHell` (zsh)
     Zsh,
-    /// NuSHell
+    /// `NuSHell`
     Nushell,
 }
 
@@ -34,24 +34,24 @@ impl clap::ValueEnum for Shell {
     /// Returns the possible values for this enum.
     fn value_variants<'a>() -> &'a [Self] {
         &[
-            Shell::Bash,
-            Shell::Elvish,
-            Shell::Fish,
-            Shell::PowerShell,
-            Shell::Zsh,
-            Shell::Nushell,
+            Self::Bash,
+            Self::Elvish,
+            Self::Fish,
+            Self::PowerShell,
+            Self::Zsh,
+            Self::Nushell,
         ]
     }
 
     /// Converts the enum variant to a `PossibleValue`.
     fn to_possible_value(&self) -> Option<PossibleValue> {
         Some(match self {
-            Shell::Bash => PossibleValue::new("bash"),
-            Shell::Elvish => PossibleValue::new("elvish"),
-            Shell::Fish => PossibleValue::new("fish"),
-            Shell::PowerShell => PossibleValue::new("powershell").alias("pwsh"),
-            Shell::Zsh => PossibleValue::new("zsh"),
-            Shell::Nushell => PossibleValue::new("nushell"),
+            Self::Bash => PossibleValue::new("bash"),
+            Self::Elvish => PossibleValue::new("elvish"),
+            Self::Fish => PossibleValue::new("fish"),
+            Self::PowerShell => PossibleValue::new("powershell").alias("pwsh"),
+            Self::Zsh => PossibleValue::new("zsh"),
+            Self::Nushell => PossibleValue::new("nushell"),
         })
     }
 }
@@ -85,11 +85,11 @@ impl TryFrom<AotShell> for Shell {
     /// Converts an `AotShell` to a `Shell`.
     fn try_from(shell: AotShell) -> Result<Self, Self::Error> {
         match shell {
-            AotShell::Bash => Ok(Shell::Bash),
-            AotShell::Elvish => Ok(Shell::Elvish),
-            AotShell::Fish => Ok(Shell::Fish),
-            AotShell::PowerShell => Ok(Shell::PowerShell),
-            AotShell::Zsh => Ok(Shell::Zsh),
+            AotShell::Bash => Ok(Self::Bash),
+            AotShell::Elvish => Ok(Self::Elvish),
+            AotShell::Fish => Ok(Self::Fish),
+            AotShell::PowerShell => Ok(Self::PowerShell),
+            AotShell::Zsh => Ok(Self::Zsh),
             _ => Err("Nushell is not supported in AOT mode".to_string()),
         }
     }
@@ -342,11 +342,11 @@ impl TryFrom<Shell> for AotShell {
     /// Attempts to convert a `Shell` to an `AotShell`.
     fn try_from(shell: Shell) -> Result<Self, Self::Error> {
         match shell {
-            Shell::Bash => Ok(AotShell::Bash),
-            Shell::Elvish => Ok(AotShell::Elvish),
-            Shell::Fish => Ok(AotShell::Fish),
-            Shell::PowerShell => Ok(AotShell::PowerShell),
-            Shell::Zsh => Ok(AotShell::Zsh),
+            Shell::Bash => Ok(Self::Bash),
+            Shell::Elvish => Ok(Self::Elvish),
+            Shell::Fish => Ok(Self::Fish),
+            Shell::PowerShell => Ok(Self::PowerShell),
+            Shell::Zsh => Ok(Self::Zsh),
             Shell::Nushell => Err("Nushell is not supported in AOT mode".to_string()),
         }
     }
@@ -358,7 +358,7 @@ impl TryFrom<Shell> for NushellShell {
     /// Attempts to convert a `Shell` to a `NushellShell`.
     fn try_from(shell: Shell) -> Result<Self, Self::Error> {
         if shell == Shell::Nushell {
-            Ok(NushellShell)
+            Ok(Self)
         } else {
             Err("Only Nushell can be converted to NushellShell".to_string())
         }
@@ -370,7 +370,7 @@ impl TryFrom<NushellShell> for Shell {
     /// Converts a `NushellShell` to a `Shell`.
     fn try_from(shell: NushellShell) -> Result<Self, String> {
         match shell {
-            NushellShell => Ok(Shell::Nushell),
+            NushellShell => Ok(Self::Nushell),
             _ => Err("Only NushellShell can be converted to Shell::Nushell".to_string()),
         }
     }
@@ -380,35 +380,35 @@ impl Shell {
     /// Converts the `Shell` enum to a shell enum implementing `clap_complete::Generator` (as a Box pointer).
     pub fn try_to_clap_complete(&self) -> Result<Box<dyn Generator>, String> {
         match self {
-            Shell::Bash => Ok(Box::new(AotShell::Bash)),
-            Shell::Elvish => Ok(Box::new(AotShell::Elvish)),
-            Shell::Fish => Ok(Box::new(AotShell::Fish)),
-            Shell::PowerShell => Ok(Box::new(AotShell::PowerShell)),
-            Shell::Zsh => Ok(Box::new(AotShell::Zsh)),
-            Shell::Nushell => Ok(Box::new(NushellShell)),
+            Self::Bash => Ok(Box::new(AotShell::Bash)),
+            Self::Elvish => Ok(Box::new(AotShell::Elvish)),
+            Self::Fish => Ok(Box::new(AotShell::Fish)),
+            Self::PowerShell => Ok(Box::new(AotShell::PowerShell)),
+            Self::Zsh => Ok(Box::new(AotShell::Zsh)),
+            Self::Nushell => Ok(Box::new(NushellShell)),
         }
     }
 
     /// Tries to find the shell from a path to its executable.
-    pub fn from_path<P: AsRef<std::path::Path>>(path: P) -> Option<Shell> {
+    pub fn from_path<P: AsRef<std::path::Path>>(path: P) -> Option<Self> {
         Self::parse_shell_from_path(path.as_ref())
     }
 
-    fn parse_shell_from_path(path: &std::path::Path) -> Option<Shell> {
+    fn parse_shell_from_path(path: &std::path::Path) -> Option<Self> {
         let name = path.file_stem()?.to_str()?;
         match name {
-            "bash" => Some(Shell::Bash),
-            "elvish" => Some(Shell::Elvish),
-            "fish" => Some(Shell::Fish),
-            "powershell" | "pwsh" | "powershell_ise" => Some(Shell::PowerShell),
-            "zsh" => Some(Shell::Zsh),
-            "nu" | "nushell" => Some(Shell::Nushell),
+            "bash" => Some(Self::Bash),
+            "elvish" => Some(Self::Elvish),
+            "fish" => Some(Self::Fish),
+            "powershell" | "pwsh" | "powershell_ise" => Some(Self::PowerShell),
+            "zsh" => Some(Self::Zsh),
+            "nu" | "nushell" => Some(Self::Nushell),
             _ => None,
         }
     }
 
     /// Attempts to find the shell from the `SHELL` environment variable.
-    pub fn from_env() -> Option<Shell> {
+    #[must_use] pub fn from_env() -> Option<Self> {
         if let Some(env_shell) = std::env::var_os("SHELL") {
             Self::parse_shell_from_path(std::path::Path::new(&env_shell))
         } else {
@@ -421,9 +421,7 @@ impl Generator for Shell {
     /// Returns the file name for the completion file.
     fn file_name(&self, name: &str) -> String {
         let shell_self = self.try_to_clap_complete();
-        shell_self
-            .map(|s| s.file_name(name))
-            .unwrap_or_else(|_| format!("{name}.nu")) // Default to Nushell if conversion fails
+        shell_self.map_or_else(|_| format!("{name}.nu"), |s| s.file_name(name)) // Default to Nushell if conversion fails
     }
 
     /// Generates the completion file for the given command and writes it to the provided buffer.
@@ -432,7 +430,7 @@ impl Generator for Shell {
         shell_self
             .map(|s| {
                 s.try_generate(cmd, buf)
-                    .unwrap_or_else(|e| panic!("failed to write completion file: {}", e))
+                    .unwrap_or_else(|e| panic!("failed to write completion file: {e}"));
             })
             .unwrap_or_else(|_| panic!("failed to write completion file"));
     }
@@ -446,7 +444,7 @@ impl Generator for Shell {
         let shell_self = self.try_to_clap_complete();
         match shell_self {
             Ok(s) => s.try_generate(cmd, buf),
-            Err(e) => Err(std::io::Error::new(std::io::ErrorKind::Other, e)),
+            Err(e) => Err(std::io::Error::other(e)),
         }
     }
 }

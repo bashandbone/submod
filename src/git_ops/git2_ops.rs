@@ -18,7 +18,7 @@ pub struct Git2Operations {
     repo: git2::Repository,
 }
 impl Git2Operations {
-    /// Create a new Git2Operations instance
+    /// Create a new `Git2Operations` instance
     pub fn new(repo_path: Option<&Path>) -> Result<Self> {
         let repo = match repo_path {
             Some(path) => git2::Repository::open(path)
@@ -33,7 +33,7 @@ impl Git2Operations {
     pub(super) fn workdir(&self) -> Option<&std::path::Path> {
         self.repo.workdir()
     }
-    /// Convert git2 submodule to our SubmoduleEntry format
+    /// Convert git2 submodule to our `SubmoduleEntry` format
     fn convert_git2_submodule_to_entry(
         &self,
         submodule: &git2::Submodule,
@@ -71,7 +71,7 @@ impl Git2Operations {
     /// Get branch configuration for a submodule
     fn get_submodule_branch(&self, name: &str) -> Result<Option<SerializableBranch>> {
         let config = self.repo.config()?;
-        let key = format!("submodule.{}.branch", name);
+        let key = format!("submodule.{name}.branch");
 
         match config.get_string(&key) {
             Ok(branch_str) => {
@@ -87,7 +87,7 @@ impl Git2Operations {
     /// Get fetch recurse configuration for a submodule
     fn get_submodule_fetch_recurse(&self, name: &str) -> Result<Option<SerializableFetchRecurse>> {
         let config = self.repo.config()?;
-        let key = format!("submodule.{}.fetchRecurseSubmodules", name);
+        let key = format!("submodule.{name}.fetchRecurseSubmodules");
 
         match config.get_string(&key) {
             Ok(fetch_str) => match fetch_str.as_str() {
@@ -102,7 +102,7 @@ impl Git2Operations {
     /// Check if a submodule is active
     fn is_submodule_active(&self, name: &str) -> Result<bool> {
         let config = self.repo.config()?;
-        let key = format!("submodule.{}.active", name);
+        let key = format!("submodule.{name}.active");
 
         match config.get_bool(&key) {
             Ok(active) => Ok(active),
@@ -186,7 +186,7 @@ impl Git2Operations {
                 self.repo.config()
             }
         }
-        .with_context(|| format!("Failed to open config at level {:?}", level))
+        .with_context(|| format!("Failed to open config at level {level:?}"))
     }
 }
 impl GitOperations for Git2Operations {
@@ -214,13 +214,13 @@ impl GitOperations for Git2Operations {
         // git2 doesn't have direct .gitmodules writing, but we can manipulate submodules
         // For now, we'll update individual submodule configurations
         if let Some(submodules) = config.submodules().as_ref() {
-            for (name, entry) in submodules.iter() {
+            for (name, entry) in *submodules {
                 // Find or create the submodule
                 match self.repo.find_submodule(
                     &entry
                         .path
                         .as_ref()
-                        .map(|p| p.to_string())
+                        .map(std::string::ToString::to_string)
                         .unwrap_or(name.clone()),
                 ) {
                     Ok(mut submodule) => {
@@ -234,7 +234,7 @@ impl GitOperations for Git2Operations {
                                 SerializableIgnore::None => "none",
                                 SerializableIgnore::Unspecified => continue, // Skip unspecified
                             };
-                            config.set_str(&format!("submodule.{}.ignore", name), ignore_str)?;
+                            config.set_str(&format!("submodule.{name}.ignore"), ignore_str)?;
                         }
                         if let Some(update) = &entry.update {
                             let update_str = match update {
@@ -244,14 +244,13 @@ impl GitOperations for Git2Operations {
                                 SerializableUpdate::None => "none",
                                 SerializableUpdate::Unspecified => continue, // Skip unspecified
                             };
-                            config.set_str(&format!("submodule.{}.update", name), update_str)?;
+                            config.set_str(&format!("submodule.{name}.update"), update_str)?;
                         }
                         // Set URL if different
-                        if let Some(url) = &entry.url {
-                            if submodule.url() != Some(url.as_str()) {
-                                config.set_str(&format!("submodule.{}.url", name), url)?;
+                        if let Some(url) = &entry.url
+                            && submodule.url() != Some(url.as_str()) {
+                                config.set_str(&format!("submodule.{name}.url"), url)?;
                             }
-                        }
                         // Sync changes
                         submodule.sync()?;
                     }
@@ -287,7 +286,7 @@ impl GitOperations for Git2Operations {
         let mut config = self.get_config_at_level(level)?;
         config
             .set_str(key, value)
-            .with_context(|| format!("Failed to set config value {}={}", key, value))?;
+            .with_context(|| format!("Failed to set config value {key}={value}"))?;
         Ok(())
     }
     fn add_submodule(&mut self, opts: &SubmoduleAddOptions) -> Result<()> {
@@ -334,47 +333,44 @@ impl GitOperations for Git2Operations {
 
         // Set branch if specified
         if let Some(branch) = &opts.branch {
-            let branch_key = format!("submodule.{}.branch", path_str);
+            let branch_key = format!("submodule.{path_str}.branch");
             config
                 .set_str(&branch_key, &branch.to_string())
                 .with_context(|| format!("Failed to set branch for submodule '{}'", opts.name))?;
         }
 
         // Set ignore rule if specified and not the sentinel Unspecified value
-        if let Some(ignore) = &opts.ignore {
-            if !matches!(ignore, SerializableIgnore::Unspecified) {
-                let ignore_key = format!("submodule.{}.ignore", path_str);
+        if let Some(ignore) = &opts.ignore
+            && !matches!(ignore, SerializableIgnore::Unspecified) {
+                let ignore_key = format!("submodule.{path_str}.ignore");
                 config
                     .set_str(&ignore_key, &ignore.to_string())
                     .with_context(|| {
                         format!("Failed to set ignore for submodule '{}'", opts.name)
                     })?;
             }
-        }
 
         // Set fetch recurse if specified and not the sentinel Unspecified value
-        if let Some(fetch_recurse) = &opts.fetch_recurse {
-            if !matches!(fetch_recurse, SerializableFetchRecurse::Unspecified) {
-                let fetch_key = format!("submodule.{}.fetchRecurseSubmodules", path_str);
+        if let Some(fetch_recurse) = &opts.fetch_recurse
+            && !matches!(fetch_recurse, SerializableFetchRecurse::Unspecified) {
+                let fetch_key = format!("submodule.{path_str}.fetchRecurseSubmodules");
                 config
                     .set_str(&fetch_key, &fetch_recurse.to_string())
                     .with_context(|| {
                         format!("Failed to set fetchRecurse for submodule '{}'", opts.name)
                     })?;
             }
-        }
 
         // Set update strategy if specified and not the sentinel Unspecified value
-        if let Some(update) = &opts.update {
-            if !matches!(update, SerializableUpdate::Unspecified) {
-                let update_key = format!("submodule.{}.update", path_str);
+        if let Some(update) = &opts.update
+            && !matches!(update, SerializableUpdate::Unspecified) {
+                let update_key = format!("submodule.{path_str}.update");
                 config
                     .set_str(&update_key, &update.to_string())
                     .with_context(|| {
                         format!("Failed to set update for submodule '{}'", opts.name)
                     })?;
             }
-        }
 
         Ok(())
     }
@@ -382,7 +378,7 @@ impl GitOperations for Git2Operations {
         let mut submodule = self
             .repo
             .find_submodule(path)
-            .with_context(|| format!("Submodule not found: {}", path))?;
+            .with_context(|| format!("Submodule not found: {path}"))?;
 
         submodule.init(false)?; // false = don't overwrite existing config
         Ok(())
@@ -391,7 +387,7 @@ impl GitOperations for Git2Operations {
         let mut submodule = self
             .repo
             .find_submodule(path)
-            .with_context(|| format!("Submodule not found: {}", path))?;
+            .with_context(|| format!("Submodule not found: {path}"))?;
         // Create update options
         let mut update_opts = git2::SubmoduleUpdateOptions::new();
         update_opts.allow_fetch(true);
@@ -432,7 +428,7 @@ impl GitOperations for Git2Operations {
 
         if submodule_path.exists() {
             std::fs::remove_dir_all(&submodule_path)
-                .with_context(|| format!("Failed to remove submodule directory: {}", path))?;
+                .with_context(|| format!("Failed to remove submodule directory: {path}"))?;
         }
         // 4. Remove from .gitmodules (this is complex with git2, might need manual file editing)
         // For now, we'll leave this to be handled by higher-level logic
@@ -442,7 +438,7 @@ impl GitOperations for Git2Operations {
         let submodule = self
             .repo
             .find_submodule(path)
-            .with_context(|| format!("Submodule not found: {}", path))?;
+            .with_context(|| format!("Submodule not found: {path}"))?;
         // git2 doesn't have a direct deinit method, so we need to:
         // 1. Remove the submodule's config entries
         // 2. Remove the submodule's working directory if force is true
@@ -450,10 +446,10 @@ impl GitOperations for Git2Operations {
         let name = submodule.name().unwrap_or(path);
         // Remove config entries
         let keys_to_remove = [
-            format!("submodule.{}.url", name),
-            format!("submodule.{}.active", name),
-            format!("submodule.{}.branch", name),
-            format!("submodule.{}.fetchRecurseSubmodules", name),
+            format!("submodule.{name}.url"),
+            format!("submodule.{name}.active"),
+            format!("submodule.{name}.branch"),
+            format!("submodule.{name}.fetchRecurseSubmodules"),
         ];
         for key in &keys_to_remove {
             let _ = config.remove(key); // Ignore errors if key doesn't exist
@@ -468,7 +464,7 @@ impl GitOperations for Git2Operations {
 
             if submodule_path.exists() {
                 std::fs::remove_dir_all(&submodule_path)
-                    .with_context(|| format!("Failed to remove submodule directory: {}", path))?;
+                    .with_context(|| format!("Failed to remove submodule directory: {path}"))?;
             }
         }
         Ok(())
@@ -477,9 +473,9 @@ impl GitOperations for Git2Operations {
         let submodule = self
             .repo
             .find_submodule(path)
-            .with_context(|| format!("Submodule not found: {}", path))?;
+            .with_context(|| format!("Submodule not found: {path}"))?;
         let name = submodule.name().unwrap_or(path).to_string();
-        let url = submodule.url().map(|u| u.to_string());
+        let url = submodule.url().map(std::string::ToString::to_string);
 
         // Get status
         let status = self
@@ -536,30 +532,30 @@ impl GitOperations for Git2Operations {
         let submodule = self
             .repo
             .find_submodule(path)
-            .with_context(|| format!("Submodule not found: {}", path))?;
+            .with_context(|| format!("Submodule not found: {path}"))?;
         // Open the submodule repository
         let sub_repo = submodule
             .open()
-            .with_context(|| format!("Failed to open submodule repository: {}", path))?;
+            .with_context(|| format!("Failed to open submodule repository: {path}"))?;
         // Find the origin remote
         let mut remote = sub_repo
             .find_remote("origin")
-            .with_context(|| format!("Failed to find origin remote for submodule: {}", path))?;
+            .with_context(|| format!("Failed to find origin remote for submodule: {path}"))?;
         // Fetch from origin
         remote
             .fetch(&[] as &[&str], None, None)
-            .with_context(|| format!("Failed to fetch submodule: {}", path))?;
+            .with_context(|| format!("Failed to fetch submodule: {path}"))?;
         Ok(())
     }
     fn reset_submodule(&self, path: &str, hard: bool) -> Result<()> {
         let submodule = self
             .repo
             .find_submodule(path)
-            .with_context(|| format!("Submodule not found: {}", path))?;
+            .with_context(|| format!("Submodule not found: {path}"))?;
         // Open the submodule repository
         let sub_repo = submodule
             .open()
-            .with_context(|| format!("Failed to open submodule repository: {}", path))?;
+            .with_context(|| format!("Failed to open submodule repository: {path}"))?;
         // Get HEAD commit
         let head = sub_repo.head()?;
         let commit = head.peel_to_commit()?;
@@ -570,19 +566,19 @@ impl GitOperations for Git2Operations {
             git2::ResetType::Soft
         };
         sub_repo
-            .reset(&commit.as_object(), reset_type, None)
-            .with_context(|| format!("Failed to reset submodule: {}", path))?;
+            .reset(commit.as_object(), reset_type, None)
+            .with_context(|| format!("Failed to reset submodule: {path}"))?;
         Ok(())
     }
     fn clean_submodule(&self, path: &str, force: bool, remove_directories: bool) -> Result<()> {
         let submodule = self
             .repo
             .find_submodule(path)
-            .with_context(|| format!("Submodule not found: {}", path))?;
+            .with_context(|| format!("Submodule not found: {path}"))?;
         // Open the submodule repository
         let sub_repo = submodule
             .open()
-            .with_context(|| format!("Failed to open submodule repository: {}", path))?;
+            .with_context(|| format!("Failed to open submodule repository: {path}"))?;
         // Get status to find untracked files
         let mut status_opts = git2::StatusOptions::new();
         status_opts.include_untracked(true);
@@ -590,8 +586,8 @@ impl GitOperations for Git2Operations {
         let statuses = sub_repo.statuses(Some(&mut status_opts))?;
         // Remove untracked files
         for entry in statuses.iter() {
-            if entry.status().is_wt_new() {
-                if let Some(file_path) = entry.path() {
+            if entry.status().is_wt_new()
+                && let Some(file_path) = entry.path() {
                     let full_path = sub_repo
                         .workdir()
                         .ok_or_else(|| anyhow::anyhow!("Submodule has no working directory"))?
@@ -602,15 +598,13 @@ impl GitOperations for Git2Operations {
                                 format!("Failed to remove file: {}", full_path.display())
                             })?;
                         }
-                    } else if full_path.is_dir() && remove_directories {
-                        if force {
+                    } else if full_path.is_dir() && remove_directories
+                        && force {
                             std::fs::remove_dir_all(&full_path).with_context(|| {
                                 format!("Failed to remove directory: {}", full_path.display())
                             })?;
                         }
-                    }
                 }
-            }
         }
         Ok(())
     }
@@ -618,11 +612,11 @@ impl GitOperations for Git2Operations {
         let submodule = self
             .repo
             .find_submodule(path)
-            .with_context(|| format!("Submodule not found: {}", path))?;
+            .with_context(|| format!("Submodule not found: {path}"))?;
         // Open the submodule repository
         let mut sub_repo = submodule
             .open()
-            .with_context(|| format!("Failed to open submodule repository: {}", path))?;
+            .with_context(|| format!("Failed to open submodule repository: {path}"))?;
         // Create stash
         let signature = sub_repo
             .signature()
@@ -633,49 +627,48 @@ impl GitOperations for Git2Operations {
         }
         sub_repo
             .stash_save(&signature, "submod stash", Some(stash_flags))
-            .with_context(|| format!("Failed to stash changes in submodule: {}", path))?;
+            .with_context(|| format!("Failed to stash changes in submodule: {path}"))?;
         Ok(())
     }
     fn enable_sparse_checkout(&self, path: &str) -> Result<()> {
         let submodule = self
             .repo
             .find_submodule(path)
-            .with_context(|| format!("Submodule not found: {}", path))?;
+            .with_context(|| format!("Submodule not found: {path}"))?;
         // Open the submodule repository
         let sub_repo = submodule
             .open()
-            .with_context(|| format!("Failed to open submodule repository: {}", path))?;
+            .with_context(|| format!("Failed to open submodule repository: {path}"))?;
         // Enable sparse checkout in config
         let mut config = sub_repo.config()?;
         config
             .set_bool("core.sparseCheckout", true)
-            .with_context(|| format!("Failed to enable sparse checkout for submodule: {}", path))?;
+            .with_context(|| format!("Failed to enable sparse checkout for submodule: {path}"))?;
         Ok(())
     }
     fn set_sparse_patterns(&self, path: &str, patterns: &[String]) -> Result<()> {
         let submodule = self
             .repo
             .find_submodule(path)
-            .with_context(|| format!("Submodule not found: {}", path))?;
+            .with_context(|| format!("Submodule not found: {path}"))?;
         // Open the submodule repository
         let sub_repo = submodule
             .open()
-            .with_context(|| format!("Failed to open submodule repository: {}", path))?;
+            .with_context(|| format!("Failed to open submodule repository: {path}"))?;
         // Write patterns to .git/info/sparse-checkout
         let git_dir = sub_repo.path();
         let sparse_checkout_file = git_dir.join("info").join("sparse-checkout");
         // Create info directory if it doesn't exist
         if let Some(parent) = sparse_checkout_file.parent() {
             std::fs::create_dir_all(parent).with_context(|| {
-                format!("Failed to create info directory for submodule: {}", path)
+                format!("Failed to create info directory for submodule: {path}")
             })?;
         }
         // Write patterns
         let content = patterns.join("\n");
         std::fs::write(&sparse_checkout_file, content).with_context(|| {
             format!(
-                "Failed to write sparse checkout patterns for submodule: {}",
-                path
+                "Failed to write sparse checkout patterns for submodule: {path}"
             )
         })?;
         Ok(())
@@ -684,11 +677,11 @@ impl GitOperations for Git2Operations {
         let submodule = self
             .repo
             .find_submodule(path)
-            .with_context(|| format!("Submodule not found: {}", path))?;
+            .with_context(|| format!("Submodule not found: {path}"))?;
         // Open the submodule repository
         let sub_repo = submodule
             .open()
-            .with_context(|| format!("Failed to open submodule repository: {}", path))?;
+            .with_context(|| format!("Failed to open submodule repository: {path}"))?;
         // Read patterns from .git/info/sparse-checkout
         let git_dir = sub_repo.path();
         let sparse_checkout_file = git_dir.join("info").join("sparse-checkout");
@@ -697,15 +690,14 @@ impl GitOperations for Git2Operations {
         }
         let content = std::fs::read_to_string(&sparse_checkout_file).with_context(|| {
             format!(
-                "Failed to read sparse checkout patterns for submodule: {}",
-                path
+                "Failed to read sparse checkout patterns for submodule: {path}"
             )
         })?;
         let patterns = content
             .lines()
-            .map(|line| line.trim())
+            .map(str::trim)
             .filter(|line| !line.is_empty() && !line.starts_with('#'))
-            .map(|line| line.to_string())
+            .map(std::string::ToString::to_string)
             .collect();
         Ok(patterns)
     }
@@ -725,11 +717,11 @@ impl Git2Operations {
         let submodule = self
             .repo
             .find_submodule(path)
-            .with_context(|| format!("Submodule not found: {}", path))?;
+            .with_context(|| format!("Submodule not found: {path}"))?;
         // Open the submodule repository
         let sub_repo = submodule
             .open()
-            .with_context(|| format!("Failed to open submodule repository: {}", path))?;
+            .with_context(|| format!("Failed to open submodule repository: {path}"))?;
         // Check if sparse checkout is enabled
         let config = sub_repo.config()?;
         let sparse_enabled = config.get_bool("core.sparseCheckout").unwrap_or(false);

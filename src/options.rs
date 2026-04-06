@@ -7,7 +7,7 @@
 //!
 //! These types mirror similar types in `gix_submodule`, and to a lesser extent, `git2`. They represent git's configuration options for submodules.
 //!
-//! - SerializableIgnore, SerializableFetchRecurse, SerializableBranch, SerializableUpdate
+//! - `SerializableIgnore`, `SerializableFetchRecurse`, `SerializableBranch`, `SerializableUpdate`
 //!
 //! Each enum implements conversion traits to and from the corresponding types in `gix_submodule` and `git2` (where applicable).
 //!
@@ -40,7 +40,7 @@ pub enum ConfigLevel {
 pub trait GitmodulesConvert {
     /// Get the git key for a submodule by the submodule's name (in git config)
     fn gitmodules_key_path(&self, name: &str) -> String {
-        format!("submodule.{name}.{}", self.gitmodules_key()).to_string()
+        format!("submodule.{name}.{}", self.gitmodules_key())
     }
 
     /// Get the git key for the enum setting
@@ -51,7 +51,7 @@ pub trait GitmodulesConvert {
         format!(
             "{}={}",
             self.gitmodules_key(),
-            self.gitmodules_key_path(&name)
+            self.gitmodules_key_path(name)
         )
     }
 
@@ -137,29 +137,29 @@ pub enum SerializableIgnore {
 
 impl GitmodulesConvert for SerializableIgnore {
     /// Get the git key for the ignore submodule setting
-    fn gitmodules_key(&self) -> &str {
+    fn gitmodules_key(&self) -> &'static str {
         "ignore"
     }
 
     /// Convert to gitmodules string (what you would get from the .gitmodules or .git/config)
     fn to_gitmodules(&self) -> String {
         match self {
-            SerializableIgnore::All => "all".to_string(),
-            SerializableIgnore::Dirty => "dirty".to_string(),
-            SerializableIgnore::Untracked => "untracked".to_string(),
-            SerializableIgnore::None => "none".to_string(),
-            SerializableIgnore::Unspecified => "".to_string(), // Unspecified is treated as an empty string
+            Self::All => "all".to_string(),
+            Self::Dirty => "dirty".to_string(),
+            Self::Untracked => "untracked".to_string(),
+            Self::None => "none".to_string(),
+            Self::Unspecified => String::new(), // Unspecified is treated as an empty string
         }
     }
 
     /// Convert from gitmodules string (what you would get from the .gitmodules or .git/config)
     fn from_gitmodules(options: &str) -> Result<Self, ()> {
         match options {
-            "all" => Ok(SerializableIgnore::All),
-            "dirty" => Ok(SerializableIgnore::Dirty),
-            "untracked" => Ok(SerializableIgnore::Untracked),
-            "none" => Ok(SerializableIgnore::None), // Default is None
-            "" => Ok(SerializableIgnore::Unspecified), // Empty string is treated as unspecified
+            "all" => Ok(Self::All),
+            "dirty" => Ok(Self::Dirty),
+            "untracked" => Ok(Self::Untracked),
+            "none" => Ok(Self::None), // Default is None
+            "" => Ok(Self::Unspecified), // Empty string is treated as unspecified
             _ => Err(()),                           // Handle unsupported options
         }
     }
@@ -174,12 +174,12 @@ impl GitmodulesConvert for SerializableIgnore {
 impl OptionsChecks for SerializableIgnore {
     /// Check if the enum is unspecified
     fn is_unspecified(&self) -> bool {
-        matches!(self, SerializableIgnore::Unspecified)
+        matches!(self, Self::Unspecified)
     }
 
     /// Check if the enum is the default value
     fn is_default(&self) -> bool {
-        matches!(self, SerializableIgnore::None)
+        matches!(self, Self::None)
     }
 }
 
@@ -188,12 +188,12 @@ impl GixGit2Convert for SerializableIgnore {
     type GixType = gix_submodule::config::Ignore;
     /// Convert from a `git2` type to a `gix_submodule` type
     fn from_git2(git2: Self::Git2Type) -> Result<Self, ()> {
-        Self::try_from(git2).map_err(|_| ()) // Handle unsupported variants
+        Self::try_from(git2) // Handle unsupported variants
     }
 
     /// Convert from a `gix_submodule` type to a `submod` type
     fn from_gix(gix: Self::GixType) -> Result<Self, ()> {
-        Self::try_from(gix).map_err(|_| ()) // Handle unsupported variants
+        Self::try_from(gix) // Handle unsupported variants
     }
 }
 
@@ -202,11 +202,11 @@ impl TryFrom<SerializableIgnore> for Git2SubmoduleIgnore {
 
     fn try_from(value: SerializableIgnore) -> Result<Self, Self::Error> {
         Ok(match value {
-            SerializableIgnore::All => Git2SubmoduleIgnore::All,
-            SerializableIgnore::Dirty => Git2SubmoduleIgnore::Dirty,
-            SerializableIgnore::Untracked => Git2SubmoduleIgnore::Untracked,
-            SerializableIgnore::None => Git2SubmoduleIgnore::None,
-            SerializableIgnore::Unspecified => Git2SubmoduleIgnore::Unspecified,
+            SerializableIgnore::All => Self::All,
+            SerializableIgnore::Dirty => Self::Dirty,
+            SerializableIgnore::Untracked => Self::Untracked,
+            SerializableIgnore::None => Self::None,
+            SerializableIgnore::Unspecified => Self::Unspecified,
             _ => return Err(()), // Handle unsupported variants
         })
     }
@@ -217,11 +217,11 @@ impl TryFrom<Git2SubmoduleIgnore> for SerializableIgnore {
 
     fn try_from(value: Git2SubmoduleIgnore) -> Result<Self, Self::Error> {
         Ok(match value {
-            Git2SubmoduleIgnore::All => SerializableIgnore::All,
-            Git2SubmoduleIgnore::Dirty => SerializableIgnore::Dirty,
-            Git2SubmoduleIgnore::Untracked => SerializableIgnore::Untracked,
-            Git2SubmoduleIgnore::None => SerializableIgnore::None,
-            Git2SubmoduleIgnore::Unspecified => SerializableIgnore::Unspecified,
+            Git2SubmoduleIgnore::All => Self::All,
+            Git2SubmoduleIgnore::Dirty => Self::Dirty,
+            Git2SubmoduleIgnore::Untracked => Self::Untracked,
+            Git2SubmoduleIgnore::None => Self::None,
+            Git2SubmoduleIgnore::Unspecified => Self::Unspecified,
             _ => return Err(()), // Handle unsupported variants
         })
     }
@@ -232,10 +232,10 @@ impl TryFrom<Ignore> for SerializableIgnore {
 
     fn try_from(value: Ignore) -> Result<Self, Self::Error> {
         Ok(match value {
-            Ignore::All => SerializableIgnore::All,
-            Ignore::Dirty => SerializableIgnore::Dirty,
-            Ignore::Untracked => SerializableIgnore::Untracked,
-            Ignore::None => SerializableIgnore::None,
+            Ignore::All => Self::All,
+            Ignore::Dirty => Self::Dirty,
+            Ignore::Untracked => Self::Untracked,
+            Ignore::None => Self::None,
             _ => return Err(()), // Handle unsupported variants
         })
     }
@@ -245,10 +245,10 @@ impl TryFrom<SerializableIgnore> for Ignore {
 
     fn try_from(value: SerializableIgnore) -> Result<Self, Self::Error> {
         Ok(match value {
-            SerializableIgnore::All => Ignore::All,
-            SerializableIgnore::Dirty => Ignore::Dirty,
-            SerializableIgnore::Untracked => Ignore::Untracked,
-            SerializableIgnore::None | SerializableIgnore::Unspecified => Ignore::None,
+            SerializableIgnore::All => Self::All,
+            SerializableIgnore::Dirty => Self::Dirty,
+            SerializableIgnore::Untracked => Self::Untracked,
+            SerializableIgnore::None | SerializableIgnore::Unspecified => Self::None,
             _ => return Err(()),
         })
     }
@@ -292,28 +292,28 @@ pub enum SerializableFetchRecurse {
 
 impl GitmodulesConvert for SerializableFetchRecurse {
     /// Get the git key for the fetch recurse submodule setting
-    fn gitmodules_key(&self) -> &str {
+    fn gitmodules_key(&self) -> &'static str {
         "fetchRecurseSubmodules"
     }
 
     /// Convert to gitmodules string (what you would get from the .gitmodules or .git/config)
     fn to_gitmodules(&self) -> String {
         match self {
-            SerializableFetchRecurse::OnDemand | SerializableFetchRecurse::Unspecified => {
+            Self::OnDemand | Self::Unspecified => {
                 "on-demand".to_string()
             }
-            SerializableFetchRecurse::Always => "true".to_string(),
-            SerializableFetchRecurse::Never => "false".to_string(),
+            Self::Always => "true".to_string(),
+            Self::Never => "false".to_string(),
         }
     }
 
     /// Convert from gitmodules string (what you would get from the .gitmodules or .git/config)
     fn from_gitmodules(options: &str) -> Result<Self, ()> {
         match options {
-            "on-demand" => Ok(SerializableFetchRecurse::OnDemand), // Default is OnDemand
-            "true" => Ok(SerializableFetchRecurse::Always),
-            "false" => Ok(SerializableFetchRecurse::Never),
-            "" => Ok(SerializableFetchRecurse::Unspecified), // Empty string is treated as unspecified
+            "on-demand" => Ok(Self::OnDemand), // Default is OnDemand
+            "true" => Ok(Self::Always),
+            "false" => Ok(Self::Never),
+            "" => Ok(Self::Unspecified), // Empty string is treated as unspecified
             _ => Err(()),                                    // Handle unsupported options
         }
     }
@@ -328,12 +328,12 @@ impl GitmodulesConvert for SerializableFetchRecurse {
 impl OptionsChecks for SerializableFetchRecurse {
     /// Check if the enum is unspecified
     fn is_unspecified(&self) -> bool {
-        matches!(self, SerializableFetchRecurse::Unspecified)
+        matches!(self, Self::Unspecified)
     }
 
     /// Check if the enum is the default value
     fn is_default(&self) -> bool {
-        matches!(self, SerializableFetchRecurse::OnDemand)
+        matches!(self, Self::OnDemand)
     }
 }
 
@@ -342,12 +342,12 @@ impl GixGit2Convert for SerializableFetchRecurse {
     type GixType = gix_submodule::config::FetchRecurse;
     /// Convert from a `git2` type to a `gix_submodule` type
     fn from_git2(git2: Self::Git2Type) -> Result<Self, ()> {
-        Self::from_gitmodules(git2.as_str()).map_err(|_| ()) // Handle unsupported variants
+        Self::from_gitmodules(git2.as_str()) // Handle unsupported variants
     }
 
     /// Convert from a `gix_submodule` type to a `submod` type
     fn from_gix(gix: Self::GixType) -> Result<Self, ()> {
-        Self::try_from(gix).map_err(|_| ()) // Handle unsupported variants
+        Self::try_from(gix) // Handle unsupported variants
     }
 }
 
@@ -356,9 +356,9 @@ impl TryFrom<FetchRecurse> for SerializableFetchRecurse {
 
     fn try_from(value: FetchRecurse) -> Result<Self, Self::Error> {
         Ok(match value {
-            FetchRecurse::OnDemand => SerializableFetchRecurse::OnDemand,
-            FetchRecurse::Always => SerializableFetchRecurse::Always,
-            FetchRecurse::Never => SerializableFetchRecurse::Never,
+            FetchRecurse::OnDemand => Self::OnDemand,
+            FetchRecurse::Always => Self::Always,
+            FetchRecurse::Never => Self::Never,
             _ => return Err(()), // Handle unsupported variants
         })
     }
@@ -370,10 +370,10 @@ impl TryFrom<SerializableFetchRecurse> for FetchRecurse {
     fn try_from(value: SerializableFetchRecurse) -> Result<Self, Self::Error> {
         Ok(match value {
             SerializableFetchRecurse::OnDemand | SerializableFetchRecurse::Unspecified => {
-                FetchRecurse::OnDemand
+                Self::OnDemand
             }
-            SerializableFetchRecurse::Always => FetchRecurse::Always,
-            SerializableFetchRecurse::Never => FetchRecurse::Never,
+            SerializableFetchRecurse::Always => Self::Always,
+            SerializableFetchRecurse::Never => Self::Never,
             _ => return Err(()), // Handle unsupported variants
         })
     }
@@ -413,9 +413,9 @@ impl<'de> Deserialize<'de> for SerializableBranch {
         // "current-in-superproject" in addition to the spellings handled
         // by `from_gitmodules`.
         if s == "current-in-superproject" {
-            return Ok(SerializableBranch::CurrentInSuperproject);
+            return Ok(Self::CurrentInSuperproject);
         }
-        SerializableBranch::from_gitmodules(&s).map_err(|_| {
+        Self::from_gitmodules(&s).map_err(|()| {
             serde::de::Error::custom(format!(
                 "invalid branch value: {s:?}; expected \".\", \"current\", \"current-in-super-project\", \"superproject\", \"super\", or a non-empty, non-whitespace branch name"
             ))
@@ -437,15 +437,15 @@ impl SerializableBranch {
 
 impl GitmodulesConvert for SerializableBranch {
     /// Get the git key for the branch submodule setting
-    fn gitmodules_key(&self) -> &str {
+    fn gitmodules_key(&self) -> &'static str {
         "branch"
     }
 
     /// Convert to gitmodules string (what you would get from the .gitmodules or .git/config)
     fn to_gitmodules(&self) -> String {
         match self {
-            SerializableBranch::CurrentInSuperproject => ".".to_string(),
-            SerializableBranch::Name(name) => name.to_string(),
+            Self::CurrentInSuperproject => ".".to_string(),
+            Self::Name(name) => name.to_string(),
         }
     }
 
@@ -457,13 +457,13 @@ impl GitmodulesConvert for SerializableBranch {
             || options == "superproject"
             || options == "super"
         {
-            return Ok(SerializableBranch::CurrentInSuperproject);
+            return Ok(Self::CurrentInSuperproject);
         }
         let trimmed = options.trim();
         if trimmed.is_empty() {
             return Err(());
         }
-        Ok(SerializableBranch::Name(trimmed.to_string()))
+        Ok(Self::Name(trimmed.to_string()))
     }
 
     /// Convert from gitmodules bytes (what you would get from the .gitmodules or .git/config)
@@ -478,8 +478,8 @@ impl TryFrom<Branch> for SerializableBranch {
 
     fn try_from(value: Branch) -> Result<Self, Self::Error> {
         Ok(match value {
-            Branch::CurrentInSuperproject => SerializableBranch::CurrentInSuperproject,
-            Branch::Name(name) => SerializableBranch::Name(name.to_string()),
+            Branch::CurrentInSuperproject => Self::CurrentInSuperproject,
+            Branch::Name(name) => Self::Name(name.to_string()),
             _ => return Err(()), // Handle unsupported variants
         })
     }
@@ -490,8 +490,8 @@ impl TryFrom<SerializableBranch> for Branch {
 
     fn try_from(value: SerializableBranch) -> Result<Self, Self::Error> {
         Ok(match value {
-            SerializableBranch::CurrentInSuperproject => Branch::CurrentInSuperproject,
-            SerializableBranch::Name(name) => Branch::Name(name.to_string().as_bytes().into()),
+            SerializableBranch::CurrentInSuperproject => Self::CurrentInSuperproject,
+            SerializableBranch::Name(name) => Self::Name(name.as_bytes().into()),
             _ => return Err(()), // Handle unsupported variants
         })
     }
@@ -500,8 +500,8 @@ impl TryFrom<SerializableBranch> for Branch {
 impl std::fmt::Display for SerializableBranch {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            SerializableBranch::CurrentInSuperproject => write!(f, "."),
-            SerializableBranch::Name(name) => write!(f, "{}", name),
+            Self::CurrentInSuperproject => write!(f, "."),
+            Self::Name(name) => write!(f, "{name}"),
         }
     }
 }
@@ -516,17 +516,17 @@ impl FromStr for SerializableBranch {
             || s == "superproject"
             || s == "super"
         {
-            return Ok(SerializableBranch::CurrentInSuperproject);
+            return Ok(Self::CurrentInSuperproject);
         }
-        Ok(SerializableBranch::Name(s.to_string()))
+        Ok(Self::Name(s.to_string()))
     }
 }
 
 impl Default for SerializableBranch {
     fn default() -> Self {
         let default_branch = gix_submodule::config::Branch::default();
-        SerializableBranch::try_from(default_branch)
-            .unwrap_or_else(|_| SerializableBranch::Name("main".to_string()))
+        Self::try_from(default_branch)
+            .unwrap_or_else(|()| Self::Name("main".to_string()))
     }
 }
 
@@ -535,18 +535,18 @@ impl SerializableBranch {
     /// Parse an optional branch string into a `SerializableBranch`, defaulting to the repo's current branch.
     pub fn set_branch(branch: Option<String>) -> Result<Self, anyhow::Error> {
         let branch = if let Some(b) = branch {
-            if !b.is_empty() {
-                Some(
-                    SerializableBranch::from_str(b.trim())
-                        .map_err(|_| anyhow::anyhow!("Invalid branch string")),
-                )
+            if b.is_empty() {
+                Some(Ok(Self::default()))
             } else {
-                Some(Ok(SerializableBranch::default()))
+                Some(
+                    Self::from_str(b.trim())
+                        .map_err(|()| anyhow::anyhow!("Invalid branch string")),
+                )
             }
         } else {
-            Some(Ok(SerializableBranch::default()))
+            Some(Ok(Self::default()))
         };
-        branch.unwrap_or_else(|| Ok(SerializableBranch::default()))
+        branch.unwrap_or_else(|| Ok(Self::default()))
     }
 }
 
@@ -555,12 +555,12 @@ impl GixGit2Convert for SerializableBranch {
     type GixType = gix_submodule::config::Branch;
     /// Convert from a `git2` type to a `gix_submodule` type
     fn from_git2(git2: Self::Git2Type) -> Result<Self, ()> {
-        Self::from_gitmodules(git2.as_str()).map_err(|_| ()) // Handle unsupported variants
+        Self::from_gitmodules(git2.as_str()) // Handle unsupported variants
     }
 
     /// Convert from a `gix_submodule` type to a `submod` type
     fn from_gix(gix: Self::GixType) -> Result<Self, ()> {
-        Self::try_from(gix).map_err(|_| ()) // Handle unsupported variants
+        Self::try_from(gix) // Handle unsupported variants
     }
 }
 
@@ -588,40 +588,40 @@ pub enum SerializableUpdate {
 impl OptionsChecks for SerializableUpdate {
     /// Check if the enum is unspecified
     fn is_unspecified(&self) -> bool {
-        matches!(self, SerializableUpdate::Unspecified)
+        matches!(self, Self::Unspecified)
     }
 
     /// Check if the enum is the default value
     fn is_default(&self) -> bool {
-        matches!(self, SerializableUpdate::Checkout)
+        matches!(self, Self::Checkout)
     }
 }
 
 impl GitmodulesConvert for SerializableUpdate {
     /// Get the git key for the update submodule setting
-    fn gitmodules_key(&self) -> &str {
+    fn gitmodules_key(&self) -> &'static str {
         "update"
     }
 
     /// Convert to gitmodules string (what you would get from the .gitmodules or .git/config)
     fn to_gitmodules(&self) -> String {
         match self {
-            SerializableUpdate::Checkout => "checkout".to_string(),
-            SerializableUpdate::Rebase => "rebase".to_string(),
-            SerializableUpdate::Merge => "merge".to_string(),
-            SerializableUpdate::None => "none".to_string(),
-            SerializableUpdate::Unspecified => "".to_string(), // Unspecified is treated as an empty string
+            Self::Checkout => "checkout".to_string(),
+            Self::Rebase => "rebase".to_string(),
+            Self::Merge => "merge".to_string(),
+            Self::None => "none".to_string(),
+            Self::Unspecified => String::new(), // Unspecified is treated as an empty string
         }
     }
 
     /// Convert from gitmodules string (what you would get from the .gitmodules or .git/config)
     fn from_gitmodules(options: &str) -> Result<Self, ()> {
         match options {
-            "checkout" => Ok(SerializableUpdate::Checkout),
-            "rebase" => Ok(SerializableUpdate::Rebase),
-            "merge" => Ok(SerializableUpdate::Merge),
-            "none" => Ok(SerializableUpdate::None), // Default is None
-            "" => Ok(SerializableUpdate::Unspecified), // Empty string is treated as unspecified
+            "checkout" => Ok(Self::Checkout),
+            "rebase" => Ok(Self::Rebase),
+            "merge" => Ok(Self::Merge),
+            "none" => Ok(Self::None), // Default is None
+            "" => Ok(Self::Unspecified), // Empty string is treated as unspecified
             _ => Err(()),                           // Handle unsupported options
         }
     }
@@ -637,11 +637,11 @@ impl TryFrom<Git2SubmoduleUpdate> for SerializableUpdate {
     type Error = ();
     fn try_from(value: Git2SubmoduleUpdate) -> Result<Self, Self::Error> {
         Ok(match value {
-            Git2SubmoduleUpdate::Checkout => SerializableUpdate::Checkout,
-            Git2SubmoduleUpdate::Rebase => SerializableUpdate::Rebase,
-            Git2SubmoduleUpdate::Merge => SerializableUpdate::Merge,
-            Git2SubmoduleUpdate::None => SerializableUpdate::None,
-            Git2SubmoduleUpdate::Default => SerializableUpdate::Unspecified,
+            Git2SubmoduleUpdate::Checkout => Self::Checkout,
+            Git2SubmoduleUpdate::Rebase => Self::Rebase,
+            Git2SubmoduleUpdate::Merge => Self::Merge,
+            Git2SubmoduleUpdate::None => Self::None,
+            Git2SubmoduleUpdate::Default => Self::Unspecified,
             _ => return Err(()),
         })
     }
@@ -651,11 +651,11 @@ impl TryFrom<SerializableUpdate> for Git2SubmoduleUpdate {
     type Error = ();
     fn try_from(value: SerializableUpdate) -> Result<Self, Self::Error> {
         Ok(match value {
-            SerializableUpdate::Checkout => Git2SubmoduleUpdate::Checkout,
-            SerializableUpdate::Rebase => Git2SubmoduleUpdate::Rebase,
-            SerializableUpdate::Merge => Git2SubmoduleUpdate::Merge,
-            SerializableUpdate::None => Git2SubmoduleUpdate::None,
-            SerializableUpdate::Unspecified => Git2SubmoduleUpdate::Default,
+            SerializableUpdate::Checkout => Self::Checkout,
+            SerializableUpdate::Rebase => Self::Rebase,
+            SerializableUpdate::Merge => Self::Merge,
+            SerializableUpdate::None => Self::None,
+            SerializableUpdate::Unspecified => Self::Default,
             _ => return Err(()), // Handle unsupported variants
         })
     }
@@ -665,12 +665,12 @@ impl TryFrom<Update> for SerializableUpdate {
     type Error = ();
     fn try_from(value: Update) -> Result<Self, Self::Error> {
         Ok(match value {
-            Update::Checkout => SerializableUpdate::Checkout,
-            Update::Rebase => SerializableUpdate::Rebase,
-            Update::Merge => SerializableUpdate::Merge,
-            Update::None => SerializableUpdate::None,
+            Update::Checkout => Self::Checkout,
+            Update::Rebase => Self::Rebase,
+            Update::Merge => Self::Merge,
+            Update::None => Self::None,
             // Commands are not directly serializable, and can't be defined in .gitmodules, so we use unspecified. `gix` has it as a variant because it can be provided by library call.
-            Update::Command(_cmd) => SerializableUpdate::Unspecified,
+            Update::Command(_cmd) => Self::Unspecified,
             _ => return Err(()),
         })
     }
@@ -679,10 +679,10 @@ impl TryFrom<SerializableUpdate> for Update {
     type Error = ();
     fn try_from(value: SerializableUpdate) -> Result<Self, Self::Error> {
         Ok(match value {
-            SerializableUpdate::Checkout | SerializableUpdate::Unspecified => Update::Checkout,
-            SerializableUpdate::Rebase => Update::Rebase,
-            SerializableUpdate::Merge => Update::Merge,
-            SerializableUpdate::None => Update::None,
+            SerializableUpdate::Checkout | SerializableUpdate::Unspecified => Self::Checkout,
+            SerializableUpdate::Rebase => Self::Rebase,
+            SerializableUpdate::Merge => Self::Merge,
+            SerializableUpdate::None => Self::None,
 
             _ => return Err(()), // Handle unsupported variants
         })
@@ -700,12 +700,12 @@ impl GixGit2Convert for SerializableUpdate {
     type GixType = gix_submodule::config::Update;
     /// Convert from a `git2` type to a `gix_submodule` type
     fn from_git2(git2: Self::Git2Type) -> Result<Self, ()> {
-        Self::try_from(git2).map_err(|_| ()) // Handle unsupported variants
+        Self::try_from(git2) // Handle unsupported variants
     }
 
     /// Convert from a `gix_submodule` type to a `submod` type
     fn from_gix(gix: Self::GixType) -> Result<Self, ()> {
-        Self::try_from(gix).map_err(|_| ()) // Handle unsupported variants
+        Self::try_from(gix) // Handle unsupported variants
     }
 }
 
@@ -734,7 +734,10 @@ mod tests {
 
         // Whitespace-only string should be rejected
         let res_ws: Result<Helper, toml::de::Error> = toml::from_str(r#"branch = "   ""#);
-        assert!(res_ws.is_err(), "expected error for whitespace-only branch value");
+        assert!(
+            res_ws.is_err(),
+            "expected error for whitespace-only branch value"
+        );
         let err_ws = res_ws.unwrap_err().to_string();
         assert!(
             err_ws.contains("invalid branch value"),

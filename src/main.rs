@@ -2,7 +2,6 @@
 //
 // SPDX-License-Identifier: LicenseRef-PlainMIT OR MIT
 #![cfg_attr(coverage_nightly, feature(coverage_attribute))]
-
 #![doc = r"
 Main entry point for the submod CLI tool.
 
@@ -60,23 +59,23 @@ fn main() -> Result<()> {
         } => {
             // Validate sparse paths for null bytes
             let sparse_paths_vec = get_sparse_paths(sparse_paths)
-                .map_err(|e| anyhow::anyhow!("Invalid sparse paths: {}", e))?;
+                .map_err(|e| anyhow::anyhow!("Invalid sparse paths: {e}"))?;
 
             let set_name = get_name(name, Some(url.clone()), path.clone())
-                .map_err(|e| anyhow::anyhow!("Failed to get submodule name: {}", e))?;
+                .map_err(|e| anyhow::anyhow!("Failed to get submodule name: {e}"))?;
 
             let set_path = path
-                .map(|p| set_path(p).map_err(|e| anyhow::anyhow!("Invalid path: {}", e)))
+                .map(|p| set_path(p).map_err(|e| anyhow::anyhow!("Invalid path: {e}")))
                 .transpose()?
                 .unwrap_or_else(|| set_name.clone());
 
             let set_url = url.trim().to_string();
 
             let set_branch = Branch::set_branch(branch)
-                .map_err(|e| anyhow::anyhow!("Failed to set branch: {}", e))?;
+                .map_err(|e| anyhow::anyhow!("Failed to set branch: {e}"))?;
 
             let mut manager = GitManager::with_verbose(config_path, verbose)
-                .map_err(|e| anyhow::anyhow!("Failed to create manager: {}", e))?;
+                .map_err(|e| anyhow::anyhow!("Failed to create manager: {e}"))?;
 
             manager
                 .add_submodule(
@@ -92,18 +91,18 @@ fn main() -> Result<()> {
                     no_init,
                     use_git_default_sparse_checkout,
                 )
-                .map_err(|e| anyhow::anyhow!("Failed to add submodule: {}", e))?;
+                .map_err(|e| anyhow::anyhow!("Failed to add submodule: {e}"))?;
         }
         Commands::Check => {
             let manager = GitManager::with_verbose(config_path, verbose)
-                .map_err(|e| anyhow::anyhow!("Failed to create manager: {}", e))?;
+                .map_err(|e| anyhow::anyhow!("Failed to create manager: {e}"))?;
             manager
                 .check_all_submodules()
-                .map_err(|e| anyhow::anyhow!("Failed to check submodules: {}", e))?;
+                .map_err(|e| anyhow::anyhow!("Failed to check submodules: {e}"))?;
         }
         Commands::Init => {
             let mut manager = GitManager::with_verbose(config_path, verbose)
-                .map_err(|e| anyhow::anyhow!("Failed to create manager: {}", e))?;
+                .map_err(|e| anyhow::anyhow!("Failed to create manager: {e}"))?;
 
             // Collect names first to avoid borrow conflict
             let names: Vec<String> = manager
@@ -114,12 +113,12 @@ fn main() -> Result<()> {
             for name in &names {
                 manager
                     .init_submodule(name)
-                    .map_err(|e| anyhow::anyhow!("Failed to init submodule {}: {}", name, e))?;
+                    .map_err(|e| anyhow::anyhow!("Failed to init submodule {name}: {e}"))?;
             }
         }
         Commands::Update => {
             let mut manager = GitManager::with_verbose(config_path, verbose)
-                .map_err(|e| anyhow::anyhow!("Failed to create manager: {}", e))?;
+                .map_err(|e| anyhow::anyhow!("Failed to create manager: {e}"))?;
 
             // Collect names first to avoid borrow conflict
             let names: Vec<String> = manager
@@ -133,15 +132,15 @@ fn main() -> Result<()> {
                 let count = names.len();
                 for name in &names {
                     manager.update_submodule(name).map_err(|e| {
-                        anyhow::anyhow!("Failed to update submodule {}: {}", name, e)
+                        anyhow::anyhow!("Failed to update submodule {name}: {e}")
                     })?;
                 }
-                println!("Updated {} submodule(s)", count);
+                println!("Updated {count} submodule(s)");
             }
         }
         Commands::Reset { all, names } => {
             let mut manager = GitManager::with_verbose(config_path, verbose)
-                .map_err(|e| anyhow::anyhow!("Failed to create manager: {}", e))?;
+                .map_err(|e| anyhow::anyhow!("Failed to create manager: {e}"))?;
 
             let submodules_to_reset: Vec<String> = if all {
                 manager
@@ -162,12 +161,12 @@ fn main() -> Result<()> {
             for name in submodules_to_reset {
                 manager
                     .reset_submodule(&name)
-                    .map_err(|e| anyhow::anyhow!("Failed to reset submodule {}: {}", name, e))?;
+                    .map_err(|e| anyhow::anyhow!("Failed to reset submodule {name}: {e}"))?;
             }
         }
         Commands::Sync => {
             let mut manager = GitManager::with_verbose(config_path, verbose)
-                .map_err(|e| anyhow::anyhow!("Failed to create manager: {}", e))?;
+                .map_err(|e| anyhow::anyhow!("Failed to create manager: {e}"))?;
 
             let start = std::time::Instant::now();
 
@@ -193,18 +192,18 @@ fn main() -> Result<()> {
             // Run check, init, and update in sequence
             manager
                 .check_all_submodules()
-                .map_err(|e| anyhow::anyhow!("Failed to check submodules: {}", e))?;
+                .map_err(|e| anyhow::anyhow!("Failed to check submodules: {e}"))?;
 
             for name in &names {
                 manager
                     .init_submodule(name)
-                    .map_err(|e| anyhow::anyhow!("Failed to init submodule {}: {}", name, e))?;
+                    .map_err(|e| anyhow::anyhow!("Failed to init submodule {name}: {e}"))?;
             }
 
             for name in &names {
                 manager
                     .update_submodule(name)
-                    .map_err(|e| anyhow::anyhow!("Failed to update submodule {}: {}", name, e))?;
+                    .map_err(|e| anyhow::anyhow!("Failed to update submodule {name}: {e}"))?;
             }
 
             let elapsed = start.elapsed();
@@ -226,7 +225,7 @@ fn main() -> Result<()> {
             active,
         } => {
             let mut manager = GitManager::with_verbose(config_path, verbose)
-                .map_err(|e| anyhow::anyhow!("Failed to create manager: {}", e))?;
+                .map_err(|e| anyhow::anyhow!("Failed to create manager: {e}"))?;
             manager
                 .change_submodule(
                     &name,
@@ -242,7 +241,7 @@ fn main() -> Result<()> {
                     active,
                     use_git_default_sparse_checkout,
                 )
-                .map_err(|e| anyhow::anyhow!("Failed to change submodule: {}", e))?;
+                .map_err(|e| anyhow::anyhow!("Failed to change submodule: {e}"))?;
         }
         Commands::ChangeGlobal {
             ignore,
@@ -251,31 +250,31 @@ fn main() -> Result<()> {
             use_git_default_sparse_checkout,
         } => {
             let mut manager = GitManager::with_verbose(config_path, verbose)
-                .map_err(|e| anyhow::anyhow!("Failed to create manager: {}", e))?;
+                .map_err(|e| anyhow::anyhow!("Failed to create manager: {e}"))?;
             manager
                 .update_global_defaults(ignore, fetch, update, use_git_default_sparse_checkout)
-                .map_err(|e| anyhow::anyhow!("Failed to update global settings: {}", e))?;
+                .map_err(|e| anyhow::anyhow!("Failed to update global settings: {e}"))?;
         }
         Commands::List { recursive } => {
             let manager = GitManager::with_verbose(config_path, verbose)
-                .map_err(|e| anyhow::anyhow!("Failed to create manager: {}", e))?;
+                .map_err(|e| anyhow::anyhow!("Failed to create manager: {e}"))?;
             manager
                 .list_submodules(recursive)
-                .map_err(|e| anyhow::anyhow!("Failed to list submodules: {}", e))?;
+                .map_err(|e| anyhow::anyhow!("Failed to list submodules: {e}"))?;
         }
         Commands::Delete { name } => {
             let mut manager = GitManager::with_verbose(config_path, verbose)
-                .map_err(|e| anyhow::anyhow!("Failed to create manager: {}", e))?;
+                .map_err(|e| anyhow::anyhow!("Failed to create manager: {e}"))?;
             manager
                 .delete_submodule_by_name(&name)
-                .map_err(|e| anyhow::anyhow!("Failed to delete submodule: {}", e))?;
+                .map_err(|e| anyhow::anyhow!("Failed to delete submodule: {e}"))?;
         }
         Commands::Disable { name } => {
             let mut manager = GitManager::with_verbose(config_path, verbose)
-                .map_err(|e| anyhow::anyhow!("Failed to create manager: {}", e))?;
+                .map_err(|e| anyhow::anyhow!("Failed to create manager: {e}"))?;
             manager
                 .disable_submodule(&name)
-                .map_err(|e| anyhow::anyhow!("Failed to disable submodule: {}", e))?;
+                .map_err(|e| anyhow::anyhow!("Failed to disable submodule: {e}"))?;
         }
         Commands::GenerateConfig {
             output,
@@ -284,14 +283,14 @@ fn main() -> Result<()> {
             template,
         } => {
             GitManager::generate_config(&output, from_setup.is_some(), template, force)
-                .map_err(|e| anyhow::anyhow!("Failed to generate config: {}", e))?;
+                .map_err(|e| anyhow::anyhow!("Failed to generate config: {e}"))?;
         }
         Commands::NukeItFromOrbit { all, names, kill } => {
             let mut manager = GitManager::with_verbose(config_path, verbose)
-                .map_err(|e| anyhow::anyhow!("Failed to create manager: {}", e))?;
+                .map_err(|e| anyhow::anyhow!("Failed to create manager: {e}"))?;
             manager
                 .nuke_submodules(all, names, kill)
-                .map_err(|e| anyhow::anyhow!("Failed to nuke submodules: {}", e))?;
+                .map_err(|e| anyhow::anyhow!("Failed to nuke submodules: {e}"))?;
         }
         Commands::CompleteMe { shell } => {
             let mut cmd = <Cli as clap::CommandFactory>::command();
