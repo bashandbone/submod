@@ -1881,3 +1881,106 @@ impl GitManager {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+    use tempfile::tempdir;
+
+
+    // Helper to create a dummy GitManager. We just need it to call check_sparse_checkout_status,
+    // which only uses `self.get_git_directory()`. It doesn't actually need the full config to be valid.
+    // Helper to create a dummy GitManager without needing a tempdir that gets dropped.
+    // It creates it pointing to the provided temp_dir.
+    fn create_dummy_manager(config_path: std::path::PathBuf) -> GitManager {
+        fs::write(&config_path, "[defaults]\n").unwrap();
+        GitManager::new(config_path).expect("Failed to create GitManager")
+    }
+
+    #[test]
+    fn test_sparse_checkout_not_configured() {
+        let temp_dir = tempdir().unwrap();
+        let submodule_path = temp_dir.path();
+
+        // Create .git directory but NO sparse-checkout file
+        let git_dir = submodule_path.join(".git");
+        fs::create_dir(&git_dir).unwrap();
+
+        // Create manager
+        let manager = create_dummy_manager(temp_dir.path().join("submod.toml"));
+
+        let expected_paths: Vec<String> = vec!["path/a".to_string()];
+
+        let status = manager
+            .check_sparse_checkout_status(submodule_path.to_str().unwrap(), &expected_paths)
+            .unwrap();
+
+        assert_eq!(status, SparseStatus::NotConfigured);
+    }
+
+    #[test]
+    fn test_sparse_checkout_correct() {
+        let temp_dir = tempdir().unwrap();
+        let submodule_path = temp_dir.path();
+
+        // Create .git/info/sparse-checkout file
+        let git_dir = submodule_path.join(".git");
+        let info_dir = git_dir.join("info");
+        fs::create_dir_all(&info_dir).unwrap();
+
+        let sparse_checkout_file = info_dir.join("sparse-checkout");
+        // Prepend SPARSE_DENY_ALL as handled in check_sparse_checkout_status
+        let content = format!("{}\npath/a\npath/b\n", SPARSE_DENY_ALL);
+        fs::write(&sparse_checkout_file, content).unwrap();
+
+        // Create manager
+        let manager = create_dummy_manager(temp_dir.path().join("submod.toml"));
+
+        let expected_paths: Vec<String> = vec![
+            "path/a".to_string(),
+            "path/b".to_string(),
+        ];
+
+        let status = manager
+            .check_sparse_checkout_status(submodule_path.to_str().unwrap(), &expected_paths)
+            .unwrap();
+
+        assert_eq!(status, SparseStatus::Correct);
+    }
+
+    #[test]
+    fn test_sparse_checkout_mismatch() {
+        let temp_dir = tempdir().unwrap();
+        let submodule_path = temp_dir.path();
+
+        // Create .git/info/sparse-checkout file
+        let git_dir = submodule_path.join(".git");
+        let info_dir = git_dir.join("info");
+        fs::create_dir_all(&info_dir).unwrap();
+
+        let sparse_checkout_file = info_dir.join("sparse-checkout");
+        let content = format!("{}\npath/a\n", SPARSE_DENY_ALL);
+        fs::write(&sparse_checkout_file, content).unwrap();
+
+        // Create manager
+        let manager = create_dummy_manager(temp_dir.path().join("submod.toml"));
+
+        let expected_paths: Vec<String> = vec![
+            "path/a".to_string(),
+            "path/b".to_string(), // This is expected but not configured
+        ];
+
+        let status = manager
+            .check_sparse_checkout_status(submodule_path.to_str().unwrap(), &expected_paths)
+            .unwrap();
+
+        match status {
+            SparseStatus::Mismatch { expected, actual } => {
+                assert_eq!(expected, vec!["path/a".to_string(), "path/b".to_string()]);
+                assert_eq!(actual, vec!["path/a".to_string()]);
+            }
+            _ => panic!("Expected Mismatch, got {:?}", status),
+        }
+    }
+}
