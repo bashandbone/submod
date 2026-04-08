@@ -414,6 +414,44 @@ mod git2_ops_tests {
         let config_content = std::fs::read_to_string(&config_path).expect("read git config");
         assert!(config_content.contains("active = false"), "submodule should be inactive in config");
     }
+
+    #[test]
+    fn test_with_submodule_write_gitmodules_active_none() {
+        let harness = TestHarness::new().expect("harness");
+        harness.init_git_repo().expect("init repo");
+        let remote = harness.create_test_remote("g2_write_sub_none").expect("remote");
+        let remote_url = format!("file://{}", remote.display());
+
+        harness
+            .run_submod_success(&[
+                "add",
+                &remote_url,
+                "--name",
+                "write-sub-none",
+                "--path",
+                "lib/writesubnone",
+            ])
+            .expect("add submodule");
+
+        let mut ops = Git2Operations::new(Some(&harness.work_dir)).expect("ops");
+        let mut entries = ops.read_gitmodules().expect("read_gitmodules");
+
+        let name = if entries.get("write-sub-none").is_some() {
+            "write-sub-none"
+        } else {
+            "lib/writesubnone"
+        };
+
+        if let Some(mut entry) = entries.get(name).cloned() {
+            entry.active = None;
+            entries.update_entry(name.to_string(), entry);
+        }
+        ops.write_gitmodules(&entries).expect("write_gitmodules active none");
+
+        let config_path = harness.work_dir.join(".git").join("config");
+        let config_content = std::fs::read_to_string(&config_path).expect("read git config");
+        assert!(!config_content.contains("active ="), "submodule active should be untouched");
+    }
 }
 
 // ============================================================
@@ -595,6 +633,23 @@ mod gix_ops_tests {
             content.contains("active = false"),
             ".gitmodules should contain active = false"
         );
+    }
+
+    #[test]
+    fn test_write_gitmodules_active_none() {
+        let harness = TestHarness::new().expect("harness");
+        harness.init_git_repo().expect("init repo");
+        let mut ops = GixOperations::new(Some(&harness.work_dir)).expect("ops");
+
+        let mut entries = one_entry_entries();
+        if let Some(mut entry) = entries.get("test-lib").cloned() {
+            entry.active = None;
+            entries.update_entry("test-lib".to_string(), entry);
+        }
+
+        ops.write_gitmodules(&entries).expect("write_gitmodules");
+        let content = std::fs::read_to_string(harness.work_dir.join(".gitmodules")).expect("read");
+        assert!(!content.contains("active ="));
     }
 
     #[test]

@@ -1515,13 +1515,10 @@ impl GitManager {
             };
 
             if let Some(gm_name) = gitmodules_name {
-                if let Some(mut gitmodules_entry) = entries.get(&gm_name).cloned() {
-                    gitmodules_entry.active = Some(false);
-                    entries.update_entry(gm_name, gitmodules_entry);
-                    if let Err(e) = self.git_ops.write_gitmodules(&entries) {
-                        eprintln!("Warning: Failed to update .gitmodules: {e}");
-                    }
-                }
+                let mut gitmodules_entry = entries.get(&gm_name).cloned().unwrap();
+                gitmodules_entry.active = Some(false);
+                entries.update_entry(gm_name, gitmodules_entry);
+                let _ = self.git_ops.write_gitmodules(&entries);
             }
         }
 
