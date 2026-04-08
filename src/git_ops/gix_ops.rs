@@ -194,6 +194,15 @@ impl GitOperations for GixOperations {
                         value.as_bytes().as_bstr(),
                     )?;
                 }
+                if let Some(active) = entry.active {
+                    let value = if active { "true" } else { "false" };
+                    git_config.set_raw_value_by(
+                        "submodule",
+                        Some(subsection_name),
+                        "active",
+                        value.as_bytes().as_bstr(),
+                    )?;
+                }
             }
 
             // Write to .gitmodules file

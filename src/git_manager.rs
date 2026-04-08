@@ -1502,6 +1502,17 @@ impl GitManager {
             .submodules
             .update_entry(name.to_string(), updated);
 
+        // Update .gitmodules
+        if let Ok(mut entries) = self.git_ops.read_gitmodules() {
+            if let Some(mut gitmodules_entry) = entries.get_submodule(name).cloned() {
+                gitmodules_entry.active = Some(false);
+                entries.update_entry(name.to_string(), gitmodules_entry);
+                if let Err(e) = self.git_ops.write_gitmodules(&entries) {
+                    eprintln!("Warning: Failed to update .gitmodules: {e}");
+                }
+            }
+        }
+
         self.write_full_config()?;
         println!("Disabled submodule '{name}'.");
         Ok(())
