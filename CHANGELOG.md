@@ -12,6 +12,28 @@ spellchecker:off
 We document all important changes below.
 
 Submod follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+## [0.3.0] - 2026-04-08
+### Bug Fixes
+
+- (**ci**) Resolve security audit job failure (#44)([`eed6371`](https://github.com/bashandbone/submod/commit/eed63718718fd003623f44c601a89d0b7dca7b08))
+
+- Formatting and linting fixes([`eac9410`](https://github.com/bashandbone/submod/commit/eac94101785396a481de35919901aab9da2c4c77))
+
+- Update schema version to 1.1.0 and improve code formatting([`43d9722`](https://github.com/bashandbone/submod/commit/43d97228c61c72e1745f756aebdb580835457983))
+
+- Remove invalid `#[serde(flatten)]` from branch deserialization test (#49)([`6791c3c`](https://github.com/bashandbone/submod/commit/6791c3c2fff842ae95905b0d573f5181e07186ce))
+
+### Features
+
+- Sparse checkout deny-all-by-default (modified cone pattern) with opt-out support (#48)([`216c28e`](https://github.com/bashandbone/submod/commit/216c28e283b697b29fa4cc903e930fec3586dc06))
+
+### Miscellaneous
+
+- (**schemas**) Update config schemas to reflect new sparse path handling and the `use_git_default_sparse_checkout` setting([`d0d6022`](https://github.com/bashandbone/submod/commit/d0d6022f51605fa3b605b56b85b3e6cbf9c28a05))
+
+- Update Cargo.toml to v0.3.0([`16bdfbe`](https://github.com/bashandbone/submod/commit/16bdfbea29d70ca1f9987421a770a0afca585b43))
+
+
 ## [0.2.7] - 2026-03-22
 ### Bug Fixes
 
