@@ -1,0 +1,311 @@
+# Instincts generated from https://github.com/bashandbone/submod
+# Generated: 2026-04-08T22:14:56.959Z
+# Version: 2.0
+# NOTE: This file supplements (does not replace) any existing curated instincts.
+# High-confidence manually curated instincts should be preserved alongside these.
+
+---
+id: submod-commit-conventional
+trigger: "when writing a commit message"
+confidence: 0.85
+domain: git
+source: repo-analysis
+source_repo: https://github.com/bashandbone/submod
+---
+
+# Submod Commit Conventional
+
+## Action
+
+Use conventional commit format with prefixes: feat
+
+## Evidence
+
+- 3 commits analyzed
+- Detected conventional commit pattern
+- Examples: feat(submodule): disable command updates .gitmodules active status
+
+---
+id: submod-commit-length
+trigger: "when writing a commit message"
+confidence: 0.6
+domain: git
+source: repo-analysis
+source_repo: https://github.com/bashandbone/submod
+---
+
+# Submod Commit Length
+
+## Action
+
+Write moderate-length commit messages (~66 characters)
+
+## Evidence
+
+- Average commit message length: 66 chars
+- Based on 3 commits
+
+---
+id: submod-naming-files
+trigger: "when creating a new file"
+confidence: 0.8
+domain: code-style
+source: repo-analysis
+source_repo: https://github.com/bashandbone/submod
+---
+
+# Submod Naming Files
+
+## Action
+
+Use snake_case naming convention
+
+## Evidence
+
+- Analyzed file naming patterns in repository
+- Dominant pattern: snake_case
+
+---
+id: submod-import-relative
+trigger: "when importing modules"
+confidence: 0.75
+domain: code-style
+source: repo-analysis
+source_repo: https://github.com/bashandbone/submod
+---
+
+# Submod Import Relative
+
+## Action
+
+Use relative imports for project files
+
+## Evidence
+
+- Import analysis shows relative import pattern
+- Example: import { x } from '../lib/x'
+
+---
+id: submod-export-style
+trigger: "when exporting from a module"
+confidence: 0.7
+domain: code-style
+source: repo-analysis
+source_repo: https://github.com/bashandbone/submod
+---
+
+# Submod Export Style
+
+## Action
+
+Prefer named exports
+
+## Evidence
+
+- Export pattern analysis
+- Dominant style: named
+
+---
+id: submod-test-separate
+trigger: "when writing tests"
+confidence: 0.8
+domain: testing
+source: repo-analysis
+source_repo: https://github.com/bashandbone/submod
+---
+
+# Submod Test Separate
+
+## Action
+
+Place tests in the tests/ or __tests__/ directory, mirroring src structure
+
+## Evidence
+
+- Separate test directory pattern detected
+- Tests live in dedicated test folders
+
+---
+id: submod-workflow-update-submodule-active-status
+trigger: "when doing update submodule active status"
+confidence: 0.6
+domain: workflow
+source: repo-analysis
+source_repo: https://github.com/bashandbone/submod
+---
+
+# Submod Workflow Update Submodule Active Status
+
+## Action
+
+Follow the update-submodule-active-status workflow:
+1. Modify submodule management logic in src/git_manager.rs
+2. Update serialization and writing logic in src/git_ops/git2_ops.rs and src/git_ops/gix_ops.rs
+3. Optionally update or add tests in tests/git_ops_tests.rs and tests/integration_tests.rs
+4. Optionally update dependencies in Cargo.lock
+
+## Evidence
+
+- Workflow detected from commit patterns
+- Frequency: ~2x per month
+- Files: src/git_manager.rs, src/git_ops/git2_ops.rs, src/git_ops/gix_ops.rs
+
+---
+id: submod-instinct-naming
+trigger: "When creating or renaming files, functions, classes, or constants"
+confidence: 0.85
+domain: code-style
+source: repo-analysis
+source_repo: bashandbone/submod
+---
+
+# Submod Instinct Naming
+
+## Action
+
+Use snake_case for files, camelCase for functions, PascalCase for classes, and SCREAMING_SNAKE_CASE for constants
+
+## Evidence
+
+- Pattern in namingConventions in analysis
+- Consistent file/function/class/constant names in src/git_manager.rs and src/git_ops/*
+
+---
+id: submod-instinct-imports
+trigger: "When importing modules within the codebase"
+confidence: 0.8
+domain: code-style
+source: repo-analysis
+source_repo: bashandbone/submod
+---
+
+# Submod Instinct Imports
+
+## Action
+
+Use relative imports
+
+## Evidence
+
+- importStyle: relative in codeStyle pattern
+- Relative imports in src/git_ops/git2_ops.rs and src/git_ops/gix_ops.rs
+
+---
+id: submod-instinct-exports
+trigger: "When exporting functions or types from a module"
+confidence: 0.8
+domain: code-style
+source: repo-analysis
+source_repo: bashandbone/submod
+---
+
+# Submod Instinct Exports
+
+## Action
+
+Use named exports
+
+## Evidence
+
+- exportStyle: named in codeStyle pattern
+- Named exports in src/git_ops/git2_ops.rs
+
+---
+id: submod-instinct-tests-location
+trigger: "When adding or updating tests"
+confidence: 0.85
+domain: testing
+source: repo-analysis
+source_repo: bashandbone/submod
+---
+
+# Submod Instinct Tests Location
+
+## Action
+
+Place tests in the tests/ directory, separate from src/
+
+## Evidence
+
+- testLocation: separate in architecture pattern
+- Test files found in tests/git_ops_tests.rs and tests/integration_tests.rs
+
+---
+id: submod-instinct-tests-pattern
+trigger: "When writing tests for new or updated features"
+confidence: 0.8
+domain: testing
+source: repo-analysis
+source_repo: bashandbone/submod
+---
+
+# Submod Instinct Tests Pattern
+
+## Action
+
+Add or update tests in both unit (tests/git_ops_tests.rs) and integration (tests/integration_tests.rs) test files
+
+## Evidence
+
+- Workflow step: Optionally update or add tests in tests/git_ops_tests.rs and tests/integration_tests.rs
+- Example commits updating both test files
+
+---
+id: submod-instinct-commit-format
+trigger: "When writing a commit message"
+confidence: 0.9
+domain: git
+source: repo-analysis
+source_repo: bashandbone/submod
+---
+
+# Submod Instinct Commit Format
+
+## Action
+
+Use the conventional commit format with 'feat' prefix for features, optionally with scope (e.g., feat(submodule): ...)
+
+## Evidence
+
+- type: conventional, prefixes: ["feat"] in commits pattern
+- Example: feat(submodule): disable command updates .gitmodules active status
+
+---
+id: submod-instinct-commit-length
+trigger: "When composing a commit message"
+confidence: 0.7
+domain: git
+source: repo-analysis
+source_repo: bashandbone/submod
+---
+
+# Submod Instinct Commit Length
+
+## Action
+
+Keep the commit message concise, around 66 characters on average
+
+## Evidence
+
+- averageLength: 66 in commits pattern
+
+---
+id: submod-instinct-update-submodule-active-status
+trigger: "When someone needs to change how submodule activation is tracked or persisted, especially regarding the 'active' field in .gitmodules"
+confidence: 0.95
+domain: workflow
+source: repo-analysis
+source_repo: bashandbone/submod
+---
+
+# Submod Instinct Update Submodule Active Status
+
+## Action
+
+Modify src/git_manager.rs, update serialization in src/git_ops/git2_ops.rs and src/git_ops/gix_ops.rs, optionally update/add tests in tests/git_ops_tests.rs and tests/integration_tests.rs, and optionally update dependencies in Cargo.lock
+
+## Evidence
+
+- Workflow: update-submodule-active-status
+- Commit sequence and files involved in workflow pattern
+
