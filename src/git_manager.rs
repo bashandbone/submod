@@ -818,35 +818,58 @@ impl GitManager {
 
     /// Initialize submodule - add it first if not registered, then initialize
     pub fn init_submodule(&mut self, name: &str) -> Result<(), SubmoduleError> {
-        let submodules = self.config.clone().submodules;
-        let config = submodules
-            .get(name)
-            .ok_or_else(|| SubmoduleError::SubmoduleNotFound {
-                name: name.to_string(),
-            })?;
+        let (
+            path_str,
+            url_str,
+            branch,
+            ignore,
+            update,
+            fetch_recurse,
+            shallow,
+            sparse_paths_opt,
+        ) = {
+            let config = self.config
+                .get_submodule(name)
+                .ok_or_else(|| SubmoduleError::SubmoduleNotFound {
+                    name: name.to_string(),
+                })?;
 
-        let path_str = config.path.as_ref().ok_or_else(|| {
-            SubmoduleError::ConfigError("No path configured for submodule".to_string())
-        })?;
-        let url_str = config.url.as_ref().ok_or_else(|| {
-            SubmoduleError::ConfigError("No URL configured for submodule".to_string())
-        })?;
+            let path_str = config.path.as_ref().ok_or_else(|| {
+                SubmoduleError::ConfigError("No path configured for submodule".to_string())
+            })?.clone();
 
-        let submodule_path = Path::new(path_str);
+            let url_str = config.url.as_ref().ok_or_else(|| {
+                SubmoduleError::ConfigError("No URL configured for submodule".to_string())
+            })?.clone();
+
+            let sparse_paths_opt = self
+                .config
+                .submodules
+                .sparse_checkouts()
+                .and_then(|sparse_checkouts| sparse_checkouts.get(name).cloned());
+
+            (
+                path_str,
+                url_str,
+                config.branch.clone(),
+                config.ignore,
+                config.update.clone(),
+                config.fetch_recurse,
+                config.shallow.unwrap_or(false),
+                sparse_paths_opt,
+            )
+        };
+
+        let submodule_path = Path::new(&path_str);
 
         if submodule_path.exists() && submodule_path.join(".git").exists() {
             if self.verbose {
                 println!("✅ {name} already initialized");
             }
             // Even if already initialized, check if we need to configure sparse checkout
-            let sparse_paths_opt = self
-                .config
-                .submodules
-                .sparse_checkouts()
-                .and_then(|sparse_checkouts| sparse_checkouts.get(name).cloned());
             if let Some(sparse_paths) = sparse_paths_opt {
                 let use_git_default = self.effective_use_git_default_sparse_checkout(name);
-                self.configure_sparse_checkout(path_str, &sparse_paths, use_git_default)?;
+                self.configure_sparse_checkout(&path_str, &sparse_paths, use_git_default)?;
             }
             return Ok(());
         }
@@ -870,13 +893,13 @@ impl GitManager {
             // Submodule not registered yet, add it first via GitOpsManager
             let opts = crate::config::SubmoduleAddOptions {
                 name: name.to_string(),
-                path: std::path::PathBuf::from(path_str),
-                url: url_str.to_string(),
-                branch: config.branch.clone(),
-                ignore: config.ignore,
-                update: config.update.clone(),
-                fetch_recurse: config.fetch_recurse,
-                shallow: config.shallow.unwrap_or(false),
+                path: std::path::PathBuf::from(&path_str),
+                url: url_str,
+                branch,
+                ignore,
+                update,
+                fetch_recurse,
+                shallow,
                 no_init: false,
             };
             self.git_ops
@@ -885,12 +908,12 @@ impl GitManager {
         } else {
             // Submodule is registered, just initialize and update using GitOperations
             self.git_ops
-                .init_submodule(path_str)
+                .init_submodule(&path_str)
                 .map_err(Self::map_git_ops_error)?;
 
             let update_opts = crate::config::SubmoduleUpdateOptions::default();
             self.git_ops
-                .update_submodule(path_str, &update_opts)
+                .update_submodule(&path_str, &update_opts)
                 .map_err(Self::map_git_ops_error)?;
         }
 
@@ -899,11 +922,10 @@ impl GitManager {
         }
 
         // Configure sparse checkout if specified
-        if let Some(sparse_checkouts) = submodules.sparse_checkouts()
-            && let Some(sparse_paths) = sparse_checkouts.get(name) {
-                let use_git_default = self.effective_use_git_default_sparse_checkout(name);
-                self.configure_sparse_checkout(path_str, sparse_paths, use_git_default)?;
-            }
+        if let Some(sparse_paths) = sparse_paths_opt {
+            let use_git_default = self.effective_use_git_default_sparse_checkout(name);
+            self.configure_sparse_checkout(&path_str, &sparse_paths, use_git_default)?;
+        }
 
         if self.verbose {
             println!("✅ {name} initialized");
