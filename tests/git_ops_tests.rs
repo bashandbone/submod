@@ -395,9 +395,16 @@ mod git2_ops_tests {
         ops.write_gitmodules(&entries).expect("write_gitmodules");
 
         // Verify that updating `active` sets it in the git configuration
-        if let Some(mut entry) = entries.get("write-sub").cloned() {
+        // In .gitmodules the git2 fallback might name the submodule by its path 'lib/writesub'
+        let name = if entries.get("write-sub").is_some() {
+            "write-sub"
+        } else {
+            "lib/writesub"
+        };
+
+        if let Some(mut entry) = entries.get(name).cloned() {
             entry.active = Some(false);
-            entries.update_entry("write-sub".to_string(), entry);
+            entries.update_entry(name.to_string(), entry);
         }
         ops.write_gitmodules(&entries).expect("write_gitmodules active false");
 
