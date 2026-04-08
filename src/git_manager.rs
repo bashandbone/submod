@@ -1504,11 +1504,23 @@ impl GitManager {
 
         // Update .gitmodules
         if let Ok(mut entries) = self.git_ops.read_gitmodules() {
-            if let Some(mut gitmodules_entry) = entries.get(name).cloned() {
-                gitmodules_entry.active = Some(false);
-                entries.update_entry(name.to_string(), gitmodules_entry);
-                if let Err(e) = self.git_ops.write_gitmodules(&entries) {
-                    eprintln!("Warning: Failed to update .gitmodules: {e}");
+            // Find by name, or fall back to finding by path
+            let gitmodules_name = if entries.get(name).is_some() {
+                Some(name.to_string())
+            } else {
+                entries
+                    .submodule_iter()
+                    .find(|(_, e)| e.path.as_deref() == Some(path.as_str()))
+                    .map(|(n, _)| n.to_string())
+            };
+
+            if let Some(gm_name) = gitmodules_name {
+                if let Some(mut gitmodules_entry) = entries.get(&gm_name).cloned() {
+                    gitmodules_entry.active = Some(false);
+                    entries.update_entry(gm_name, gitmodules_entry);
+                    if let Err(e) = self.git_ops.write_gitmodules(&entries) {
+                        eprintln!("Warning: Failed to update .gitmodules: {e}");
+                    }
                 }
             }
         }

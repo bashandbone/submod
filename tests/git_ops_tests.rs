@@ -390,9 +390,22 @@ mod git2_ops_tests {
             .expect("add submodule");
 
         let mut ops = Git2Operations::new(Some(&harness.work_dir)).expect("ops");
-        let entries = ops.read_gitmodules().expect("read_gitmodules");
+        let mut entries = ops.read_gitmodules().expect("read_gitmodules");
         // write_gitmodules with the same entries should succeed without error
         ops.write_gitmodules(&entries).expect("write_gitmodules");
+
+        // Verify that updating `active` sets it in the git configuration
+        if let Some(mut entry) = entries.get("write-sub").cloned() {
+            entry.active = Some(false);
+            entries.update_entry("write-sub".to_string(), entry);
+        }
+        ops.write_gitmodules(&entries).expect("write_gitmodules active false");
+
+        // Check git2 config manually or via read_gitmodules? Actually read_gitmodules in git2
+        // doesn't read active from .git/config, but wait, it is set in `.git/config`!
+        let config_path = harness.work_dir.join(".git").join("config");
+        let config_content = std::fs::read_to_string(&config_path).expect("read git config");
+        assert!(config_content.contains("active = false"), "submodule should be inactive in config");
     }
 }
 
@@ -551,6 +564,29 @@ mod gix_ops_tests {
         assert!(
             content.contains("lib/test"),
             ".gitmodules should contain the path we wrote"
+        );
+    }
+
+    #[test]
+    fn test_write_gitmodules_active_false() {
+        let harness = TestHarness::new().expect("harness");
+        harness.init_git_repo().expect("init repo");
+        let mut ops = GixOperations::new(Some(&harness.work_dir)).expect("ops");
+
+        let mut entries = one_entry_entries();
+        if let Some(mut entry) = entries.get("test-lib").cloned() {
+            entry.active = Some(false);
+            entries.update_entry("test-lib".to_string(), entry);
+        }
+
+        ops.write_gitmodules(&entries)
+            .expect("write_gitmodules should succeed");
+
+        let content = std::fs::read_to_string(harness.work_dir.join(".gitmodules"))
+            .expect("read .gitmodules");
+        assert!(
+            content.contains("active = false"),
+            ".gitmodules should contain active = false"
         );
     }
 

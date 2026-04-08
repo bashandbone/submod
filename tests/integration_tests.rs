@@ -557,6 +557,13 @@ active = true
         // Config should show active = false
         let config = harness.read_config().expect("Failed to read config");
         assert!(config.contains("active = false"));
+
+        // .gitmodules should show active = false
+        let gitmodules_path = harness.work_dir.join(".gitmodules");
+        let gitmodules_content = std::fs::read_to_string(&gitmodules_path)
+            .expect("Failed to read .gitmodules");
+        println!("GITMODULES CONTENT:\n{gitmodules_content}");
+        assert!(gitmodules_content.contains("active = false"));
     }
 
     #[test]
