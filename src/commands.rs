@@ -289,7 +289,6 @@ pub enum Commands {
         name: String,
     },
 
-    // TODO: Implement this command (use git2). Functionally this changes a module to `active = false` in our config and `.gitmodules`, but does not delete the submodule from the filesystem.
     #[command(
         name = "disable",
         visible_alias = "d",

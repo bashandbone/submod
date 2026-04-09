@@ -557,6 +557,46 @@ active = true
         // Config should show active = false
         let config = harness.read_config().expect("Failed to read config");
         assert!(config.contains("active = false"));
+
+        // .gitmodules should show active = false
+        let gitmodules_path = harness.work_dir.join(".gitmodules");
+        let gitmodules_content = std::fs::read_to_string(&gitmodules_path)
+            .expect("Failed to read .gitmodules");
+        println!("GITMODULES CONTENT:\n{gitmodules_content}");
+        assert!(gitmodules_content.contains("active = false"));
+    }
+
+    #[test]
+    fn test_disable_command_matching_name() {
+        let harness = TestHarness::new().expect("Failed to create test harness");
+        harness.init_git_repo().expect("Failed to init git repo");
+
+        // Manually create a .gitmodules with a matching name
+        let gitmodules_content = "\
+[submodule \"my-lib\"]
+\tpath = lib/my
+\turl = https://example.com/my-lib.git
+";
+        std::fs::write(harness.work_dir.join(".gitmodules"), gitmodules_content)
+            .expect("Failed to write .gitmodules");
+
+        let config_content = "\
+[my-lib]
+path = \"lib/my\"
+url = \"https://example.com/my-lib.git\"
+active = true
+";
+        harness.create_config(config_content).expect("Failed to create config");
+
+        let stdout = harness
+            .run_submod_success(&["disable", "my-lib"])
+            .expect("Failed to disable submodule");
+
+        assert!(stdout.contains("Disabled submodule 'my-lib'"));
+
+        let gitmodules_updated = std::fs::read_to_string(harness.work_dir.join(".gitmodules"))
+            .expect("Failed to read .gitmodules");
+        assert!(gitmodules_updated.contains("active = false"));
     }
 
     #[test]

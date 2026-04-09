@@ -1502,6 +1502,26 @@ impl GitManager {
             .submodules
             .update_entry(name.to_string(), updated);
 
+        // Update .gitmodules
+        if let Ok(mut entries) = self.git_ops.read_gitmodules() {
+            // Find by name, or fall back to finding by path
+            let gitmodules_name = if entries.get(name).is_some() {
+                Some(name.to_string())
+            } else {
+                entries
+                    .submodule_iter()
+                    .find(|(_, e)| e.path.as_deref() == Some(path.as_str()))
+                    .map(|(n, _)| n.to_string())
+            };
+
+            if let Some(gm_name) = gitmodules_name {
+                let mut gitmodules_entry = entries.get(&gm_name).cloned().unwrap();
+                gitmodules_entry.active = Some(false);
+                entries.update_entry(gm_name, gitmodules_entry);
+                let _ = self.git_ops.write_gitmodules(&entries);
+            }
+        }
+
         self.write_full_config()?;
         println!("Disabled submodule '{name}'.");
         Ok(())
