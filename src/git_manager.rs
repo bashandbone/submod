@@ -1889,10 +1889,10 @@ mod tests {
     use tempfile::tempdir;
 
 
-    // Helper to create a dummy GitManager. We just need it to call check_sparse_checkout_status,
-    // which only uses `self.get_git_directory()`. It doesn't actually need the full config to be valid.
-    // Helper to create a dummy GitManager without needing a tempdir that gets dropped.
-    // It creates it pointing to the provided temp_dir.
+    // Helper to create a `GitManager` for tests that need to call methods such as
+    // `check_sparse_checkout_status`. It writes a minimal config to `config_path`, but
+    // constructing `GitManager` is not fully dummy here: `GitManager::new` currently
+    // depends on successfully opening a repository via `GitOpsManager`.
     fn create_dummy_manager(config_path: std::path::PathBuf) -> GitManager {
         fs::write(&config_path, "[defaults]\n").unwrap();
         GitManager::new(config_path).expect("Failed to create GitManager")
@@ -1913,7 +1913,7 @@ mod tests {
         let expected_paths: Vec<String> = vec!["path/a".to_string()];
 
         let status = manager
-            .check_sparse_checkout_status(submodule_path.to_str().unwrap(), &expected_paths)
+            .check_sparse_checkout_status(&submodule_path.to_string_lossy(), &expected_paths)
             .unwrap();
 
         assert_eq!(status, SparseStatus::NotConfigured);
@@ -1943,12 +1943,41 @@ mod tests {
         ];
 
         let status = manager
-            .check_sparse_checkout_status(submodule_path.to_str().unwrap(), &expected_paths)
+            .check_sparse_checkout_status(&submodule_path.to_string_lossy(), &expected_paths)
             .unwrap();
 
         assert_eq!(status, SparseStatus::Correct);
     }
 
+
+    #[test]
+    fn test_sparse_checkout_configured_has_extras() {
+        let temp_dir = tempdir().unwrap();
+        let submodule_path = temp_dir.path();
+
+        let git_dir = submodule_path.join(".git");
+        let info_dir = git_dir.join("info");
+        fs::create_dir_all(&info_dir).unwrap();
+
+        let sparse_checkout_file = info_dir.join("sparse-checkout");
+        let content = format!("{}\npath/a\npath/b\npath/c\n", SPARSE_DENY_ALL);
+        fs::write(&sparse_checkout_file, content).unwrap();
+
+        let manager = create_dummy_manager(temp_dir.path().join("submod.toml"));
+
+        let expected_paths: Vec<String> = vec![
+            "path/a".to_string(),
+            "path/b".to_string(),
+        ];
+
+        let status = manager
+            .check_sparse_checkout_status(&submodule_path.to_string_lossy(), &expected_paths)
+            .unwrap();
+
+        // Currently check_sparse_checkout_status only checks that all expected paths are present.
+        // It returns Correct even if there are extra paths configured.
+        assert_eq!(status, SparseStatus::Correct);
+    }
     #[test]
     fn test_sparse_checkout_mismatch() {
         let temp_dir = tempdir().unwrap();
@@ -1972,7 +2001,7 @@ mod tests {
         ];
 
         let status = manager
-            .check_sparse_checkout_status(submodule_path.to_str().unwrap(), &expected_paths)
+            .check_sparse_checkout_status(&submodule_path.to_string_lossy(), &expected_paths)
             .unwrap();
 
         match status {
