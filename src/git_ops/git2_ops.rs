@@ -215,13 +215,7 @@ impl GitOperations for Git2Operations {
         if let Some(submodules) = config.submodules().as_ref() {
             for (name, entry) in submodules.iter() {
                 // Find or create the submodule
-                match self.repo.find_submodule(
-                    &entry
-                        .path
-                        .as_ref()
-                        .map(|p| p.to_string())
-                        .unwrap_or(name.clone()),
-                ) {
+                match self.repo.find_submodule(entry.path.as_deref().unwrap_or(name)) {
                     Ok(mut submodule) => {
                         // Update existing submodule configuration through git config
                         let mut config = self.repo.config()?;
