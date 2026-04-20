@@ -443,4 +443,22 @@ mod tests {
         let result = get_sparse_paths(Some(vec![])).unwrap();
         assert_eq!(result, Some(vec![]));
     }
+
+    #[test]
+    fn test_path_to_string_lossy_valid() {
+        let path = std::path::Path::new("valid_utf8");
+        assert_eq!(path_to_string_lossy(path), "valid_utf8");
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn test_path_to_string_lossy_invalid() {
+        use std::os::unix::ffi::OsStringExt;
+        let bytes = vec![0x61, 0xFF, 0x62]; // 'a', invalid, 'b'
+        let os_str = std::ffi::OsString::from_vec(bytes);
+        let path = std::path::Path::new(&os_str);
+
+        let result = path_to_string_lossy(path);
+        assert_eq!(result, format!("a{}b", std::char::REPLACEMENT_CHARACTER));
+    }
 }
