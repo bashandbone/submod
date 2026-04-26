@@ -6,7 +6,6 @@
 
 mod common;
 use common::TestHarness;
-use std::fs;
 
 #[cfg(test)]
 mod tests {
