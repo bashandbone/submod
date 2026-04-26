@@ -459,6 +459,6 @@ mod tests {
         let path = std::path::Path::new(&os_string);
 
         let result = path_to_string_lossy(path);
-        assert_eq!(result, format!("a{}b", std::char::REPLACEMENT_CHARACTER));
+        assert_eq!(result, "a\u{FFFD}b");
     }
 }
