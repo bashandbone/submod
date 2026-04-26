@@ -66,7 +66,7 @@ mod tests {
         let remote_url = format!("file://{}", remote_repo.display());
 
         // Path starting with hyphen
-        let path = "./-sparse";
+        let path = "-sparse";
 
         // Ensure the directory exists to trigger the CLI fallback in apply_sparse_checkout if needed,
         // although apply_sparse_checkout is usually called after gix/git2 which might fail or be bypassed.
