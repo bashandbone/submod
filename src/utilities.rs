@@ -122,11 +122,9 @@ pub fn path_to_string_lossy(path: &std::path::Path) -> String {
         return s.to_string();
     }
     let lossy = path.to_string_lossy();
-    if matches!(lossy, std::borrow::Cow::Owned(_)) {
-        eprintln!(
-            "Warning: Path contains non-UTF-8 characters, using lossy conversion: {lossy}"
-        );
-    }
+    eprintln!(
+        "Warning: Path contains non-UTF-8 characters, using lossy conversion: {lossy}"
+    );
     lossy.to_string()
 }
 
@@ -460,8 +458,8 @@ mod tests {
     fn test_path_to_string_lossy_invalid() {
         use std::os::unix::ffi::OsStringExt;
         let bytes = vec![0x61, 0xFF, 0x62]; // 'a', invalid, 'b'
-        let os_str = std::ffi::OsString::from_vec(bytes);
-        let path = std::path::Path::new(&os_str);
+        let os_string = std::ffi::OsString::from_vec(bytes);
+        let path = std::path::Path::new(&os_string);
 
         let result = path_to_string_lossy(path);
         assert_eq!(result, format!("a{}b", std::char::REPLACEMENT_CHARACTER));
