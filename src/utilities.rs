@@ -118,6 +118,9 @@ pub fn path_to_string(path: &std::path::Path) -> Result<String, anyhow::Error> {
 
 /// Convert a `Path` to a `String`, using lossy conversion for non-UTF-8 characters
 pub fn path_to_string_lossy(path: &std::path::Path) -> String {
+    if let Some(s) = path.to_str() {
+        return s.to_string();
+    }
     let lossy = path.to_string_lossy();
     if matches!(lossy, std::borrow::Cow::Owned(_)) {
         eprintln!(
