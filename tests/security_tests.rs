@@ -21,38 +21,22 @@ mod tests {
             .expect("Failed to create remote");
         let remote_url = format!("file://{}", remote_repo.display());
 
-        // A path starting with a hyphen that could be a git flag
+        // A path starting with a hyphen that could be a git flag.
+        // This should be handled as a literal path component, not interpreted
+        // as an option to git or to any cleanup command that operates on paths.
         let malicious_path = "-c";
 
-        // This should not fail with "unknown option" or similar error from git -C
-        // It might still fail for other reasons if the path is invalid for a submodule,
-        // but it shouldn't be interpreted as a flag to the 'git' command itself.
-
-        // Note: Using add_submodule via harness.
-        // We need to make sure the directory doesn't exist or is handled.
-
-        let result = harness.run_submod(&[
+        harness.run_submod_success(&[
             "add",
             &remote_url,
             "--name",
             "hyphen-sub",
             "--path",
             malicious_path,
-        ]);
+        ]).expect("Failed to add submodule with hyphenated path");
 
-        // The operation might fail because "-c" is a weird path, but it shouldn't be a Command Injection.
-        // If it was interpreted as `git -C -c`, it would fail with "unknown option: -c" or similar.
-
-        match result {
-            Ok(output) => {
-                let stderr = String::from_utf8_lossy(&output.stderr);
-                assert!(!stderr.contains("unknown option: -c"), "Potential command injection detected: git interpreted path as a flag");
-            },
-            Err(e) => {
-                let err_msg = e.to_string();
-                assert!(!err_msg.contains("unknown option: -c"), "Potential command injection detected: git interpreted path as a flag");
-            }
-        }
+        // Verify the submodule was actually created at the requested path.
+        assert!(harness.dir_exists("-c"));
     }
 
     #[test]
