@@ -246,6 +246,10 @@ impl GitOperations for Git2Operations {
                             };
                             config.set_str(&format!("submodule.{name}.update"), update_str)?;
                         }
+                        if let Some(active) = entry.active {
+                            let active_str = if active { "true" } else { "false" };
+                            config.set_str(&format!("submodule.{name}.active"), active_str)?;
+                        }
                         // Set URL if different
                         if let Some(url) = &entry.url
                             && submodule.url() != Some(url.as_str()) {

@@ -344,6 +344,27 @@ impl GitManager {
         })
     }
 
+    /// Creates a `GitManager` pointed at an explicit repository path.
+    ///
+    /// Used in tests to avoid depending on the caller's working directory
+    /// being a git repository.
+    #[cfg(test)]
+    fn with_repo_path(config_path: PathBuf, repo_path: &Path) -> Result<Self, SubmoduleError> {
+        let git_ops = GitOpsManager::new(Some(repo_path), false)
+            .map_err(|_| SubmoduleError::RepositoryError)?;
+
+        let config = Config::default()
+            .load(&config_path, Config::default())
+            .map_err(|e| SubmoduleError::ConfigError(format!("Failed to load config: {e}")))?;
+
+        Ok(Self {
+            git_ops,
+            config,
+            config_path,
+            verbose: false,
+        })
+    }
+
     /// Check submodule repository status using gix APIs
     pub fn check_submodule_repository_status(
         &self,
@@ -406,7 +427,14 @@ impl GitManager {
         })
     }
 
-    /// Check sparse checkout configuration
+    /// Check whether the sparse-checkout configuration for a submodule matches
+    /// the expected paths.
+    ///
+    /// Returns [`SparseStatus::Correct`] when every expected path is present in
+    /// the configured file.  Extra patterns in the file that are not in
+    /// `expected_paths` are **not** treated as a mismatch; the check is a
+    /// subset test (all expected ⊆ configured).  Returns [`SparseStatus::Mismatch`]
+    /// when at least one expected path is absent from the file.
     pub fn check_sparse_checkout_status(
         &self,
         submodule_path: &str,
@@ -818,35 +846,58 @@ impl GitManager {
 
     /// Initialize submodule - add it first if not registered, then initialize
     pub fn init_submodule(&mut self, name: &str) -> Result<(), SubmoduleError> {
-        let submodules = self.config.clone().submodules;
-        let config = submodules
-            .get(name)
-            .ok_or_else(|| SubmoduleError::SubmoduleNotFound {
-                name: name.to_string(),
-            })?;
+        let (
+            path_str,
+            url_str,
+            branch,
+            ignore,
+            update,
+            fetch_recurse,
+            shallow,
+            sparse_paths_opt,
+        ) = {
+            let config = self.config
+                .get_submodule(name)
+                .ok_or_else(|| SubmoduleError::SubmoduleNotFound {
+                    name: name.to_string(),
+                })?;
 
-        let path_str = config.path.as_ref().ok_or_else(|| {
-            SubmoduleError::ConfigError("No path configured for submodule".to_string())
-        })?;
-        let url_str = config.url.as_ref().ok_or_else(|| {
-            SubmoduleError::ConfigError("No URL configured for submodule".to_string())
-        })?;
+            let path_str = config.path.as_ref().ok_or_else(|| {
+                SubmoduleError::ConfigError("No path configured for submodule".to_string())
+            })?.clone();
 
-        let submodule_path = Path::new(path_str);
+            let url_str = config.url.as_ref().ok_or_else(|| {
+                SubmoduleError::ConfigError("No URL configured for submodule".to_string())
+            })?.clone();
+
+            let sparse_paths_opt = self
+                .config
+                .submodules
+                .sparse_checkouts()
+                .and_then(|sparse_checkouts| sparse_checkouts.get(name).cloned());
+
+            (
+                path_str,
+                url_str,
+                config.branch.clone(),
+                config.ignore,
+                config.update.clone(),
+                config.fetch_recurse,
+                config.shallow.unwrap_or(false),
+                sparse_paths_opt,
+            )
+        };
+
+        let submodule_path = Path::new(&path_str);
 
         if submodule_path.exists() && submodule_path.join(".git").exists() {
             if self.verbose {
                 println!("✅ {name} already initialized");
             }
             // Even if already initialized, check if we need to configure sparse checkout
-            let sparse_paths_opt = self
-                .config
-                .submodules
-                .sparse_checkouts()
-                .and_then(|sparse_checkouts| sparse_checkouts.get(name).cloned());
             if let Some(sparse_paths) = sparse_paths_opt {
                 let use_git_default = self.effective_use_git_default_sparse_checkout(name);
-                self.configure_sparse_checkout(path_str, &sparse_paths, use_git_default)?;
+                self.configure_sparse_checkout(&path_str, &sparse_paths, use_git_default)?;
             }
             return Ok(());
         }
@@ -870,13 +921,13 @@ impl GitManager {
             // Submodule not registered yet, add it first via GitOpsManager
             let opts = crate::config::SubmoduleAddOptions {
                 name: name.to_string(),
-                path: std::path::PathBuf::from(path_str),
-                url: url_str.to_string(),
-                branch: config.branch.clone(),
-                ignore: config.ignore,
-                update: config.update.clone(),
-                fetch_recurse: config.fetch_recurse,
-                shallow: config.shallow.unwrap_or(false),
+                path: std::path::PathBuf::from(&path_str),
+                url: url_str,
+                branch,
+                ignore,
+                update,
+                fetch_recurse,
+                shallow,
                 no_init: false,
             };
             self.git_ops
@@ -885,12 +936,12 @@ impl GitManager {
         } else {
             // Submodule is registered, just initialize and update using GitOperations
             self.git_ops
-                .init_submodule(path_str)
+                .init_submodule(&path_str)
                 .map_err(Self::map_git_ops_error)?;
 
             let update_opts = crate::config::SubmoduleUpdateOptions::default();
             self.git_ops
-                .update_submodule(path_str, &update_opts)
+                .update_submodule(&path_str, &update_opts)
                 .map_err(Self::map_git_ops_error)?;
         }
 
@@ -899,11 +950,10 @@ impl GitManager {
         }
 
         // Configure sparse checkout if specified
-        if let Some(sparse_checkouts) = submodules.sparse_checkouts()
-            && let Some(sparse_paths) = sparse_checkouts.get(name) {
-                let use_git_default = self.effective_use_git_default_sparse_checkout(name);
-                self.configure_sparse_checkout(path_str, sparse_paths, use_git_default)?;
-            }
+        if let Some(sparse_paths) = sparse_paths_opt {
+            let use_git_default = self.effective_use_git_default_sparse_checkout(name);
+            self.configure_sparse_checkout(&path_str, &sparse_paths, use_git_default)?;
+        }
 
         if self.verbose {
             println!("✅ {name} initialized");
@@ -1502,6 +1552,26 @@ impl GitManager {
             .submodules
             .update_entry(name.to_string(), updated);
 
+        // Update .gitmodules
+        if let Ok(mut entries) = self.git_ops.read_gitmodules() {
+            // Find by name, or fall back to finding by path
+            let gitmodules_name = if entries.get(name).is_some() {
+                Some(name.to_string())
+            } else {
+                entries
+                    .submodule_iter()
+                    .find(|(_, e)| e.path.as_deref() == Some(path.as_str()))
+                    .map(|(n, _)| n.to_string())
+            };
+
+            if let Some(gm_name) = gitmodules_name {
+                let mut gitmodules_entry = entries.get(&gm_name).cloned().unwrap();
+                gitmodules_entry.active = Some(false);
+                entries.update_entry(gm_name, gitmodules_entry);
+                let _ = self.git_ops.write_gitmodules(&entries);
+            }
+        }
+
         self.write_full_config()?;
         println!("Disabled submodule '{name}'.");
         Ok(())
@@ -1879,5 +1949,135 @@ impl GitManager {
         std::fs::write(output, empty).map_err(SubmoduleError::IoError)?;
         println!("Generated empty config at '{}'.", output.display());
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+    use tempfile::tempdir;
+
+    // Helper to create a `GitManager` for tests that need to call methods such as
+    // `check_sparse_checkout_status`. It initialises a real git repository in `repo_dir`
+    // via `git2` so that `GitOpsManager` can open it without depending on the caller's
+    // working directory being inside a git repo.
+    fn create_test_manager(repo_dir: &Path, config_path: PathBuf) -> GitManager {
+        git2::Repository::init(repo_dir).expect("Failed to init git repo");
+        fs::write(&config_path, "[defaults]\n").unwrap();
+        GitManager::with_repo_path(config_path, repo_dir).expect("Failed to create GitManager")
+    }
+
+    #[test]
+    fn test_sparse_checkout_not_configured() {
+        let temp_dir = tempdir().unwrap();
+        let submodule_path = temp_dir.path().join("submodule");
+        fs::create_dir(&submodule_path).unwrap();
+
+        // Create .git directory but NO sparse-checkout file
+        let git_dir = submodule_path.join(".git");
+        fs::create_dir(&git_dir).unwrap();
+
+        let manager = create_test_manager(temp_dir.path(), temp_dir.path().join("submod.toml"));
+
+        let expected_paths: Vec<String> = vec!["path/a".to_string()];
+
+        let status = manager
+            .check_sparse_checkout_status(
+                &submodule_path.to_string_lossy(),
+                &expected_paths,
+            )
+            .unwrap();
+
+        assert_eq!(status, SparseStatus::NotConfigured);
+    }
+
+    #[test]
+    fn test_sparse_checkout_correct() {
+        let temp_dir = tempdir().unwrap();
+        let submodule_path = temp_dir.path().join("submodule");
+        fs::create_dir(&submodule_path).unwrap();
+
+        // Create .git/info/sparse-checkout with the expected paths
+        let info_dir = submodule_path.join(".git").join("info");
+        fs::create_dir_all(&info_dir).unwrap();
+        let content = format!("{}\npath/a\npath/b\n", SPARSE_DENY_ALL);
+        fs::write(info_dir.join("sparse-checkout"), content).unwrap();
+
+        let manager = create_test_manager(temp_dir.path(), temp_dir.path().join("submod.toml"));
+
+        let expected_paths = vec!["path/a".to_string(), "path/b".to_string()];
+
+        let status = manager
+            .check_sparse_checkout_status(
+                &submodule_path.to_string_lossy(),
+                &expected_paths,
+            )
+            .unwrap();
+
+        assert_eq!(status, SparseStatus::Correct);
+    }
+
+    #[test]
+    fn test_sparse_checkout_correct_with_extras() {
+        // When the sparse-checkout file contains all expected paths plus additional
+        // ones, the result is still Correct (subset check, not equality).
+        let temp_dir = tempdir().unwrap();
+        let submodule_path = temp_dir.path().join("submodule");
+        fs::create_dir(&submodule_path).unwrap();
+
+        let info_dir = submodule_path.join(".git").join("info");
+        fs::create_dir_all(&info_dir).unwrap();
+        // File has path/a, path/b AND an extra path/c not in expected_paths
+        let content = format!("{}\npath/a\npath/b\npath/c\n", SPARSE_DENY_ALL);
+        fs::write(info_dir.join("sparse-checkout"), content).unwrap();
+
+        let manager = create_test_manager(temp_dir.path(), temp_dir.path().join("submod.toml"));
+
+        let expected_paths = vec!["path/a".to_string(), "path/b".to_string()];
+
+        let status = manager
+            .check_sparse_checkout_status(
+                &submodule_path.to_string_lossy(),
+                &expected_paths,
+            )
+            .unwrap();
+
+        assert_eq!(status, SparseStatus::Correct);
+    }
+
+    #[test]
+    fn test_sparse_checkout_mismatch() {
+        let temp_dir = tempdir().unwrap();
+        let submodule_path = temp_dir.path().join("submodule");
+        fs::create_dir(&submodule_path).unwrap();
+
+        // sparse-checkout has only path/a; path/b is expected but absent
+        let info_dir = submodule_path.join(".git").join("info");
+        fs::create_dir_all(&info_dir).unwrap();
+        let content = format!("{}\npath/a\n", SPARSE_DENY_ALL);
+        fs::write(info_dir.join("sparse-checkout"), content).unwrap();
+
+        let manager = create_test_manager(temp_dir.path(), temp_dir.path().join("submod.toml"));
+
+        let expected_paths = vec![
+            "path/a".to_string(),
+            "path/b".to_string(), // expected but not configured
+        ];
+
+        let status = manager
+            .check_sparse_checkout_status(
+                &submodule_path.to_string_lossy(),
+                &expected_paths,
+            )
+            .unwrap();
+
+        match status {
+            SparseStatus::Mismatch { expected, actual } => {
+                assert_eq!(expected, vec!["path/a".to_string(), "path/b".to_string()]);
+                assert_eq!(actual, vec!["path/a".to_string()]);
+            }
+            _ => panic!("Expected Mismatch, got {:?}", status),
+        }
     }
 }
