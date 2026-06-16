@@ -2167,4 +2167,26 @@ active = true
             .expect("submodule should exist");
         assert!(retrieved.is_remote());
     }
+
+    #[test]
+    fn test_config_get_submodule() {
+        let mut config = Config::default();
+        let entry = SubmoduleEntry::new(
+            Some("https://github.com/user/repo".to_string()),
+            Some("libs/repo".to_string()),
+            None,
+            None,
+            None,
+            None,
+            Some(true),
+            None,
+            None,
+        );
+        config.add_submodule("repo".to_string(), entry.clone());
+
+        let retrieved = config.get_submodule("repo").expect("submodule should exist");
+        assert_eq!(retrieved, &entry);
+
+        assert!(config.get_submodule("non-existent").is_none());
+    }
 }
