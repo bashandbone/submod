@@ -118,6 +118,9 @@ pub fn path_to_string(path: &std::path::Path) -> Result<String, anyhow::Error> {
 
 /// Convert a `Path` to a `String`, using lossy conversion for non-UTF-8 characters
 pub fn path_to_string_lossy(path: &std::path::Path) -> String {
+    if let Some(s) = path.to_str() {
+        return s.to_string();
+    }
     let lossy = path.to_string_lossy();
     eprintln!(
         "Warning: Path contains non-UTF-8 characters, using lossy conversion: {lossy}"
@@ -442,5 +445,23 @@ mod tests {
     fn test_get_sparse_paths_empty_vec() {
         let result = get_sparse_paths(Some(vec![])).unwrap();
         assert_eq!(result, Some(vec![]));
+    }
+
+    #[test]
+    fn test_path_to_string_lossy_valid() {
+        let path = std::path::Path::new("valid_utf8");
+        assert_eq!(path_to_string_lossy(path), "valid_utf8");
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn test_path_to_string_lossy_invalid() {
+        use std::os::unix::ffi::OsStringExt;
+        let bytes = vec![0x61, 0xFF, 0x62]; // 'a', invalid, 'b'
+        let os_string = std::ffi::OsString::from_vec(bytes);
+        let path = std::path::Path::new(&os_string);
+
+        let result = path_to_string_lossy(path);
+        assert_eq!(result, format!("a{}b", std::char::REPLACEMENT_CHARACTER));
     }
 }
