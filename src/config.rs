@@ -739,22 +739,10 @@ impl SubmoduleEntries {
     }
 
     /// Add a submodule entry
-    #[must_use] pub fn add_submodule(self, name: SubmoduleName, entry: SubmoduleEntry) -> Self {
-        if self.submodules().is_some() {
-            let mut submodules = self.submodules.unwrap();
-            submodules.insert(name, entry);
-            Self {
-                submodules: Some(submodules),
-                sparse_checkouts: self.sparse_checkouts,
-            }
-        } else {
-            let mut submodules = HashMap::new();
-            submodules.insert(name, entry);
-            Self {
-                submodules: Some(submodules),
-                sparse_checkouts: self.sparse_checkouts,
-            }
-        }
+    #[must_use] pub fn add_submodule(mut self, name: SubmoduleName, entry: SubmoduleEntry) -> Self {
+        let submodules = self.submodules.get_or_insert_with(HashMap::new);
+        submodules.insert(name, entry);
+        self
     }
 
     /// Remove a submodule entry
