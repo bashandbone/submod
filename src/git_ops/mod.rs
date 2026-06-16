@@ -389,7 +389,7 @@ impl GitOperations for GitOpsManager {
 
             // And removed from index
             let _ = std::process::Command::new("git")
-                .args(["rm", "--cached", "-r", "--ignore-unmatch"])
+                .args(["rm", "--cached", "-r", "--ignore-unmatch", "--"])
                 .arg(&opts.path)
                 .current_dir(workdir)
                 .output();
@@ -525,7 +525,8 @@ impl GitOperations for GitOpsManager {
         .or_else(|_| {
             // CLI fallback: use git read-tree to apply sparse checkout
             let output = std::process::Command::new("git")
-                .args(["-C", path, "read-tree", "-mu", "HEAD"])
+                .current_dir(path)
+                .args(["read-tree", "-mu", "HEAD"])
                 .output()
                 .context("Failed to run git read-tree")?;
             if output.status.success() {
