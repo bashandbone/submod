@@ -9,9 +9,9 @@ Defines project-level defaults, and submodule
 configuration management. Supports loading and saving configuration in TOML format.
 
 Main Types:
-- SubmoduleGitOptions: Git-specific options for a submodule.
-- SubmoduleDefaults: Project-level default submodule options.
-- SubmoduleConfig: Configuration for a single submodule.
+- `SubmoduleGitOptions`: Git-specific options for a submodule.
+- `SubmoduleDefaults`: Project-level default submodule options.
+- `SubmoduleConfig`: Configuration for a single submodule.
 - Config: Main configuration structure, containing defaults and all submodules.
 
 Features:
@@ -40,12 +40,12 @@ use figment::{
 };
 
 /// Returns true. Used as a serde default for boolean fields.
-fn default_true() -> bool {
+const fn default_true() -> bool {
     true
 }
 
 /// Returns false. Used as a serde default for boolean fields.
-fn default_false() -> bool {
+const fn default_false() -> bool {
     false
 }
 
@@ -80,7 +80,7 @@ pub struct SubmoduleGitOptions {
 #[allow(dead_code)]
 impl SubmoduleGitOptions {
     /// Create a new instance with defaults
-    pub fn new(
+    #[must_use] pub const fn new(
         ignore: Option<SerializableIgnore>,
         fetch_recurse: Option<SerializableFetchRecurse>,
         branch: Option<SerializableBranch>,
@@ -95,7 +95,7 @@ impl SubmoduleGitOptions {
     }
 
     /// new with defaults
-    pub fn default() -> Self {
+    #[must_use] pub fn default() -> Self {
         Self {
             ignore: Some(SerializableIgnore::default()),
             fetch_recurse: Some(SerializableFetchRecurse::default()),
@@ -118,7 +118,7 @@ pub struct Git2SubmoduleOptions {
 #[allow(dead_code)]
 impl Git2SubmoduleOptions {
     /// Create a new `Git2SubmoduleOptions` from individual git2 option values.
-    pub fn new(
+    #[must_use] pub const fn new(
         ignore: git2::SubmoduleIgnore,
         update: git2::SubmoduleUpdate,
         branch: Option<String>,
@@ -138,13 +138,13 @@ impl TryFrom<SubmoduleGitOptions> for Git2SubmoduleOptions {
 
     fn try_from(options: SubmoduleGitOptions) -> Result<Self, Self::Error> {
         let ignore = match options.ignore {
-            Some(i) => git2::SubmoduleIgnore::try_from(i).map_err(|_| {
+            Some(i) => git2::SubmoduleIgnore::try_from(i).map_err(|()| {
                 "Failed to convert SerializableIgnore to git2::SubmoduleIgnore".to_string()
             })?,
             None => git2::SubmoduleIgnore::Unspecified,
         };
         let update = match options.update {
-            Some(u) => git2::SubmoduleUpdate::try_from(u).map_err(|_| {
+            Some(u) => git2::SubmoduleUpdate::try_from(u).map_err(|()| {
                 "Failed to convert SerializableUpdate to git2::SubmoduleUpdate".to_string()
             })?,
             None => git2::SubmoduleUpdate::Default,
@@ -166,10 +166,15 @@ pub struct SubmoduleDefaults {
     pub fetch_recurse: Option<SerializableFetchRecurse>,
     /// [`Update`][SerializableUpdate] setting for submodules
     pub update: Option<SerializableUpdate>,
+    /// When `true`, use git's built-in sparse-checkout behaviour (no `!/*` prefix is
+    /// prepended). Defaults to `false`, which uses submod's deny-all-by-default model.
+    /// Individual submodules can override this per-entry.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub use_git_default_sparse_checkout: Option<bool>,
 }
 
 impl Iterator for SubmoduleDefaults {
-    type Item = SubmoduleDefaults;
+    type Item = Self;
 
     fn next(&mut self) -> Option<Self::Item> {
         Some(self.clone())
@@ -178,13 +183,13 @@ impl Iterator for SubmoduleDefaults {
 
 #[allow(dead_code)]
 impl SubmoduleDefaults {
-    /// Returns a vector of SubmoduleDefaults with the current values (for comparison)
-    pub fn get_values(&self) -> Vec<SubmoduleDefaults> {
+    /// Returns a vector of `SubmoduleDefaults` with the current values (for comparison)
+    #[must_use] pub fn get_values(&self) -> Vec<Self> {
         vec![self.clone()].into_iter().flatten().collect()
     }
 
-    /// Merge another SubmoduleDefaults into this one. Only updates fields that are set in the other. Returns a new instance with the merged values.
-    pub fn merge_from(&self, other: SubmoduleDefaults) -> Self {
+    /// Merge another `SubmoduleDefaults` into this one. Only updates fields that are set in the other. Returns a new instance with the merged values.
+    #[must_use] pub fn merge_from(&self, other: Self) -> Self {
         let mut mut_self = self.clone();
         if other.ignore.is_some() {
             mut_self.ignore = other.ignore;
@@ -204,6 +209,7 @@ impl SubmoduleDefaults {
                     .fetch_recurse
                     .or_else(|| Some(SerializableFetchRecurse::default())),
                 update: update.or_else(|| Some(SerializableUpdate::default())),
+                use_git_default_sparse_checkout: mut_self.use_git_default_sparse_checkout,
             }
         }
     }
@@ -235,8 +241,8 @@ pub struct SubmoduleAddOptions {
 
 #[allow(dead_code)]
 impl SubmoduleAddOptions {
-    /// Create an add options from a SubmoduleEntry
-    pub fn into_submodule_entry(self) -> SubmoduleEntry {
+    /// Create an add options from a `SubmoduleEntry`
+    #[must_use] pub fn into_submodule_entry(self) -> SubmoduleEntry {
         SubmoduleEntry {
             url: Some(self.url),
             path: Some(self.path.to_string_lossy().to_string()),
@@ -248,34 +254,32 @@ impl SubmoduleAddOptions {
             active: Some(!self.no_init), // we're adding so unless we have a 'no_init" flag, we can assume active
             no_init: Some(self.no_init),
             sparse_paths: None,
+            use_git_default_sparse_checkout: None,
         }
     }
 
-    /// Create an add options from a entries tuple (name and SubmoduleEntry)
+    /// Create an add options from a entries tuple (name and `SubmoduleEntry`)
     pub fn from_submodule_entries_tuple(entry: (SubmoduleName, SubmoduleEntry)) -> Self {
         let (name, submodule_entry) = entry;
         Self {
             name: name.clone(),
             url: submodule_entry
                 .url
-                .map(|u| u.to_string())
                 .unwrap_or_else(|| submodule_entry.path.clone().unwrap_or_else(|| name.clone())),
             path: submodule_entry
-                .path
-                .map(PathBuf::from)
-                .unwrap_or_else(|| PathBuf::from(name.clone())),
+                .path.map_or_else(|| PathBuf::from(name.clone()), PathBuf::from),
             branch: submodule_entry.branch,
             ignore: submodule_entry.ignore,
             update: submodule_entry.update,
             fetch_recurse: submodule_entry.fetch_recurse,
-            shallow: submodule_entry.shallow.map_or(false, |s| s),
-            no_init: submodule_entry.no_init.map_or(false, |f| f),
+            shallow: submodule_entry.shallow.is_some_and(|s| s),
+            no_init: submodule_entry.no_init.is_some_and(|f| f),
         }
     }
 
-    /// Convert an AddOptions to a SubmoduleEntries tuple
-    pub fn into_entries_tuple(self) -> (SubmoduleName, SubmoduleEntry) {
-        (self.name.to_owned(), self.clone().into_submodule_entry())
+    /// Convert an `AddOptions` to a `SubmoduleEntries` tuple
+    #[must_use] pub fn into_entries_tuple(self) -> (SubmoduleName, SubmoduleEntry) {
+        (self.name.clone(), self.into_submodule_entry())
     }
 }
 
@@ -293,7 +297,7 @@ pub struct SubmoduleUpdateOptions {
 #[allow(dead_code)]
 impl SubmoduleUpdateOptions {
     /// Create a new instance with defaults
-    pub fn new(strategy: SerializableUpdate, recursive: bool, force: bool) -> Self {
+    #[must_use] pub const fn new(strategy: SerializableUpdate, recursive: bool, force: bool) -> Self {
         Self {
             strategy,
             recursive,
@@ -302,7 +306,7 @@ impl SubmoduleUpdateOptions {
     }
 
     /// Create a new instance with default values
-    pub fn default() -> Self {
+    #[must_use] pub fn default() -> Self {
         Self {
             strategy: SerializableUpdate::default(),
             recursive: false, // Default to not recursive
@@ -311,7 +315,7 @@ impl SubmoduleUpdateOptions {
     }
 
     /// Get a new instance with the recursive flag set
-    pub fn forced(&self) -> Self {
+    #[must_use] pub fn forced(&self) -> Self {
         Self {
             strategy: self.strategy.clone(),
             recursive: self.recursive,
@@ -319,10 +323,10 @@ impl SubmoduleUpdateOptions {
         }
     }
 
-    /// Convert from SubmoduleGitOptions to SubmoduleUpdateOptions
-    pub fn from_options(options: SubmoduleGitOptions) -> Self {
+    /// Convert from `SubmoduleGitOptions` to `SubmoduleUpdateOptions`
+    #[must_use] pub fn from_options(options: SubmoduleGitOptions) -> Self {
         Self {
-            strategy: options.update.unwrap_or(SerializableUpdate::default()),
+            strategy: options.update.unwrap_or_default(),
             recursive: match options.fetch_recurse {
                 Some(SerializableFetchRecurse::Always) => true,
                 _ => false,
@@ -361,7 +365,7 @@ pub struct OtherSubmoduleSettings {
 #[allow(dead_code)]
 impl OtherSubmoduleSettings {
     /// Create a new instance with default values
-    fn default() -> Self {
+    const fn default() -> Self {
         Self {
             url: None,      // Default to None, which makes it easier to identify missing values
             path: None,     // Default to None
@@ -383,20 +387,12 @@ impl OtherSubmoduleSettings {
         Self {
             url: url.clone().or_else(|| Some(".".to_string())),
             path: path.clone().or_else(|| {
-                if let Some(ref u) = url {
-                    Some(Self::name_from_url(u))
-                } else {
-                    None
-                }
+                url.as_ref().map(|u| Self::name_from_url(u))
             }),
             name: name.or_else(|| {
                 if let Some(ref p) = path {
                     Some(p.clone())
-                } else if let Some(ref u) = url {
-                    Some(Self::name_from_url(u))
-                } else {
-                    None
-                }
+                } else { url.as_ref().map(|u| Self::name_from_url(u)) }
             }),
             active: active.unwrap_or(true), // Default to true if not specified
             shallow: shallow.unwrap_or(false), // Default to false if not specified
@@ -410,8 +406,8 @@ impl OtherSubmoduleSettings {
         url.rsplit(&['/', ':'][..]).next().unwrap_or("").to_string()
     }
 
-    /// Create a new instance from SubmoduleEntry, optionally providing a name
-    pub fn from_entry(entry: &SubmoduleEntry, name: Option<String>) -> Self {
+    /// Create a new instance from `SubmoduleEntry`, optionally providing a name
+    #[must_use] pub fn from_entry(entry: &SubmoduleEntry, name: Option<String>) -> Self {
         Self::new(
             entry.url.clone(),
             entry.path.clone(),
@@ -423,7 +419,7 @@ impl OtherSubmoduleSettings {
     }
 
     /// Get a new instance with an updated name
-    pub fn update_with_name(&self, name: SubmoduleName) -> Self {
+    #[must_use] pub fn update_with_name(&self, name: SubmoduleName) -> Self {
         let mut new_self = self.clone();
         new_self.name = Some(name);
         new_self
@@ -460,12 +456,16 @@ pub struct SubmoduleEntry {
     /// Sparse checkout paths for this submodule (optional)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub sparse_paths: Option<Vec<String>>,
+    /// When `true`, use git's built-in sparse-checkout behaviour instead of submod's
+    /// deny-all-by-default model.  Overrides the global `[defaults]` setting.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub use_git_default_sparse_checkout: Option<bool>,
 }
 
 #[allow(dead_code)]
 impl SubmoduleEntry {
     /// Create a new submodule entry with defaults
-    pub fn new(
+    #[must_use] pub const fn new(
         url: Option<String>,
         path: Option<String>,
         branch: Option<SerializableBranch>,
@@ -483,15 +483,16 @@ impl SubmoduleEntry {
             ignore,
             update,
             fetch_recurse,
-            active: active,
-            shallow: shallow,
-            no_init: no_init,
+            active,
+            shallow,
+            no_init,
             sparse_paths: None,
+            use_git_default_sparse_checkout: None,
         }
     }
 
-    /// Create a new submodule entry with defaults, using the URL and path from OtherSubmoduleSettings
-    pub fn from_options_and_settings(
+    /// Create a new submodule entry with defaults, using the URL and path from `OtherSubmoduleSettings`
+    #[must_use] pub fn from_options_and_settings(
         options: SubmoduleGitOptions,
         other_settings: OtherSubmoduleSettings,
     ) -> Self {
@@ -509,7 +510,7 @@ impl SubmoduleEntry {
     }
 
     /// Create a new submodule entries from a gitmodules entry
-    pub fn from_gitmodules(
+    #[must_use] pub fn from_gitmodules(
         name: &String,
         entries: std::collections::HashMap<String, String>,
     ) -> Self {
@@ -555,7 +556,7 @@ impl SubmoduleEntry {
     }
 
     /// Get a new instance with updated options
-    pub fn update_with_options(&self, options: SubmoduleGitOptions) -> Self {
+    #[must_use] pub fn update_with_options(&self, options: SubmoduleGitOptions) -> Self {
         let mut new_self = self.clone();
         if let Some(ignore) = options.ignore {
             new_self.ignore = Some(ignore);
@@ -573,7 +574,7 @@ impl SubmoduleEntry {
     }
 
     /// Get a new instance with updated settings
-    pub fn update_with_settings(&self, other_settings: OtherSubmoduleSettings) -> Self {
+    #[must_use] pub fn update_with_settings(&self, other_settings: OtherSubmoduleSettings) -> Self {
         let mut new_self = self.clone();
         if let Some(url) = other_settings.url {
             new_self.url = Some(url);
@@ -588,14 +589,14 @@ impl SubmoduleEntry {
     }
 
     /// Returns true if the url is a local path (relative or absolute)
-    pub fn is_local(&self) -> bool {
-        let url = self.url.clone().unwrap_or_else(|| "".to_string());
+    #[must_use] pub fn is_local(&self) -> bool {
+        let url = self.url.clone().unwrap_or_default();
         url.starts_with("./") || url.starts_with("../") || url.starts_with('/')
     }
 
     /// Returns true if the url is a remote repository (http, ssh, git, etc)
-    pub fn is_remote(&self) -> bool {
-        let url = self.url.clone().unwrap_or_else(|| "".to_string());
+    #[must_use] pub fn is_remote(&self) -> bool {
+        let url = self.url.clone().unwrap_or_default();
         url.starts_with("http://")
             || url.starts_with("https://")
             || url.starts_with("ssh://")
@@ -610,17 +611,17 @@ impl SubmoduleEntry {
     }
 
     /// Returns the git-specific options for this submodule entry.
-    pub fn git_options(&self) -> SubmoduleGitOptions {
+    #[must_use] pub fn git_options(&self) -> SubmoduleGitOptions {
         SubmoduleGitOptions {
-            ignore: self.ignore.clone(),
-            fetch_recurse: self.fetch_recurse.clone(),
+            ignore: self.ignore,
+            fetch_recurse: self.fetch_recurse,
             branch: self.branch.clone(),
             update: self.update.clone(),
         }
     }
 
     /// Returns the non-git settings for this submodule entry (path, url, active state, etc.).
-    pub fn settings(&self) -> OtherSubmoduleSettings {
+    #[must_use] pub fn settings(&self) -> OtherSubmoduleSettings {
         OtherSubmoduleSettings {
             name: None, // We don't have a name in this struct, so we leave it as None
             url: self.url.clone(),
@@ -633,21 +634,21 @@ impl SubmoduleEntry {
 
     /// Convert this submodule configuration to git2 options
     pub fn to_git2_options(&self) -> Result<Git2SubmoduleOptions> {
-        Git2SubmoduleOptions::try_from(self.git_options().clone()).map_err(|e| anyhow::anyhow!(e))
+        Git2SubmoduleOptions::try_from(self.git_options()).map_err(|e| anyhow::anyhow!(e))
     }
 
-    /// convert path to PathBuf for filesystem operations
+    /// convert path to `PathBuf` for filesystem operations
     pub fn path_as_pathbuf(&self) -> Option<PathBuf> {
         self.path.as_ref().map(PathBuf::from)
     }
 
     /// Convert the submodule's URL to a string
-    pub fn url_as_string(&self) -> String {
-        self.url.clone().unwrap_or_else(|| "".to_string())
+    #[must_use] pub fn url_as_string(&self) -> String {
+        self.url.clone().unwrap_or_default()
     }
 
     /// Get the configuration active setting
-    pub fn is_active(&self) -> bool {
+    #[must_use] pub fn is_active(&self) -> bool {
         self.active.unwrap_or(true)
     }
 }
@@ -666,13 +667,14 @@ impl From<OtherSubmoduleSettings> for SubmoduleEntry {
             update: default_git_options.update,
             no_init: Some(other.no_init),
             sparse_paths: None,
+            use_git_default_sparse_checkout: None,
         }
     }
 }
 
 /// A collection of submodule entries, including sparse checkouts
 ///
-/// Revamped to better reflect git's structure so we can use the SubmoduleEntry types directly with gix/git2
+/// Revamped to better reflect git's structure so we can use the `SubmoduleEntry` types directly with gix/git2
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct SubmoduleEntries {
     submodules: Option<HashMap<SubmoduleName, SubmoduleEntry>>,
@@ -687,13 +689,12 @@ impl<'de> Deserialize<'de> for SubmoduleEntries {
         let map: HashMap<SubmoduleName, SubmoduleEntry> = HashMap::deserialize(deserializer)?;
         let mut sparse_checkouts: HashMap<SubmoduleName, Vec<String>> = HashMap::new();
         for (name, entry) in &map {
-            if let Some(paths) = &entry.sparse_paths {
-                if !paths.is_empty() {
+            if let Some(paths) = &entry.sparse_paths
+                && !paths.is_empty() {
                     sparse_checkouts.insert(name.clone(), paths.clone());
                 }
-            }
         }
-        Ok(SubmoduleEntries {
+        Ok(Self {
             submodules: Some(map),
             sparse_checkouts: Some(sparse_checkouts),
         })
@@ -718,8 +719,8 @@ impl Serialize for SubmoduleEntries {
 
 #[allow(dead_code)]
 impl SubmoduleEntries {
-    /// Create a new empty SubmoduleEntries
-    pub fn new(
+    /// Create a new empty `SubmoduleEntries`
+    #[must_use] pub fn new(
         submodules: Option<HashMap<SubmoduleName, SubmoduleEntry>>,
         sparse_checkouts: Option<HashMap<SubmoduleName, Vec<String>>>,
     ) -> Self {
@@ -730,7 +731,7 @@ impl SubmoduleEntries {
     }
 
     /// Create a new empty `SubmoduleEntries` with default (empty) collections.
-    pub fn default() -> Self {
+    #[must_use] pub fn default() -> Self {
         Self {
             submodules: Some(HashMap::new()),
             sparse_checkouts: Some(HashMap::new()),
@@ -738,17 +739,17 @@ impl SubmoduleEntries {
     }
 
     /// Add a submodule entry
-    pub fn add_submodule(self, name: SubmoduleName, entry: SubmoduleEntry) -> Self {
+    #[must_use] pub fn add_submodule(self, name: SubmoduleName, entry: SubmoduleEntry) -> Self {
         if self.submodules().is_some() {
-            let mut submodules = self.submodules.unwrap().clone();
-            submodules.insert(name.clone(), entry);
+            let mut submodules = self.submodules.unwrap();
+            submodules.insert(name, entry);
             Self {
                 submodules: Some(submodules),
                 sparse_checkouts: self.sparse_checkouts,
             }
         } else {
             let mut submodules = HashMap::new();
-            submodules.insert(name.clone(), entry);
+            submodules.insert(name, entry);
             Self {
                 submodules: Some(submodules),
                 sparse_checkouts: self.sparse_checkouts,
@@ -765,19 +766,19 @@ impl SubmoduleEntries {
     }
 
     /// Returns a list of all submodule names, or `None` if no submodules are configured.
-    pub fn submodule_names(&self) -> Option<Vec<String>> {
+    #[must_use] pub fn submodule_names(&self) -> Option<Vec<String>> {
         self.submodules
             .as_ref()
             .map(|s| s.keys().cloned().collect())
     }
 
     /// Get the submodules map
-    pub fn submodules(&self) -> Option<&HashMap<SubmoduleName, SubmoduleEntry>> {
+    #[must_use] pub const fn submodules(&self) -> Option<&HashMap<SubmoduleName, SubmoduleEntry>> {
         self.submodules.as_ref()
     }
 
     /// Get the sparse checkouts map
-    pub fn sparse_checkouts(&self) -> Option<&HashMap<SubmoduleName, Vec<String>>> {
+    #[must_use] pub const fn sparse_checkouts(&self) -> Option<&HashMap<SubmoduleName, Vec<String>>> {
         self.sparse_checkouts.as_ref()
     }
 
@@ -785,17 +786,14 @@ impl SubmoduleEntries {
     pub fn add_checkout(&mut self, name: SubmoduleName, checkout: &[String], replace: bool) {
         if let Some(sparse_checkouts) = &mut self.sparse_checkouts {
             if let Some(existing_checkout) = sparse_checkouts.get(&name) {
-                match replace {
-                    true => {
-                        // Replace the existing checkout with the new one
-                        sparse_checkouts.insert(name, checkout.to_vec());
-                    }
-                    false => {
-                        // Append to the existing checkout
-                        let mut new_checkout = existing_checkout.clone();
-                        new_checkout.extend_from_slice(checkout);
-                        sparse_checkouts.insert(name, new_checkout);
-                    }
+                if replace {
+                    // Replace the existing checkout with the new one
+                    sparse_checkouts.insert(name, checkout.to_vec());
+                } else {
+                    // Append to the existing checkout
+                    let mut new_checkout = existing_checkout.clone();
+                    new_checkout.extend_from_slice(checkout);
+                    sparse_checkouts.insert(name, new_checkout);
                 }
             } else {
                 // No existing checkout, just insert the new one
@@ -815,14 +813,13 @@ impl SubmoduleEntries {
 
     /// Remove a sparse checkout path
     pub fn remove_sparse_path(&mut self, name: SubmoduleName, path: String) {
-        if let Some(sparse_checkouts) = &mut self.sparse_checkouts {
-            if let Some(paths) = sparse_checkouts.get_mut(&name) {
+        if let Some(sparse_checkouts) = &mut self.sparse_checkouts
+            && let Some(paths) = sparse_checkouts.get_mut(&name) {
                 paths.retain(|p| p != &path);
                 if paths.is_empty() {
                     sparse_checkouts.remove(&name); // Remove the entry if no paths left
                 }
             }
-        }
     }
 
     /// Add a sparse path
@@ -835,15 +832,15 @@ impl SubmoduleEntries {
     }
 
     /// Get a submodule entry by name
-    pub fn get(&self, name: &str) -> Option<&SubmoduleEntry> {
+    #[must_use] pub fn get(&self, name: &str) -> Option<&SubmoduleEntry> {
         self.submodules.as_ref()?.get(name)
     }
 
     /// Returns `true` if a submodule with the given name exists.
-    pub fn contains_key(&self, name: &str) -> bool {
+    #[must_use] pub fn contains_key(&self, name: &str) -> bool {
         self.submodules
             .as_ref()
-            .map_or(false, |s| s.contains_key(name))
+            .is_some_and(|s| s.contains_key(name))
     }
 
     /// Get an iterator over all submodule entries
@@ -872,8 +869,8 @@ impl SubmoduleEntries {
         })
     }
 
-    /// Create a new SubmoduleEntries from a HashMap of submodule entries
-    pub fn from_gitmodules(
+    /// Create a new `SubmoduleEntries` from a `HashMap` of submodule entries
+    #[must_use] pub fn from_gitmodules(
         entries: std::collections::HashMap<String, std::collections::HashMap<String, String>>,
     ) -> Self {
         let mut submodules = HashMap::new();
@@ -905,6 +902,24 @@ impl SubmoduleEntries {
             }
         }
     }
+
+    /// Set sparse paths for an existing submodule entry in-place, keeping `sparse_checkouts` in sync.
+    ///
+    /// Does nothing if no submodule with `name` exists.
+    pub fn set_sparse_paths_for(&mut self, name: &str, paths: Vec<String>) {
+        if let Some(entry) = self.submodules.as_mut().and_then(|m| m.get_mut(name)) {
+            if paths.is_empty() {
+                entry.sparse_paths = None;
+                if let Some(sparse_map) = self.sparse_checkouts.as_mut() {
+                    sparse_map.remove(name);
+                }
+            } else {
+                entry.sparse_paths = Some(paths.clone());
+                let sparse_map = self.sparse_checkouts.get_or_insert_with(HashMap::new);
+                sparse_map.insert(name.to_string(), paths);
+            }
+        }
+    }
 }
 
 impl IntoIterator for SubmoduleEntries {
@@ -930,7 +945,7 @@ pub struct Config {
 #[allow(dead_code)]
 impl Config {
     /// Create a new configuration with the given defaults and submodules
-    pub fn new(defaults: SubmoduleDefaults, submodules: SubmoduleEntries) -> Self {
+    #[must_use] pub const fn new(defaults: SubmoduleDefaults, submodules: SubmoduleEntries) -> Self {
         Self {
             defaults,
             submodules,
@@ -938,7 +953,7 @@ impl Config {
     }
 
     /// Create a new empty configuration with default values
-    pub fn default() -> Self {
+    #[must_use] pub fn default() -> Self {
         Self {
             defaults: SubmoduleDefaults::default(),
             submodules: SubmoduleEntries::default(),
@@ -962,7 +977,7 @@ impl Config {
     }
 
     /// Create a new configuration, resolving defaults
-    pub fn apply_defaults(mut self) -> Self {
+    #[must_use] pub fn apply_defaults(mut self) -> Self {
         if let Some(submodules) = self.submodules.submodules.as_mut() {
             for sub in submodules.values_mut() {
                 Self::apply_option_default(
@@ -1010,7 +1025,7 @@ impl Config {
 
     /// Get a submodule configuration by name
     /// Returns None if the submodule does not exist
-    pub fn get_submodule(&self, name: &str) -> Option<&SubmoduleEntry> {
+    #[must_use] pub fn get_submodule(&self, name: &str) -> Option<&SubmoduleEntry> {
         self.submodules.get(name)
     }
 
@@ -1031,7 +1046,7 @@ impl Config {
         for (name, entry) in target_gitmodules.submodule_iter() {
             if let Some(branch) = &entry.branch {
                 git_ops.set_config_value(
-                    &format!("submodule.{}.branch", name),
+                    &format!("submodule.{name}.branch"),
                     branch.to_string().as_str(),
                     ConfigLevel::Local,
                 )?;
@@ -1042,13 +1057,13 @@ impl Config {
     }
 
     /// Load configuration from a file, merging with CLI options
-    pub fn load(&self, path: impl AsRef<Path>, cli_options: Config) -> anyhow::Result<Self> {
+    pub fn load(&self, path: impl AsRef<Path>, cli_options: Self) -> anyhow::Result<Self> {
         let fig = Figment::from(Self::default()) // 1) start from Rust-side defaults
             .merge(Toml::file(path)) // 2) file-based overrides
             .merge(cli_options); // 3) CLI overrides file
 
         // 4) extract into Config, then post-process submodules
-        let cfg: Config = fig.extract()?;
+        let cfg: Self = fig.extract()?;
         Ok(cfg.apply_defaults())
     }
 
@@ -1060,7 +1075,7 @@ impl Config {
         };
         let fig = Figment::from(Self::default()).merge(Toml::file(p));
         // Extract the configuration from Figment
-        let cfg: Config = fig.extract()?;
+        let cfg: Self = fig.extract()?;
         Ok(cfg.apply_defaults())
     }
 
@@ -1069,7 +1084,7 @@ impl Config {
         &self,
         path: impl AsRef<Path>,
         git_ops: &mut dyn GitOperations,
-        cli_options: Config,
+        cli_options: Self,
     ) -> anyhow::Result<Self> {
         let mut cfg = self.load(path, cli_options)?;
         // Sync with git config
@@ -1082,8 +1097,8 @@ const REPO: figment::Profile = figment::Profile::const_new("repo");
 
 // TODO: Implement figment::Profile for modular configs
 /**
-const USER: figment::Profile = figment::Profile::const_new("user");
-const DEVELOPER: figment::Profile = figment::Profile::const_new("developer");
+const USER: `figment::Profile` = `figment::Profile::const_new("user`");
+const DEVELOPER: `figment::Profile` = `figment::Profile::const_new("developer`");
 */
 
 impl Provider for Config {
@@ -1134,11 +1149,13 @@ mod tests {
             ignore: Some(SerializableIgnore::All),
             fetch_recurse: Some(SerializableFetchRecurse::Always),
             update: Some(SerializableUpdate::Rebase),
+            use_git_default_sparse_checkout: None,
         };
         let other = SubmoduleDefaults {
             ignore: Some(SerializableIgnore::Dirty),
             fetch_recurse: None,
             update: Some(SerializableUpdate::Merge),
+            use_git_default_sparse_checkout: None,
         };
         let merged = base.merge_from(other);
         // other.ignore overrides
@@ -1155,6 +1172,7 @@ mod tests {
             ignore: Some(SerializableIgnore::All),
             fetch_recurse: Some(SerializableFetchRecurse::Never),
             update: Some(SerializableUpdate::Checkout),
+            use_git_default_sparse_checkout: None,
         };
         let other = SubmoduleDefaults::default();
         let merged = base.merge_from(other);
@@ -1171,6 +1189,7 @@ mod tests {
             ignore: Some(SerializableIgnore::Dirty),
             fetch_recurse: Some(SerializableFetchRecurse::Always),
             update: Some(SerializableUpdate::Merge),
+            use_git_default_sparse_checkout: None,
         };
         let merged = base.merge_from(other);
         assert_eq!(merged.ignore, Some(SerializableIgnore::Dirty));
@@ -1554,6 +1573,7 @@ mod tests {
             shallow: None,
             no_init: None,
             sparse_paths: Some(vec!["src/".to_string()]),
+            use_git_default_sparse_checkout: None,
         };
         entries.update_entry("repo".to_string(), entry);
 
@@ -1579,6 +1599,7 @@ mod tests {
             shallow: None,
             no_init: None,
             sparse_paths: Some(vec!["src/".to_string()]),
+            use_git_default_sparse_checkout: None,
         };
         entries.update_entry("repo".to_string(), entry_with_sparse);
         assert!(entries.sparse_checkouts().unwrap().contains_key("repo"));
@@ -1595,6 +1616,7 @@ mod tests {
             shallow: None,
             no_init: None,
             sparse_paths: None,
+            use_git_default_sparse_checkout: None,
         };
         entries.update_entry("repo".to_string(), entry_no_sparse);
         assert!(!entries.sparse_checkouts().unwrap().contains_key("repo"));
@@ -1761,6 +1783,7 @@ mod tests {
             ignore: Some(SerializableIgnore::Dirty),
             fetch_recurse: Some(SerializableFetchRecurse::Always),
             update: Some(SerializableUpdate::Rebase),
+            use_git_default_sparse_checkout: None,
         };
         let entry = SubmoduleEntry::new(
             Some("url".to_string()),
@@ -1790,6 +1813,7 @@ mod tests {
             ignore: Some(SerializableIgnore::Dirty),
             fetch_recurse: Some(SerializableFetchRecurse::Always),
             update: Some(SerializableUpdate::Rebase),
+            use_git_default_sparse_checkout: None,
         };
         let entry = SubmoduleEntry::new(
             Some("url".to_string()),
@@ -1882,6 +1906,7 @@ mod tests {
             shallow: None,
             no_init: None,
             sparse_paths: None,
+            use_git_default_sparse_checkout: None,
         };
         let opts = SubmoduleAddOptions::from_submodule_entries_tuple(("mymod".to_string(), entry));
         // url fallback: path
@@ -1902,6 +1927,7 @@ mod tests {
             shallow: None,
             no_init: None,
             sparse_paths: None,
+            use_git_default_sparse_checkout: None,
         };
         let opts = SubmoduleAddOptions::from_submodule_entries_tuple(("mymod".to_string(), entry));
         // Falls back to name for both url and path
@@ -1954,6 +1980,7 @@ mod tests {
             shallow: Some(false),
             no_init: None,
             sparse_paths: Some(vec!["src/".to_string()]),
+            use_git_default_sparse_checkout: None,
         };
         entries = entries.add_submodule("mymod".to_string(), entry);
 
@@ -2135,7 +2162,9 @@ active = true
         );
         config.add_submodule("repo".to_string(), entry);
 
-        let retrieved = config.get_submodule("repo").expect("submodule should exist");
+        let retrieved = config
+            .get_submodule("repo")
+            .expect("submodule should exist");
         assert!(retrieved.is_remote());
     }
 }

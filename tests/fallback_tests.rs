@@ -16,9 +16,7 @@ use common::TestHarness;
 
 use std::collections::HashMap;
 use submod::config::{SubmoduleAddOptions, SubmoduleEntries, SubmoduleEntry};
-use submod::git_ops::{
-    Git2Operations, GitConfig, GitOpsManager, GitOperations, GixOperations,
-};
+use submod::git_ops::{Git2Operations, GitConfig, GitOperations, GitOpsManager, GixOperations};
 use submod::options::ConfigLevel;
 
 // ============================================================
@@ -56,7 +54,8 @@ mod fallback_behavior_tests {
             "gix.enable_sparse_checkout should return error"
         );
         assert!(
-            gix.set_sparse_patterns("any", &["src".to_string()]).is_err(),
+            gix.set_sparse_patterns("any", &["src".to_string()])
+                .is_err(),
             "gix.set_sparse_patterns should return error"
         );
         assert!(
@@ -154,10 +153,7 @@ mod fallback_behavior_tests {
             .read_git_config(ConfigLevel::Local)
             .expect("read config");
         assert_eq!(
-            config
-                .entries
-                .get("submod.fallbackkey")
-                .map(String::as_str),
+            config.entries.get("submod.fallbackkey").map(String::as_str),
             Some("fallbackval"),
         );
     }
@@ -198,9 +194,7 @@ mod fallback_submodule_tests {
         let harness = TestHarness::new().expect("harness");
         harness.init_git_repo().expect("init repo");
 
-        let remote = harness
-            .create_test_remote("add_fb")
-            .expect("create remote");
+        let remote = harness.create_test_remote("add_fb").expect("create remote");
         let remote_url = format!("file://{}", remote.display());
 
         let mut mgr = GitOpsManager::new(Some(&harness.work_dir), true).expect("mgr");
@@ -272,7 +266,13 @@ mod fallback_submodule_tests {
 
         // Enable sparse checkout first using git commands directly
         let _ = std::process::Command::new("git")
-            .args(["-C", submodule_path.to_str().unwrap(), "config", "core.sparseCheckout", "true"])
+            .args([
+                "-C",
+                submodule_path.to_str().unwrap(),
+                "config",
+                "core.sparseCheckout",
+                "true",
+            ])
             .output();
 
         // apply_sparse_checkout goes through gix (fail) → git2 (fail) → CLI
@@ -469,7 +469,11 @@ mod backend_consistency_tests {
         // Open gix BEFORE writing .gitmodules
         let gix_before = GixOperations::new(Some(&harness.work_dir)).expect("gix");
         let before_entries = gix_before.read_gitmodules().expect("read before");
-        assert_eq!(before_entries.submodule_iter().count(), 0, "should be empty initially");
+        assert_eq!(
+            before_entries.submodule_iter().count(),
+            0,
+            "should be empty initially"
+        );
 
         // Write .gitmodules externally
         let gitmodules_content = "[submodule \"cache-test\"]\n\tpath = lib/cache\n\turl = https://example.com/cache.git\n";

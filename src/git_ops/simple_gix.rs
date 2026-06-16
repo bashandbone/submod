@@ -5,7 +5,7 @@
 
 //! A series of functions that mirror gix cli functionality. Sometimes it's just easier to copy what's already there.
 //!
-//! This module is adapted and simplified from the `gix` CLI (https://github.com/GitoxideLabs/gitoxide/tree/main/src/) and its supporting `gitoxide-core` crate.
+//! This module is adapted and simplified from the `gix` CLI (<https://github.com/GitoxideLabs/gitoxide/tree/main/src>/) and its supporting `gitoxide-core` crate.
 
 use anyhow::Result;
 use gitoxide_core::repository::fetch::{
@@ -37,7 +37,7 @@ pub fn setup_line_renderer_range(
 }
 
 /// Get a progress tree for use with prodash.
-pub fn progress_tree(trace: bool) -> std::sync::Arc<prodash::tree::Root> {
+#[must_use] pub fn progress_tree(trace: bool) -> std::sync::Arc<prodash::tree::Root> {
     prodash::tree::root::Options {
         message_buffer_capacity: if trace { 10_000 } else { 200 },
         ..Default::default()
@@ -80,7 +80,7 @@ pub fn get_progress<T>(
 }
 
 /// Fetch options for the `fetch` command, with an option for shallow fetching.
-fn fetch_options(remote: Option<String>, shallow: bool) -> FetchOptions {
+const fn fetch_options(remote: Option<String>, shallow: bool) -> FetchOptions {
     let shallow = if shallow {
         gix::remote::fetch::Shallow::DepthAtRemote(std::num::NonZeroU32::new(1).unwrap())
     } else {
@@ -89,9 +89,9 @@ fn fetch_options(remote: Option<String>, shallow: bool) -> FetchOptions {
     FetchOptions {
         format: gitoxide_core::OutputFormat::Human,
         dry_run: false,
-        remote: remote,
+        remote,
         ref_specs: Vec::new(),
-        shallow: shallow,
+        shallow,
         handshake_info: false,
         negotiation_info: false,
         open_negotiation_graph: None,
@@ -100,15 +100,8 @@ fn fetch_options(remote: Option<String>, shallow: bool) -> FetchOptions {
 
 /// Fetch updates from a remote repository.
 pub fn fetch_repo(repo: gix::Repository, remote: Option<String>, shallow: bool) -> Result<()> {
-    let inner_result =
-        get_progress("fetch", Some(FetchProgressRange), |progress, out, err| {
-            gitoxide_core::repository::fetch(
-                repo,
-                progress,
-                out,
-                err,
-                fetch_options(remote, shallow),
-            )
-        })?;
+    let inner_result = get_progress("fetch", Some(FetchProgressRange), |progress, out, err| {
+        gitoxide_core::repository::fetch(repo, progress, out, err, fetch_options(remote, shallow))
+    })?;
     inner_result.map_err(|e| anyhow::anyhow!("Fetch failed: {e}"))
 }

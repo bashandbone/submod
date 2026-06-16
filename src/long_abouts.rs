@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: LicenseRef-PlainMIT OR MIT
 
 //! A series of multiline strings for long-about text. We put them here to keep the command module somewhat readable.
-pub const COMPLETE_ME: &str = r##"
+pub const COMPLETE_ME: &str = r#"
 Generates shell completion script for the specified shell.
 
 Supported shells:
@@ -29,4 +29,4 @@ Usage:
     - Zsh: `submod completeme zsh > ~/.zsh/completions/_submod` or `submod completeme zsh > ~/.zfunc/_submod`
 
     - Nushell: `submod completeme nu > "$NUSHELL_CONFIG_DIR/scripts/completions/submod.nu" && echo 'use completions/submod.nu' >> "$NU_CONFIG_PATH"`
-"##;
+"#;

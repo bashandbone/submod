@@ -146,10 +146,7 @@ impl TestHarness {
 
         // Create a working copy to add content
         let work_copy = self.temp_dir.path().join(format!("{name}_work"));
-        self.git_cmd()
-            .args(["init"])
-            .arg(&work_copy)
-            .output()?;
+        self.git_cmd().args(["init"]).arg(&work_copy).output()?;
 
         // Set the default branch to main for the working copy
         self.git_cmd()
@@ -264,6 +261,7 @@ impl TestHarness {
     }
 
     /// Create a config file with given content
+    #[allow(dead_code)] // Used by integration tests; required for test harness
     pub fn create_config(&self, content: &str) -> Result<(), Box<dyn std::error::Error>> {
         fs::write(self.config_path(), content)?;
         Ok(())
@@ -381,10 +379,7 @@ impl TestHarness {
 
         // Create a working copy to add content
         let work_copy = self.temp_dir.path().join(format!("{name}_work"));
-        self.git_cmd()
-            .args(["init"])
-            .arg(&work_copy)
-            .output()?;
+        self.git_cmd().args(["init"]).arg(&work_copy).output()?;
 
         // Set up the main branch and remote
         self.git_cmd()

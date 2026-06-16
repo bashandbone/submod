@@ -13,7 +13,7 @@ use common::TestHarness;
 use std::collections::HashMap;
 use submod::config::{SubmoduleEntries, SubmoduleEntry, SubmoduleUpdateOptions};
 use submod::git_ops::{
-    Git2Operations, GitConfig, GitOpsManager, GitOperations, GixOperations, SubmoduleStatusFlags,
+    Git2Operations, GitConfig, GitOperations, GitOpsManager, GixOperations, SubmoduleStatusFlags,
 };
 use submod::options::ConfigLevel;
 
@@ -132,10 +132,7 @@ mod git2_ops_tests {
             .read_git_config(ConfigLevel::Local)
             .expect("read config");
         assert_eq!(
-            config
-                .entries
-                .get("submod.singlekey")
-                .map(String::as_str),
+            config.entries.get("submod.singlekey").map(String::as_str),
             Some("singlevalue"),
         );
     }
@@ -345,9 +342,7 @@ mod git2_ops_tests {
     fn test_with_submodule_enable_sparse_checkout_and_patterns() {
         let harness = TestHarness::new().expect("harness");
         harness.init_git_repo().expect("init repo");
-        let remote = harness
-            .create_test_remote("g2_sparse_sub")
-            .expect("remote");
+        let remote = harness.create_test_remote("g2_sparse_sub").expect("remote");
         let remote_url = format!("file://{}", remote.display());
 
         harness
@@ -380,9 +375,7 @@ mod git2_ops_tests {
     fn test_with_submodule_write_gitmodules_updates_existing() {
         let harness = TestHarness::new().expect("harness");
         harness.init_git_repo().expect("init repo");
-        let remote = harness
-            .create_test_remote("g2_write_sub")
-            .expect("remote");
+        let remote = harness.create_test_remote("g2_write_sub").expect("remote");
         let remote_url = format!("file://{}", remote.display());
 
         harness
@@ -397,9 +390,67 @@ mod git2_ops_tests {
             .expect("add submodule");
 
         let mut ops = Git2Operations::new(Some(&harness.work_dir)).expect("ops");
-        let entries = ops.read_gitmodules().expect("read_gitmodules");
+        let mut entries = ops.read_gitmodules().expect("read_gitmodules");
         // write_gitmodules with the same entries should succeed without error
         ops.write_gitmodules(&entries).expect("write_gitmodules");
+
+        // Verify that updating `active` sets it in the git configuration
+        // In .gitmodules the git2 fallback might name the submodule by its path 'lib/writesub'
+        let name = if entries.get("write-sub").is_some() {
+            "write-sub"
+        } else {
+            "lib/writesub"
+        };
+
+        if let Some(mut entry) = entries.get(name).cloned() {
+            entry.active = Some(false);
+            entries.update_entry(name.to_string(), entry);
+        }
+        ops.write_gitmodules(&entries).expect("write_gitmodules active false");
+
+        // Check git2 config manually or via read_gitmodules? Actually read_gitmodules in git2
+        // doesn't read active from .git/config, but wait, it is set in `.git/config`!
+        let config_path = harness.work_dir.join(".git").join("config");
+        let config_content = std::fs::read_to_string(&config_path).expect("read git config");
+        assert!(config_content.contains("active = false"), "submodule should be inactive in config");
+    }
+
+    #[test]
+    fn test_with_submodule_write_gitmodules_active_none() {
+        let harness = TestHarness::new().expect("harness");
+        harness.init_git_repo().expect("init repo");
+        let remote = harness.create_test_remote("g2_write_sub_none").expect("remote");
+        let remote_url = format!("file://{}", remote.display());
+
+        harness
+            .run_submod_success(&[
+                "add",
+                &remote_url,
+                "--name",
+                "write-sub-none",
+                "--path",
+                "lib/writesubnone",
+            ])
+            .expect("add submodule");
+
+        let mut ops = Git2Operations::new(Some(&harness.work_dir)).expect("ops");
+        let mut entries = ops.read_gitmodules().expect("read_gitmodules");
+
+        let name = if entries.get("write-sub-none").is_some() {
+            "write-sub-none"
+        } else {
+            "lib/writesubnone"
+        };
+
+        if let Some(mut entry) = entries.get(name).cloned() {
+            entry.active = None;
+            entries.update_entry(name.to_string(), entry);
+        }
+        ops.write_gitmodules(&entries).expect("write_gitmodules active none");
+
+        let config_path = harness.work_dir.join(".git").join("config");
+        let config_content = std::fs::read_to_string(&config_path).expect("read git config");
+        assert!(!config_content.contains("active ="), "submodule active should be untouched");
     }
 }
 
@@ -528,8 +579,11 @@ mod gix_ops_tests {
         // gix cannot round-trip through write_git_config, so this always fails.
         // The test exists to exercise the set_config_value → read → merge → write
         // code path for coverage.
-        let result =
-            ops.set_config_value("remote.gixremote.url", "https://gix.example.com", ConfigLevel::Local);
+        let result = ops.set_config_value(
+            "remote.gixremote.url",
+            "https://gix.example.com",
+            ConfigLevel::Local,
+        );
         assert!(
             result.is_err(),
             "expected failure: existing 2-part config keys cannot be round-tripped by gix"
@@ -556,6 +610,46 @@ mod gix_ops_tests {
             content.contains("lib/test"),
             ".gitmodules should contain the path we wrote"
         );
+    }
+
+    #[test]
+    fn test_write_gitmodules_active_false() {
+        let harness = TestHarness::new().expect("harness");
+        harness.init_git_repo().expect("init repo");
+        let mut ops = GixOperations::new(Some(&harness.work_dir)).expect("ops");
+
+        let mut entries = one_entry_entries();
+        if let Some(mut entry) = entries.get("test-lib").cloned() {
+            entry.active = Some(false);
+            entries.update_entry("test-lib".to_string(), entry);
+        }
+
+        ops.write_gitmodules(&entries)
+            .expect("write_gitmodules should succeed");
+
+        let content = std::fs::read_to_string(harness.work_dir.join(".gitmodules"))
+            .expect("read .gitmodules");
+        assert!(
+            content.contains("active = false"),
+            ".gitmodules should contain active = false"
+        );
+    }
+
+    #[test]
+    fn test_write_gitmodules_active_none() {
+        let harness = TestHarness::new().expect("harness");
+        harness.init_git_repo().expect("init repo");
+        let mut ops = GixOperations::new(Some(&harness.work_dir)).expect("ops");
+
+        let mut entries = one_entry_entries();
+        if let Some(mut entry) = entries.get("test-lib").cloned() {
+            entry.active = None;
+            entries.update_entry("test-lib".to_string(), entry);
+        }
+
+        ops.write_gitmodules(&entries).expect("write_gitmodules");
+        let content = std::fs::read_to_string(harness.work_dir.join(".gitmodules")).expect("read");
+        assert!(!content.contains("active ="));
     }
 
     #[test]
@@ -587,7 +681,10 @@ mod gix_ops_tests {
             no_init: false,
         };
         let result = ops.add_submodule(&add_opts);
-        assert!(result.is_err(), "gix add_submodule should be not implemented");
+        assert!(
+            result.is_err(),
+            "gix add_submodule should be not implemented"
+        );
         let msg = result.unwrap_err().to_string();
         assert!(
             msg.contains("gix add_submodule not implemented"),
@@ -686,9 +783,7 @@ mod gix_ops_tests {
     fn test_with_submodule_list_and_read_gitmodules() {
         let harness = TestHarness::new().expect("harness");
         harness.init_git_repo().expect("init repo");
-        let remote = harness
-            .create_test_remote("gix_list_sub")
-            .expect("remote");
+        let remote = harness.create_test_remote("gix_list_sub").expect("remote");
         let remote_url = format!("file://{}", remote.display());
 
         harness
@@ -747,7 +842,10 @@ mod git_ops_manager_tests {
         let harness = TestHarness::new().expect("harness");
         harness.init_git_repo().expect("init repo");
         let mgr = GitOpsManager::new(Some(&harness.work_dir), false);
-        assert!(mgr.is_ok(), "manager creation from valid path should succeed");
+        assert!(
+            mgr.is_ok(),
+            "manager creation from valid path should succeed"
+        );
     }
 
     #[test]
@@ -799,7 +897,11 @@ mod git_ops_manager_tests {
         harness.init_git_repo().expect("init repo");
         let mgr = GitOpsManager::new(Some(&harness.work_dir), false).expect("mgr");
         let result = mgr.read_git_config(ConfigLevel::Local);
-        assert!(result.is_ok(), "should read local config: {:?}", result.err());
+        assert!(
+            result.is_ok(),
+            "should read local config: {:?}",
+            result.err()
+        );
     }
 
     #[test]
@@ -833,8 +935,7 @@ mod git_ops_manager_tests {
         let harness = TestHarness::new().expect("harness");
         harness.init_git_repo().expect("init repo");
         let mgr = GitOpsManager::new(Some(&harness.work_dir), false).expect("mgr");
-        let result =
-            mgr.set_config_value("submod.mgrsetkey", "mgrsetval", ConfigLevel::Local);
+        let result = mgr.set_config_value("submod.mgrsetkey", "mgrsetval", ConfigLevel::Local);
         assert!(
             result.is_ok(),
             "set_config_value should succeed: {:?}",
@@ -941,9 +1042,11 @@ mod data_types_tests {
             | SubmoduleStatusFlags::WD_ADDED
             | SubmoduleStatusFlags::WD_DELETED;
 
-        assert!(flags.intersects(
-            SubmoduleStatusFlags::WD_MODIFIED | SubmoduleStatusFlags::WD_WD_MODIFIED
-        ));
+        assert!(
+            flags.intersects(
+                SubmoduleStatusFlags::WD_MODIFIED | SubmoduleStatusFlags::WD_WD_MODIFIED
+            )
+        );
         assert!(flags.contains(SubmoduleStatusFlags::INDEX_ADDED));
         assert!(!flags.contains(SubmoduleStatusFlags::IN_HEAD));
     }

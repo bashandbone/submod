@@ -432,6 +432,61 @@ mod tests {
     }
 
     #[test]
+    fn test_generate_config_from_setup_includes_sparse_paths() {
+        let harness = TestHarness::new().expect("Failed to create test harness");
+        harness.init_git_repo().expect("Failed to init git repo");
+
+        let remote = harness
+            .create_complex_remote("genconf_sparse")
+            .expect("Failed to create remote");
+        let url = format!("file://{}", remote.display());
+
+        // Add a submodule with sparse checkout paths configured
+        harness
+            .run_submod_success(&[
+                "add",
+                &url,
+                "--name",
+                "sparse-lib",
+                "--path",
+                "lib/sparse",
+                "--sparse-paths",
+                "src,docs",
+            ])
+            .expect("Failed to add submodule with sparse paths");
+
+        let output_path = harness.work_dir.join("sparse_setup.toml");
+
+        let stdout = harness
+            .run_submod_success(&[
+                "--config",
+                output_path.to_str().unwrap(),
+                "generate-config",
+                "--from-setup",
+                "--output",
+                output_path.to_str().unwrap(),
+            ])
+            .expect("Failed to generate config from setup");
+
+        assert!(
+            stdout.contains("Generated config from .gitmodules"),
+            "Expected success message; got: {stdout}"
+        );
+
+        assert!(output_path.exists(), "Output config file should exist");
+
+        let content = fs::read_to_string(&output_path).expect("Failed to read generated config");
+        assert!(
+            content.contains("sparse_paths"),
+            "Generated config should include sparse_paths; got:\n{content}"
+        );
+        assert!(
+            content.contains("src") && content.contains("docs"),
+            "Generated config should include the configured sparse paths 'src' and 'docs'; got:\n{content}"
+        );
+    }
+
+    #[test]
     fn test_generate_config_force_overwrites_existing() {
         let harness = TestHarness::new().expect("Failed to create test harness");
         harness.init_git_repo().expect("Failed to init git repo");
