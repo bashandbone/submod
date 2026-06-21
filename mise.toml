@@ -14,10 +14,10 @@ cargo-binstall = "latest"
 "cargo:cargo-watch" = "latest" # For watching files and rerunning commands.
 hk = "latest"  # Handles git hooks, like pre-commit.
 jq = "latest"
-"pipx:reuse" = "latest"
 pkl = "latest"  # pkl for `hk`, which handles git hooks
 rust = "1.89"   # The minimum Rust version we support; mise just makes sure it's there.
 typos = "latest"
+"pipx:reuse" = { version = "latest", uvx_args = '-p 3.13' }
 
 [env]
 CARGO_TARGET_DIR = "target"
