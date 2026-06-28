@@ -18,6 +18,7 @@ pkl = "latest"  # pkl for `hk`, which handles git hooks
 rust = "1.89"   # The minimum Rust version we support; mise just makes sure it's there.
 typos = "latest"
 "pipx:reuse" = { version = "latest", uvx_args = '-p 3.13' }
+"cargo:licet" = "0.2.2"
 
 [env]
 CARGO_TARGET_DIR = "target"
