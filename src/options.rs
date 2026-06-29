@@ -290,6 +290,25 @@ pub enum SerializableFetchRecurse {
     Unspecified,
 }
 
+impl SerializableFetchRecurse {
+    /// The value as written to / read from `submod.toml`.
+    ///
+    /// This is the serde kebab-case form (`on-demand` / `always` / `never`) and is
+    /// deliberately distinct from [`GitmodulesConvert::to_gitmodules`], which uses
+    /// git's `true`/`false` encoding for `.gitmodules` and `.git/config`. The TOML
+    /// writers must use this form so values round-trip back through the `Deserialize`
+    /// impl (which expects the kebab-case spelling).
+    #[must_use]
+    pub const fn as_config_value(&self) -> &'static str {
+        match self {
+            Self::OnDemand => "on-demand",
+            Self::Always => "always",
+            Self::Never => "never",
+            Self::Unspecified => "",
+        }
+    }
+}
+
 impl GitmodulesConvert for SerializableFetchRecurse {
     /// Get the git key for the fetch recurse submodule setting
     fn gitmodules_key(&self) -> &'static str {
@@ -909,6 +928,21 @@ mod tests {
         assert_eq!(
             SerializableFetchRecurse::OnDemand.gitmodules_key(),
             "fetchRecurseSubmodules"
+        );
+    }
+
+    #[test]
+    fn test_fetch_recurse_as_config_value_uses_serde_form_not_git_bools() {
+        // The submod.toml value form must be the serde kebab spelling so it round-trips
+        // through Deserialize — NOT git's true/false encoding used by to_gitmodules.
+        assert_eq!(SerializableFetchRecurse::OnDemand.as_config_value(), "on-demand");
+        assert_eq!(SerializableFetchRecurse::Always.as_config_value(), "always");
+        assert_eq!(SerializableFetchRecurse::Never.as_config_value(), "never");
+        assert_eq!(SerializableFetchRecurse::Unspecified.as_config_value(), "");
+        // Guard against regressing to the git-config encoding for the TOML value.
+        assert_ne!(
+            SerializableFetchRecurse::Always.as_config_value(),
+            SerializableFetchRecurse::Always.to_gitmodules()
         );
     }
 
