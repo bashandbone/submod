@@ -41,7 +41,7 @@ rustdoc-args = ["--cfg", "docsrs"]
 
 [dependencies]
 # Gitoxide ops
-gix = { version = "0.81.0", default-features = false, features = [
+gix = { version = "0.83.0", default-features = false, features = [
   "blocking-network-client",
   "blocking-http-transport-curl-rustls",
   "parallel",
