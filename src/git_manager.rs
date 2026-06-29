@@ -375,16 +375,11 @@ impl GitManager {
         let submodule_repo =
             gix::open(submodule_path).map_err(|_| SubmoduleError::RepositoryError)?;
 
-        // GITOXIDE API: Use gix for what's available, fall back to CLI for complex status
-        // For now, use a simple approach - check if there are any uncommitted changes
-        let is_dirty = match submodule_repo.head() {
-            Ok(_head) => {
-                // Simple check - if we can get head, assume repository is clean
-                // This is a conservative approach until we can use the full status API
-                false
-            }
-            Err(_) => true,
-        };
+        // GITOXIDE API: Determine whether the worktree has uncommitted changes.
+        // `is_dirty()` runs the real status computation (modified tracked files
+        // and untracked files alike). If it cannot be determined, conservatively
+        // report dirty so a potential problem is surfaced rather than hidden.
+        let is_dirty = submodule_repo.is_dirty().unwrap_or(true);
 
         // GITOXIDE API: Use reference APIs for current commit
         let current_commit = match submodule_repo.head() {

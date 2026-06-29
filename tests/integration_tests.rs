@@ -323,6 +323,70 @@ sparse_paths = ["src"]
         );
     }
 
+    /// `check` must report a submodule whose worktree has uncommitted changes as
+    /// dirty. Regression test for `is_dirty` being a stub that always reported
+    /// clean when HEAD resolved (`src/git_manager.rs`), so the status command
+    /// could never surface a modified working tree (#62 P1).
+    #[test]
+    fn check_reports_dirty_submodule_worktree() {
+        let harness = TestHarness::new().expect("Failed to create test harness");
+        harness.init_git_repo().expect("Failed to init git repo");
+
+        let remote_repo = harness
+            .create_test_remote("dirty_lib")
+            .expect("Failed to create remote");
+        let remote_url = format!("file://{}", remote_repo.display());
+
+        harness
+            .run_submod_success(&[
+                "add",
+                &remote_url,
+                "--name",
+                "dirty-lib",
+                "--path",
+                "lib/dirty",
+            ])
+            .expect("Failed to add submodule");
+
+        // Precondition (guards against a vacuous pass): a clean worktree is
+        // reported clean. If this ever fails, the dirty assertion below would
+        // be meaningless.
+        let clean_out = harness
+            .run_submod_success(&["check", "--verbose"])
+            .expect("Failed to run check on clean submodule");
+        assert!(
+            clean_out.contains("Working tree is clean"),
+            "precondition: a freshly-added submodule must report a clean worktree, got:\n{clean_out}"
+        );
+
+        // Modify a tracked file in the submodule worktree without committing.
+        fs::write(
+            harness.work_dir.join("lib/dirty/LICENSE"),
+            "MIT License\nlocal edit\n",
+        )
+        .expect("Failed to dirty submodule worktree");
+
+        // Precondition: git itself sees the worktree as dirty.
+        assert!(
+            !harness
+                .git_stdout(&["-C", "lib/dirty", "status", "--porcelain"])
+                .is_empty(),
+            "precondition: the submodule worktree must be dirty per git"
+        );
+
+        let dirty_out = harness
+            .run_submod_success(&["check", "--verbose"])
+            .expect("Failed to run check on dirty submodule");
+        assert!(
+            dirty_out.contains("Working tree has changes"),
+            "check must report the modified submodule worktree as dirty, got:\n{dirty_out}"
+        );
+        assert!(
+            !dirty_out.contains("Working tree is clean"),
+            "check must not report the modified submodule worktree as clean, got:\n{dirty_out}"
+        );
+    }
+
     #[test]
     fn test_reset_command() {
         let harness = TestHarness::new().expect("Failed to create test harness");
