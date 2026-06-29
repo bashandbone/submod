@@ -953,4 +953,250 @@ active = true
             "Repository at lib/shallow should be shallow"
         );
     }
+
+    // ---------------------------------------------------------------------
+    // Git-state assertions for add / delete / nuke (issue #62, P0-2).
+    //
+    // These tests assert on the *git state* submod manipulates — the index
+    // gitlink, `.gitmodules`, the `submodule.*` config sections, and the
+    // per-submodule `.git/modules/<path>` directory — rather than on printed
+    // output or `submod.toml` text. The pre-delete assertions double as a guard
+    // against the post-delete assertions passing vacuously.
+    // ---------------------------------------------------------------------
+
+    /// `add` must register real git state, not just write `submod.toml`:
+    /// an index gitlink at mode 160000, a `.gitmodules` entry, a `submodule.*`
+    /// config section, the `.git/modules/<path>` dir, and a worktree checked out
+    /// at the gitlinked commit.
+    #[test]
+    fn test_add_registers_real_git_state() {
+        let harness = TestHarness::new().expect("Failed to create test harness");
+        harness.init_git_repo().expect("Failed to init git repo");
+
+        let remote_repo = harness
+            .create_test_remote("state_lib")
+            .expect("Failed to create remote");
+        let remote_url = format!("file://{}", remote_repo.display());
+
+        harness
+            .run_submod_success(&[
+                "add",
+                &remote_url,
+                "--name",
+                "state-lib",
+                "--path",
+                "lib/state",
+            ])
+            .expect("Failed to add submodule");
+
+        // Index gitlink: the path must be staged as a submodule (mode 160000).
+        let stage = harness.git_stdout(&["ls-files", "--stage", "--", "lib/state"]);
+        let fields: Vec<&str> = stage.split_whitespace().collect();
+        assert_eq!(
+            fields.first().copied(),
+            Some("160000"),
+            "expected an index gitlink at mode 160000 for lib/state, got: {stage:?}"
+        );
+        let gitlink_oid = fields.get(1).copied().expect("gitlink should carry an OID");
+
+        // `.gitmodules` must carry the submodule's path and url.
+        let gitmodules = harness.gitmodules_entries();
+        assert!(
+            gitmodules.contains("lib/state") && gitmodules.contains(&remote_url),
+            "expected .gitmodules to record lib/state and its url, got:\n{gitmodules}"
+        );
+
+        // `.git/config` must carry a `submodule.*` section for the submodule.
+        let config_entries = harness.submodule_config_entries();
+        assert!(
+            config_entries.contains("lib/state"),
+            "expected a submodule.* config section for lib/state, got:\n{config_entries}"
+        );
+
+        // The per-submodule git directory must exist.
+        assert!(
+            harness.git_modules_dir_exists("lib/state"),
+            ".git/modules/lib/state should exist after add"
+        );
+
+        // The worktree must be checked out at exactly the gitlinked commit.
+        let head = harness.git_stdout(&["-C", "lib/state", "rev-parse", "HEAD"]);
+        assert_eq!(
+            head, gitlink_oid,
+            "submodule worktree HEAD should match the index gitlink commit"
+        );
+    }
+
+    /// `delete` must remove all git state, not just the `submod.toml` section:
+    /// the worktree, the index gitlink, the `.gitmodules` entry, the `submodule.*`
+    /// config section, and the `.git/modules/<path>` directory.
+    #[test]
+    fn test_delete_cleans_up_git_state() {
+        let harness = TestHarness::new().expect("Failed to create test harness");
+        harness.init_git_repo().expect("Failed to init git repo");
+
+        let remote_repo = harness
+            .create_test_remote("del_state_lib")
+            .expect("Failed to create remote");
+        let remote_url = format!("file://{}", remote_repo.display());
+
+        harness
+            .run_submod_success(&[
+                "add",
+                &remote_url,
+                "--name",
+                "del-state",
+                "--path",
+                "lib/delstate",
+            ])
+            .expect("Failed to add submodule");
+
+        // Guard: the state we are about to assert is *gone* must first be present,
+        // so the post-delete assertions cannot pass vacuously.
+        assert_eq!(
+            harness.index_gitlink_mode("lib/delstate").as_deref(),
+            Some("160000"),
+            "precondition: gitlink should exist before delete"
+        );
+        assert!(
+            !harness.gitmodules_entries().is_empty(),
+            "precondition: .gitmodules entry should exist before delete"
+        );
+        assert!(
+            !harness.submodule_config_entries().is_empty(),
+            "precondition: submodule.* config should exist before delete"
+        );
+        assert!(
+            harness.git_modules_dir_exists("lib/delstate"),
+            "precondition: .git/modules/lib/delstate should exist before delete"
+        );
+        assert!(harness.dir_exists("lib/delstate"));
+
+        harness
+            .run_submod_success(&["delete", "del-state"])
+            .expect("Failed to delete submodule");
+
+        assert!(
+            !harness.dir_exists("lib/delstate"),
+            "worktree lib/delstate should be removed"
+        );
+        assert_eq!(
+            harness.index_gitlink_mode("lib/delstate"),
+            None,
+            "index gitlink for lib/delstate should be cleared"
+        );
+        assert!(
+            harness.gitmodules_entries().is_empty(),
+            "no submodule entry should remain in .gitmodules, got:\n{}",
+            harness.gitmodules_entries()
+        );
+        assert!(
+            harness.submodule_config_entries().is_empty(),
+            "no submodule.* config section should remain, got:\n{}",
+            harness.submodule_config_entries()
+        );
+        assert!(
+            !harness.git_modules_dir_exists("lib/delstate"),
+            ".git/modules/lib/delstate should be removed"
+        );
+    }
+
+    /// `nuke-it-from-orbit --kill` must clean up the same git state as `delete`.
+    #[test]
+    fn test_nuke_kill_cleans_up_git_state() {
+        let harness = TestHarness::new().expect("Failed to create test harness");
+        harness.init_git_repo().expect("Failed to init git repo");
+
+        let remote_repo = harness
+            .create_test_remote("nuke_state_lib")
+            .expect("Failed to create remote");
+        let remote_url = format!("file://{}", remote_repo.display());
+
+        harness
+            .run_submod_success(&[
+                "add",
+                &remote_url,
+                "--name",
+                "nuke-state",
+                "--path",
+                "lib/nukestate",
+            ])
+            .expect("Failed to add submodule");
+
+        // Guard against vacuous post-nuke assertions.
+        assert_eq!(
+            harness.index_gitlink_mode("lib/nukestate").as_deref(),
+            Some("160000"),
+            "precondition: gitlink should exist before nuke"
+        );
+        assert!(harness.git_modules_dir_exists("lib/nukestate"));
+
+        harness
+            .run_submod_success(&["nuke-it-from-orbit", "nuke-state", "--kill"])
+            .expect("Failed to nuke submodule");
+
+        assert!(
+            !harness.dir_exists("lib/nukestate"),
+            "worktree lib/nukestate should be removed after nuke --kill"
+        );
+        assert_eq!(
+            harness.index_gitlink_mode("lib/nukestate"),
+            None,
+            "index gitlink for lib/nukestate should be cleared after nuke --kill"
+        );
+        assert!(
+            harness.gitmodules_entries().is_empty(),
+            "no submodule entry should remain in .gitmodules after nuke --kill, got:\n{}",
+            harness.gitmodules_entries()
+        );
+        assert!(
+            harness.submodule_config_entries().is_empty(),
+            "no submodule.* config section should remain after nuke --kill, got:\n{}",
+            harness.submodule_config_entries()
+        );
+        assert!(
+            !harness.git_modules_dir_exists("lib/nukestate"),
+            ".git/modules/lib/nukestate should be removed after nuke --kill"
+        );
+    }
+
+    /// After a `delete`, the on-disk git cleanup must be thorough enough that the
+    /// same name+path can be added again — the real proof that no blocking
+    /// `.git/modules/<path>` or stale config lingers.
+    #[test]
+    fn test_delete_then_readd_same_name_and_path_succeeds() {
+        let harness = TestHarness::new().expect("Failed to create test harness");
+        harness.init_git_repo().expect("Failed to init git repo");
+
+        let remote_repo = harness
+            .create_test_remote("readd_lib")
+            .expect("Failed to create remote");
+        let remote_url = format!("file://{}", remote_repo.display());
+
+        let add_args = [
+            "add",
+            remote_url.as_str(),
+            "--name",
+            "readd-lib",
+            "--path",
+            "lib/readd",
+        ];
+
+        harness
+            .run_submod_success(&add_args)
+            .expect("initial add should succeed");
+        harness
+            .run_submod_success(&["delete", "readd-lib"])
+            .expect("delete should succeed");
+
+        // Re-adding the same name+path must succeed and re-register the gitlink.
+        harness
+            .run_submod_success(&add_args)
+            .expect("re-add of same name+path after delete should succeed");
+        assert_eq!(
+            harness.index_gitlink_mode("lib/readd").as_deref(),
+            Some("160000"),
+            "re-added submodule should be staged as a gitlink again"
+        );
+    }
 }

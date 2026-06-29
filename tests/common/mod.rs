@@ -285,6 +285,66 @@ impl TestHarness {
         self.work_dir.join(path).is_file()
     }
 
+    /// Run a git command in the work directory (with per-test config isolation) and
+    /// return its stdout, trimmed. Panics if git cannot be spawned. Intended for
+    /// asserting on real git state rather than on printed output or `submod.toml` text.
+    #[allow(dead_code)] // Used by integration tests; required for test harness
+    pub fn git_stdout(&self, args: &[&str]) -> String {
+        let output = self
+            .git_cmd()
+            .args(args)
+            .current_dir(&self.work_dir)
+            .output()
+            .expect("failed to run git command");
+        String::from_utf8_lossy(&output.stdout).trim().to_string()
+    }
+
+    /// Return the index gitlink mode for `path` (e.g. `"160000"`), or `None` if the
+    /// path is not staged. A registered submodule is staged as mode `160000`.
+    #[allow(dead_code)] // Used by integration tests; required for test harness
+    pub fn index_gitlink_mode(&self, path: &str) -> Option<String> {
+        let out = self.git_stdout(&["ls-files", "--stage", "--", path]);
+        if out.is_empty() {
+            return None;
+        }
+        out.split_whitespace().next().map(str::to_string)
+    }
+
+    /// Return all `submodule.*` entries from the superproject's `.git/config`
+    /// (`git config --get-regexp ^submodule\.`), or an empty string if there are none.
+    #[allow(dead_code)] // Used by integration tests; required for test harness
+    pub fn submodule_config_entries(&self) -> String {
+        self.git_stdout(&["config", "--get-regexp", r"^submodule\."])
+    }
+
+    /// Return all `submodule.*` entries from the `.gitmodules` file, or an empty string
+    /// if the file is absent/empty. Queries via git so the result reflects parsed config,
+    /// not raw text.
+    #[allow(dead_code)] // Used by integration tests; required for test harness
+    pub fn gitmodules_entries(&self) -> String {
+        if !self.work_dir.join(".gitmodules").exists() {
+            return String::new();
+        }
+        self.git_stdout(&[
+            "config",
+            "--file",
+            ".gitmodules",
+            "--get-regexp",
+            r"^submodule\.",
+        ])
+    }
+
+    /// Check whether the per-submodule git directory `.git/modules/<subpath>` exists.
+    /// This is the artifact whose lingering presence can block a clean re-add.
+    #[allow(dead_code)] // Used by integration tests; required for test harness
+    pub fn git_modules_dir_exists(&self, subpath: &str) -> bool {
+        self.work_dir
+            .join(".git")
+            .join("modules")
+            .join(subpath)
+            .exists()
+    }
+
     /// Find the actual sparse-checkout file path, handling gitlinks
     #[allow(dead_code)] // Used by integration tests; required for test harness
     pub fn get_sparse_checkout_file_path(&self, submodule_path: &str) -> std::path::PathBuf {
