@@ -2,8 +2,17 @@
 #
 # SPDX-License-Identifier: LicenseRef-PlainMIT OR MIT
 
-/target
+.DS_STORE
+Thumbs.db
+
+.venv
+venv
+
+target/
 lcov.info
 .coverage
 htmlcov
 coverage.xml
+.claudedocs/
+claudedocs/
+
