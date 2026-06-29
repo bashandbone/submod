@@ -188,6 +188,30 @@ impl GitOpsManager {
         })
     }
 
+    /// Create a `GitOpsManager` with the gix backend disabled, forcing every
+    /// operation through git2 (and, for `add_submodule`, the CLI last resort).
+    ///
+    /// gix is an optional optimistic backend: when it is absent, `GitOpsManager`
+    /// is designed to fall straight through to git2 for every operation. This
+    /// constructor makes that git2-only mode reachable so the fallback path can
+    /// be exercised for correct results rather than left as dead code.
+    pub fn without_gix(repo_path: Option<&Path>, verbose: bool) -> Result<Self> {
+        let git2_ops = Git2Operations::new(repo_path)
+            .with_context(|| "Failed to initialize git2 operations")?;
+
+        Ok(Self {
+            gix_ops: None,
+            git2_ops,
+            verbose,
+        })
+    }
+
+    /// Whether the optimistic gix backend is currently active. When `false`,
+    /// every operation is served by git2 (the fallback backend).
+    pub fn gix_enabled(&self) -> bool {
+        self.gix_ops.is_some()
+    }
+
     /// Return the working directory of the underlying git repository, if any.
     pub fn workdir(&self) -> Option<&std::path::Path> {
         self.git2_ops.workdir()

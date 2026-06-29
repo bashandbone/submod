@@ -684,3 +684,293 @@ mod verbose_fallback_tests {
             .expect("should succeed silently in non-verbose mode");
     }
 }
+
+// ============================================================
+// Failure-injection seam: force git2 by disabling gix (P0-1)
+//
+// `GitOpsManager::without_gix` builds a manager with no gix backend, so every
+// `try_with_fallback` call goes straight to git2. This is the only way to
+// exercise git2's implementation of operations gix *does* implement
+// (read/write_gitmodules, add/delete, list) for *correct results* rather than
+// just "didn't panic". Without this seam, gix always wins those ops and git2's
+// code is dead from the suite's perspective.
+// ============================================================
+
+#[cfg(test)]
+mod git2_fallback_injection_tests {
+    use super::*;
+
+    /// Set up a repo with one real submodule (name `inj-sub`, path `lib/inj`).
+    fn setup_repo_with_submodule(
+        harness: &TestHarness,
+    ) -> Result<String, Box<dyn std::error::Error>> {
+        harness.init_git_repo()?;
+        let remote = harness.create_test_remote("inj_sub")?;
+        let remote_url = format!("file://{}", remote.display());
+        harness.run_submod_success(&[
+            "add",
+            &remote_url,
+            "--name",
+            "inj-sub",
+            "--path",
+            "lib/inj",
+        ])?;
+        Ok(remote_url)
+    }
+
+    /// The seam itself: `without_gix` must disable the gix backend while the
+    /// normal constructor keeps it enabled. This guarantees the tests below
+    /// actually route through git2 (non-vacuousness for the whole module).
+    #[test]
+    fn without_gix_disables_gix_backend() {
+        let harness = TestHarness::new().expect("harness");
+        harness.init_git_repo().expect("init repo");
+
+        let with_gix = GitOpsManager::new(Some(&harness.work_dir), false).expect("mgr");
+        assert!(
+            with_gix.gix_enabled(),
+            "GitOpsManager::new should keep the gix backend enabled"
+        );
+
+        let no_gix = GitOpsManager::without_gix(Some(&harness.work_dir), false).expect("mgr");
+        assert!(
+            !no_gix.gix_enabled(),
+            "GitOpsManager::without_gix should disable the gix backend"
+        );
+    }
+
+    /// git2's `read_gitmodules` must parse the *correct* path and url, not just
+    /// return a non-empty count.
+    #[test]
+    fn git2_fallback_reads_gitmodules_correctly() {
+        let harness = TestHarness::new().expect("harness");
+        harness.init_git_repo().expect("init repo");
+
+        let gitmodules =
+            "[submodule \"read-lib\"]\n\tpath = lib/read\n\turl = https://example.com/read.git\n";
+        std::fs::write(harness.work_dir.join(".gitmodules"), gitmodules)
+            .expect("write .gitmodules");
+
+        let mgr = GitOpsManager::without_gix(Some(&harness.work_dir), false).expect("mgr");
+        let entries = mgr.read_gitmodules().expect("git2 read_gitmodules");
+
+        let entry = entries
+            .submodule_iter()
+            .find(|(name, _)| name.as_str() == "read-lib")
+            .map(|(_, e)| e)
+            .expect("git2 should parse the read-lib entry");
+        assert_eq!(
+            entry.path.as_deref(),
+            Some("lib/read"),
+            "git2 must parse the submodule path"
+        );
+        assert_eq!(
+            entry.url.as_deref(),
+            Some("https://example.com/read.git"),
+            "git2 must parse the submodule url"
+        );
+    }
+
+    /// git2's config write must persist a correct value. Routed through the
+    /// git2-only seam, `write_git_config` + `read_git_config` must round-trip
+    /// the exact value (this is the write path the manager relies on git2 for).
+    #[test]
+    fn git2_fallback_writes_git_config_correctly() {
+        let harness = TestHarness::new().expect("harness");
+        harness.init_git_repo().expect("init repo");
+
+        let mgr = GitOpsManager::without_gix(Some(&harness.work_dir), false).expect("mgr");
+
+        let mut entries = HashMap::new();
+        entries.insert("submod.injkey".to_string(), "injvalue".to_string());
+        let config = GitConfig { entries };
+
+        mgr.write_git_config(&config, ConfigLevel::Local)
+            .expect("git2 write_git_config should succeed");
+
+        let read_back = mgr
+            .read_git_config(ConfigLevel::Local)
+            .expect("git2 read_git_config");
+        assert_eq!(
+            read_back.entries.get("submod.injkey").map(String::as_str),
+            Some("injvalue"),
+            "git2 must persist and read back the exact config value"
+        );
+    }
+
+    /// git2's `add_submodule` must produce *correct git state*: an index gitlink
+    /// at mode 160000, a `.gitmodules` entry, a `submodule.*` config section, and
+    /// the path must appear in `list_submodules`.
+    #[test]
+    fn git2_fallback_add_produces_real_git_state() {
+        let harness = TestHarness::new().expect("harness");
+        harness.init_git_repo().expect("init repo");
+        let remote = harness
+            .create_test_remote("inj_add")
+            .expect("create remote");
+        let remote_url = format!("file://{}", remote.display());
+
+        let mut mgr = GitOpsManager::without_gix(Some(&harness.work_dir), false).expect("mgr");
+
+        let opts = SubmoduleAddOptions {
+            url: remote_url,
+            path: std::path::PathBuf::from("lib/addinj"),
+            name: "addinj-sub".to_string(),
+            branch: None,
+            ignore: None,
+            update: None,
+            fetch_recurse: None,
+            shallow: false,
+            no_init: false,
+        };
+        mgr.add_submodule(&opts)
+            .expect("git2 add_submodule should succeed");
+
+        assert_eq!(
+            harness.index_gitlink_mode("lib/addinj").as_deref(),
+            Some("160000"),
+            "git2 add must stage a gitlink at mode 160000"
+        );
+        assert!(
+            harness.gitmodules_entries().contains("lib/addinj"),
+            "git2 add must write the .gitmodules entry"
+        );
+        assert!(
+            harness.submodule_config_entries().contains("lib/addinj"),
+            "git2 add must write the submodule.* config section"
+        );
+        let subs = mgr.list_submodules().expect("git2 list_submodules");
+        assert!(
+            subs.iter().any(|p| p == "lib/addinj"),
+            "git2 list_submodules must include the added path, got: {subs:?}"
+        );
+    }
+
+    /// git2's `deinit_submodule(force)` removes the worktree and the
+    /// `submodule.*` config section. git2's `delete_submodule` deliberately
+    /// leaves `.gitmodules` untouched ("left to higher-level logic"), so the
+    /// entry persists — which is exactly why `GitManager` performs additional
+    /// cleanup. This characterizes that partial git2 contract.
+    #[test]
+    fn git2_fallback_deinit_clears_worktree_and_config() {
+        let harness = TestHarness::new().expect("harness");
+        setup_repo_with_submodule(&harness).expect("setup");
+
+        let mut mgr = GitOpsManager::without_gix(Some(&harness.work_dir), false).expect("mgr");
+
+        // Guards: present before delete (so the post-delete checks can't pass vacuously).
+        assert!(
+            harness.work_dir.join("lib/inj").exists(),
+            "submodule worktree should exist before delete"
+        );
+        assert!(
+            harness.submodule_config_entries().contains("lib/inj"),
+            "submodule.* config should exist before delete"
+        );
+
+        mgr.deinit_submodule("lib/inj", true)
+            .expect("git2 deinit_submodule");
+        mgr.delete_submodule("lib/inj")
+            .expect("git2 delete_submodule");
+
+        assert!(
+            !harness.work_dir.join("lib/inj").exists(),
+            "git2 deinit(force) must remove the submodule worktree"
+        );
+        assert!(
+            !harness.submodule_config_entries().contains("lib/inj"),
+            "git2 deinit must remove the submodule.* config section"
+        );
+        // git2 leaves .gitmodules alone — documents why higher-level cleanup exists.
+        assert!(
+            harness.gitmodules_entries().contains("lib/inj"),
+            "git2 delete_submodule must NOT touch .gitmodules (higher-level logic handles it)"
+        );
+    }
+
+    /// Cross-backend parity: the gix-enabled manager and the git2-only manager
+    /// must list the same submodules for the same repo state.
+    #[test]
+    fn gix_and_git2_list_submodules_agree() {
+        let harness = TestHarness::new().expect("harness");
+        setup_repo_with_submodule(&harness).expect("setup");
+
+        let gix_mgr = GitOpsManager::new(Some(&harness.work_dir), false).expect("mgr");
+        let git2_mgr = GitOpsManager::without_gix(Some(&harness.work_dir), false).expect("mgr");
+
+        let mut gix_list = gix_mgr.list_submodules().expect("gix list");
+        let mut git2_list = git2_mgr.list_submodules().expect("git2 list");
+        gix_list.sort();
+        git2_list.sort();
+
+        assert_eq!(
+            gix_list, git2_list,
+            "gix and git2 backends must list the same submodules"
+        );
+        assert!(
+            git2_list.iter().any(|p| p == "lib/inj"),
+            "both backends must see the added submodule"
+        );
+    }
+
+    /// reopen() hazard (P0-1): in a single process, add → delete → reopen →
+    /// re-add the same name+path must succeed and re-stage a gitlink. This
+    /// exercises `GitOpsManager::reopen()` in-process, which refreshes the
+    /// cached git2 repository so the re-add sees the post-delete state.
+    #[test]
+    fn reopen_after_delete_allows_readd_same_path() {
+        let harness = TestHarness::new().expect("harness");
+        harness.init_git_repo().expect("init repo");
+        let remote = harness.create_test_remote("inj_reopen").expect("remote");
+        let remote_url = format!("file://{}", remote.display());
+
+        let mut mgr = GitOpsManager::new(Some(&harness.work_dir), false).expect("mgr");
+
+        let opts = SubmoduleAddOptions {
+            url: remote_url,
+            path: std::path::PathBuf::from("lib/reopen"),
+            name: "reopen-sub".to_string(),
+            branch: None,
+            ignore: None,
+            update: None,
+            fetch_recurse: None,
+            shallow: false,
+            no_init: false,
+        };
+
+        mgr.add_submodule(&opts).expect("initial add");
+        assert_eq!(
+            harness.index_gitlink_mode("lib/reopen").as_deref(),
+            Some("160000"),
+            "gitlink should be staged after the first add"
+        );
+
+        // Full delete: deinit + git-layer delete, then strip the config/state that
+        // git2's delete deliberately leaves behind, mirroring the high-level cleanup.
+        mgr.deinit_submodule("lib/reopen", true).expect("deinit");
+        mgr.delete_submodule("lib/reopen").expect("delete");
+        let _ = std::fs::remove_file(harness.work_dir.join(".gitmodules"));
+        let _ = harness.git_stdout(&[
+            "rm",
+            "--cached",
+            "-r",
+            "--ignore-unmatch",
+            "--",
+            "lib/reopen",
+        ]);
+        let _ = harness.git_stdout(&["config", "--remove-section", "submodule.lib/reopen"]);
+        let _ = std::fs::remove_dir_all(harness.work_dir.join(".git/modules/lib/reopen"));
+
+        // Refresh cached git2 state after the destructive sequence.
+        mgr.reopen().expect("reopen after delete");
+
+        // Re-add the same name+path in the same process.
+        mgr.add_submodule(&opts)
+            .expect("re-add after reopen should succeed");
+        assert_eq!(
+            harness.index_gitlink_mode("lib/reopen").as_deref(),
+            Some("160000"),
+            "gitlink should be re-staged after reopen + re-add"
+        );
+    }
+}
