@@ -974,3 +974,224 @@ mod git2_fallback_injection_tests {
         );
     }
 }
+
+// ============================================================
+// CLI last-resort path of add_submodule
+// ============================================================
+//
+// `add_submodule`'s `.or_else(...)` CLI branch only runs when *both* in-process
+// backends (gix and git2) fail. That condition cannot be reproduced offline with
+// real inputs — git2 and the git CLI clone from the same URL, so anything that
+// breaks git2 breaks the CLI too. `GitOpsManager::forcing_cli_add` is a fault-
+// injection seam that bypasses both in-process backends so the otherwise-
+// unreachable CLI last resort runs *unmodified* and can be checked for correct
+// results, including its cleanup of partial state left by a failed git2 attempt.
+
+#[cfg(test)]
+mod cli_last_resort_tests {
+    use super::*;
+
+    /// The seam itself: `forcing_cli_add` must flag the manager to route
+    /// `add_submodule` through the CLI last resort, while the normal constructor
+    /// does not. This anchors non-vacuousness for the whole module — when the
+    /// flag is set, any resulting git state must have come from the CLI branch
+    /// (both in-process backends are bypassed).
+    #[test]
+    fn forcing_cli_add_enables_cli_seam() {
+        let harness = TestHarness::new().expect("harness");
+        harness.init_git_repo().expect("init repo");
+
+        let normal = GitOpsManager::new(Some(&harness.work_dir), false).expect("mgr");
+        assert!(
+            !normal.forces_cli_add(),
+            "GitOpsManager::new must not force the CLI last resort"
+        );
+
+        let forced = GitOpsManager::forcing_cli_add(Some(&harness.work_dir), false).expect("mgr");
+        assert!(
+            forced.forces_cli_add(),
+            "GitOpsManager::forcing_cli_add must force the CLI last resort"
+        );
+    }
+
+    /// The CLI last resort must produce *correct git state*: an index gitlink at
+    /// mode 160000, a `.gitmodules` entry, a `submodule.*` config section, and the
+    /// path must appear in `list_submodules`. Both in-process backends are
+    /// bypassed, so this state can only have come from the CLI branch.
+    #[test]
+    fn cli_last_resort_add_produces_real_git_state() {
+        let harness = TestHarness::new().expect("harness");
+        harness.init_git_repo().expect("init repo");
+        let remote = harness
+            .create_test_remote("cli_add")
+            .expect("create remote");
+        let remote_url = format!("file://{}", remote.display());
+
+        let mut mgr = GitOpsManager::forcing_cli_add(Some(&harness.work_dir), false).expect("mgr");
+
+        let opts = SubmoduleAddOptions {
+            url: remote_url,
+            path: std::path::PathBuf::from("lib/cliadd"),
+            name: "cliadd-sub".to_string(),
+            branch: None,
+            ignore: None,
+            update: None,
+            fetch_recurse: None,
+            shallow: false,
+            no_init: false,
+        };
+        mgr.add_submodule(&opts)
+            .expect("CLI last-resort add_submodule should succeed");
+
+        assert_eq!(
+            harness.index_gitlink_mode("lib/cliadd").as_deref(),
+            Some("160000"),
+            "CLI add must stage a gitlink at mode 160000"
+        );
+        assert!(
+            harness.gitmodules_entries().contains("lib/cliadd"),
+            "CLI add must write the .gitmodules entry"
+        );
+        // `git submodule add --name cliadd-sub` keys .git/config by the submodule
+        // *name* (submodule.cliadd-sub.url), unlike git2 which keys by path.
+        assert!(
+            harness.submodule_config_entries().contains("cliadd-sub"),
+            "CLI add must write the submodule.* config section (keyed by name)"
+        );
+        let subs = mgr.list_submodules().expect("list_submodules");
+        assert!(
+            subs.iter().any(|p| p == "lib/cliadd"),
+            "CLI add path must appear in list_submodules, got: {subs:?}"
+        );
+    }
+
+    /// The CLI branch's first job is to clean up partial state a failed git2
+    /// attempt may have left behind (a stale `.gitmodules` section, a config
+    /// section, an internal `.git/modules/<name>` dir, a staged index entry) and
+    /// then re-add cleanly. Seed exactly that leftover state for the target name,
+    /// then run the forced CLI add and assert it both succeeds and ends with the
+    /// *real* url — not the stale seed — proving the cleanup ran.
+    #[test]
+    fn cli_last_resort_cleans_up_partial_state_and_succeeds() {
+        let harness = TestHarness::new().expect("harness");
+        harness.init_git_repo().expect("init repo");
+        let remote = harness
+            .create_test_remote("cli_reinit")
+            .expect("create remote");
+        let remote_url = format!("file://{}", remote.display());
+
+        // Simulate the debris a half-finished git2 add_submodule leaves behind:
+        // a stale .gitmodules section (with a bogus url), a stale config section,
+        // and an internal modules directory — all keyed by the submodule name.
+        let stale_gitmodules = "[submodule \"cleanup-sub\"]\n\tpath = lib/cleanup\n\turl = https://example.com/STALE.git\n";
+        std::fs::write(harness.work_dir.join(".gitmodules"), stale_gitmodules)
+            .expect("seed stale .gitmodules");
+        harness.git_stdout(&[
+            "config",
+            "submodule.cleanup-sub.url",
+            "https://example.com/STALE.git",
+        ]);
+        std::fs::create_dir_all(harness.work_dir.join(".git/modules/cleanup-sub"))
+            .expect("seed stale internal modules dir");
+
+        let mut mgr = GitOpsManager::forcing_cli_add(Some(&harness.work_dir), false).expect("mgr");
+
+        let opts = SubmoduleAddOptions {
+            url: remote_url.clone(),
+            path: std::path::PathBuf::from("lib/cleanup"),
+            name: "cleanup-sub".to_string(),
+            branch: None,
+            ignore: None,
+            update: None,
+            fetch_recurse: None,
+            shallow: false,
+            no_init: false,
+        };
+        mgr.add_submodule(&opts)
+            .expect("CLI last-resort add must clean up partial state and succeed");
+
+        assert_eq!(
+            harness.index_gitlink_mode("lib/cleanup").as_deref(),
+            Some("160000"),
+            "CLI add must stage the gitlink after cleaning up partial state"
+        );
+        let gitmodules = harness.gitmodules_entries();
+        assert!(
+            gitmodules.contains(&remote_url),
+            "the real url must replace the stale seed, got: {gitmodules}"
+        );
+        assert!(
+            !gitmodules.contains("STALE.git"),
+            "the stale .gitmodules section must have been cleaned up, got: {gitmodules}"
+        );
+    }
+
+    /// The audit flagged that fallback warning logs are never asserted. gix's
+    /// `add_submodule` always errors, so a verbose run of the real binary must
+    /// emit the gix→git2 fallback warning to stderr.
+    #[test]
+    fn fallback_warning_is_logged_in_verbose_mode() {
+        let harness = TestHarness::new().expect("harness");
+        harness.init_git_repo().expect("init repo");
+        let remote = harness
+            .create_test_remote("warn_add")
+            .expect("create remote");
+        let remote_url = format!("file://{}", remote.display());
+
+        let output = harness
+            .run_submod(&[
+                "--verbose",
+                "add",
+                &remote_url,
+                "--name",
+                "warn-sub",
+                "--path",
+                "lib/warn",
+            ])
+            .expect("run submod --verbose add");
+        assert!(
+            output.status.success(),
+            "verbose add should still succeed via fallback; stderr: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        assert!(
+            stderr.contains("falling back to git2"),
+            "verbose mode must log the gix→git2 fallback warning, got stderr: {stderr}"
+        );
+    }
+
+    /// Non-vacuousness for the warning assertion above: without `--verbose`, the
+    /// same fallback occurs silently. This proves the assertion discriminates on
+    /// the verbose flag rather than matching unconditional output.
+    #[test]
+    fn fallback_warning_is_silent_without_verbose() {
+        let harness = TestHarness::new().expect("harness");
+        harness.init_git_repo().expect("init repo");
+        let remote = harness
+            .create_test_remote("quiet_add")
+            .expect("create remote");
+        let remote_url = format!("file://{}", remote.display());
+
+        let output = harness
+            .run_submod(&[
+                "add",
+                &remote_url,
+                "--name",
+                "quiet-sub",
+                "--path",
+                "lib/quiet",
+            ])
+            .expect("run submod add");
+        assert!(
+            output.status.success(),
+            "non-verbose add should succeed via fallback; stderr: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        assert!(
+            !stderr.contains("falling back to git2"),
+            "non-verbose mode must not log the fallback warning, got stderr: {stderr}"
+        );
+    }
+}

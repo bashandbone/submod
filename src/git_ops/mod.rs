@@ -171,6 +171,7 @@ pub struct GitOpsManager {
     gix_ops: Option<GixOperations>,
     git2_ops: Git2Operations,
     verbose: bool,
+    force_cli_add: bool,
 }
 
 /// Implement `GitOperations` for `GitOpsManager`, using gix first and falling back to git2 if gix fails
@@ -185,6 +186,7 @@ impl GitOpsManager {
             gix_ops,
             git2_ops,
             verbose,
+            force_cli_add: false,
         })
     }
 
@@ -203,13 +205,35 @@ impl GitOpsManager {
             gix_ops: None,
             git2_ops,
             verbose,
+            force_cli_add: false,
         })
+    }
+
+    /// Create a `GitOpsManager` that routes `add_submodule` straight to its CLI
+    /// last-resort path, bypassing both the gix and git2 backends.
+    ///
+    /// The CLI branch in `add_submodule` only runs when *both* in-process
+    /// backends fail — a condition that cannot be reproduced offline with real
+    /// inputs, since git2 and the git CLI clone from the same URL. This
+    /// fault-injection seam makes that otherwise-unreachable last resort
+    /// exercisable for correct results: the entire CLI branch — including its
+    /// cleanup of partial state left by a failed git2 attempt — runs unmodified.
+    pub fn forcing_cli_add(repo_path: Option<&Path>, verbose: bool) -> Result<Self> {
+        let mut manager = Self::new(repo_path, verbose)?;
+        manager.force_cli_add = true;
+        Ok(manager)
     }
 
     /// Whether the optimistic gix backend is currently active. When `false`,
     /// every operation is served by git2 (the fallback backend).
     pub fn gix_enabled(&self) -> bool {
         self.gix_ops.is_some()
+    }
+
+    /// Whether `add_submodule` is forced through its CLI last-resort path,
+    /// bypassing both in-process backends. Normally `false`.
+    pub fn forces_cli_add(&self) -> bool {
+        self.force_cli_add
     }
 
     /// Return the working directory of the underlying git repository, if any.
@@ -336,11 +360,21 @@ impl GitOperations for GitOpsManager {
         // the correct `submodule.clone() + add_finalize()` sequence.
         // CLI is kept as a last-resort safety net and sets current_dir to the superproject
         // workdir so it works regardless of the process's CWD.
-        self.try_with_fallback_mut(
-            |gix| gix.add_submodule(opts),
-            |git2| git2.add_submodule(opts),
-        )
-        .or_else(|git2_err| {
+        //
+        // The `force_cli_add` fault-injection seam short-circuits both in-process
+        // backends so the CLI last resort can be exercised directly (see
+        // `GitOpsManager::forcing_cli_add`).
+        let in_process = if self.force_cli_add {
+            Err(anyhow::anyhow!(
+                "in-process git backends bypassed (forcing CLI last resort)"
+            ))
+        } else {
+            self.try_with_fallback_mut(
+                |gix| gix.add_submodule(opts),
+                |git2| git2.add_submodule(opts),
+            )
+        };
+        in_process.or_else(|git2_err| {
             let workdir = self
                 .git2_ops
                 .workdir()
