@@ -13,7 +13,7 @@ schema_version = "1.1.0"
 # [defaults]
 # ignore = "none"
 # update = "checkout"
-# fetch = "on-demand"
+# fetchRecurse = "on-demand"
 # ```
 # Submodule paths can't be set globally, but their default assignment is the submodule name in the repository root.
 #
@@ -21,7 +21,7 @@ schema_version = "1.1.0"
 # See [docs](https://docs.rs/submod/latest/submod/options/) for details.
 # - `ignore`: "all", "dirty", "untracked", "none" [default]
 # - `update`: "checkout" [default], "rebase", "merge", "none"
-# - `fetch`: "on-demand" [default], "always", "never"
+# - `fetchRecurse`: "on-demand" [default], "always", "never"
 
 [defaults]
 ignore = "dirty" # Override default ignore setting for all submodules
@@ -35,7 +35,7 @@ ignore = "dirty" # Override default ignore setting for all submodules
 #
 # ## Available Options
 #
-# **Submodules support all global options (ignore, fetch, update)**, which will override the defaults. If you want a submodule to maintain default behavior, but set a different global behavior, you *must* explicitly add the options here. Other submodule options are:
+# **Submodules support all global options (ignore, fetchRecurse, update)**, which will override the defaults. If you want a submodule to maintain default behavior, but set a different global behavior, you *must* explicitly add the options here. Other submodule options are:
 #
 # ## `url`
 # **Required.** The submodule repository URL. Use the same value as in `.gitmodules` or `.git/config`. Accepts remote URLs or local paths (absolute or relative).

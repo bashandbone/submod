@@ -839,13 +839,18 @@ mod tests {
             "Global update not saved"
         );
         // The `--fetch always` CLI value maps to SerializableFetchRecurse::Always.
-        // That variant's TOML serialization (via to_gitmodules()) uses git's native
-        // fetchRecurseSubmodules encoding: "true" means "always fetch".
-        // The TOML config therefore stores `fetch = "true"` not `fetch = "always"`.
+        // It must be written under the documented `fetchRecurse` key using the serde
+        // value form (`always`), NOT the git-config `true`/`false` encoding — otherwise
+        // submod cannot read its own config back (see the fetch-recurse round-trip fix).
         assert!(
-            config.contains("fetch = \"true\""),
-            "Global fetch not saved; config: {config}"
+            config.contains("fetchRecurse = \"always\""),
+            "Global fetch not saved in round-trippable form; config: {config}"
         );
+
+        // Reloading must actually parse the value back (guards against silent drop).
+        harness
+            .run_submod_success(&["check"])
+            .expect("submod check should succeed after change-global");
     }
 
     #[test]

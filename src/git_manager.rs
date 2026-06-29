@@ -272,9 +272,9 @@ impl GitManager {
                     }
                 }
                 if let Some(fetch_recurse) = &entry.fetch_recurse {
-                    let val = fetch_recurse.to_string();
+                    let val = fetch_recurse.as_config_value();
                     if !val.is_empty() {
-                        output.push_str(&format!("fetch = \"{val}\"\n"));
+                        output.push_str(&format!("fetchRecurse = \"{val}\"\n"));
                     }
                 }
                 if let Some(update) = &entry.update {
@@ -287,20 +287,20 @@ impl GitManager {
                     output.push_str(&format!("active = {active}\n"));
                 }
                 if let Some(shallow) = entry.shallow
-                    && shallow {
-                        output.push_str("shallow = true\n");
-                    }
+                    && shallow
+                {
+                    output.push_str("shallow = true\n");
+                }
                 if let Some(sparse_paths) = &entry.sparse_paths
-                    && !sparse_paths.is_empty() {
-                        let joined = sparse_paths
-                            .iter()
-                            .map(|p| {
-                                format!("\"{}\"", p.replace('\\', "\\\\").replace('"', "\\\""))
-                            })
-                            .collect::<Vec<_>>()
-                            .join(", ");
-                        output.push_str(&format!("sparse_paths = [{joined}]\n"));
-                    }
+                    && !sparse_paths.is_empty()
+                {
+                    let joined = sparse_paths
+                        .iter()
+                        .map(|p| format!("\"{}\"", p.replace('\\', "\\\\").replace('"', "\\\"")))
+                        .collect::<Vec<_>>()
+                        .join(", ");
+                    output.push_str(&format!("sparse_paths = [{joined}]\n"));
+                }
             }
         }
 
@@ -608,11 +608,10 @@ impl GitManager {
         // Only configure git-level sparse checkout if the submodule directory exists
         // (it may not exist yet if --no-init was used)
         let submodule_exists = std::path::Path::new(path).exists();
-        if submodule_exists
-            && let Some(patterns) = sparse_paths {
-                let use_git_default = self.effective_use_git_default_sparse_checkout(name);
-                self.configure_sparse_checkout(path, &patterns, use_git_default)?;
-            }
+        if submodule_exists && let Some(patterns) = sparse_paths {
+            let use_git_default = self.effective_use_git_default_sparse_checkout(name);
+            self.configure_sparse_checkout(path, &patterns, use_git_default)?;
+        }
         Ok(())
     }
 
@@ -846,29 +845,28 @@ impl GitManager {
 
     /// Initialize submodule - add it first if not registered, then initialize
     pub fn init_submodule(&mut self, name: &str) -> Result<(), SubmoduleError> {
-        let (
-            path_str,
-            url_str,
-            branch,
-            ignore,
-            update,
-            fetch_recurse,
-            shallow,
-            sparse_paths_opt,
-        ) = {
-            let config = self.config
-                .get_submodule(name)
-                .ok_or_else(|| SubmoduleError::SubmoduleNotFound {
+        let (path_str, url_str, branch, ignore, update, fetch_recurse, shallow, sparse_paths_opt) = {
+            let config = self.config.get_submodule(name).ok_or_else(|| {
+                SubmoduleError::SubmoduleNotFound {
                     name: name.to_string(),
-                })?;
+                }
+            })?;
 
-            let path_str = config.path.as_ref().ok_or_else(|| {
-                SubmoduleError::ConfigError("No path configured for submodule".to_string())
-            })?.clone();
+            let path_str = config
+                .path
+                .as_ref()
+                .ok_or_else(|| {
+                    SubmoduleError::ConfigError("No path configured for submodule".to_string())
+                })?
+                .clone();
 
-            let url_str = config.url.as_ref().ok_or_else(|| {
-                SubmoduleError::ConfigError("No URL configured for submodule".to_string())
-            })?.clone();
+            let url_str = config
+                .url
+                .as_ref()
+                .ok_or_else(|| {
+                    SubmoduleError::ConfigError("No URL configured for submodule".to_string())
+                })?
+                .clone();
 
             let sparse_paths_opt = self
                 .config
@@ -1145,9 +1143,9 @@ impl GitManager {
             }
         }
         if let Some(fetch_recurse) = &entry.fetch_recurse {
-            let val = fetch_recurse.to_string();
+            let val = fetch_recurse.as_config_value();
             if !val.is_empty() {
-                kv.push(("fetch".into(), format!("\"{val}\"")));
+                kv.push(("fetchRecurse".into(), format!("\"{val}\"")));
             }
         }
         if let Some(update) = &entry.update {
@@ -1160,18 +1158,20 @@ impl GitManager {
             kv.push(("active".into(), active.to_string()));
         }
         if let Some(shallow) = entry.shallow
-            && shallow {
-                kv.push(("shallow".into(), "true".into()));
-            }
+            && shallow
+        {
+            kv.push(("shallow".into(), "true".into()));
+        }
         if let Some(sparse_paths) = &entry.sparse_paths
-            && !sparse_paths.is_empty() {
-                let joined = sparse_paths
-                    .iter()
-                    .map(|p| format!("\"{}\"", p.replace('\\', "\\\\").replace('"', "\\\"")))
-                    .collect::<Vec<_>>()
-                    .join(", ");
-                kv.push(("sparse_paths".into(), format!("[{joined}]")));
-            }
+            && !sparse_paths.is_empty()
+        {
+            let joined = sparse_paths
+                .iter()
+                .map(|p| format!("\"{}\"", p.replace('\\', "\\\\").replace('"', "\\\"")))
+                .collect::<Vec<_>>()
+                .join(", ");
+            kv.push(("sparse_paths".into(), format!("[{joined}]")));
+        }
         kv
     }
 
@@ -1181,6 +1181,7 @@ impl GitManager {
         "url",
         "branch",
         "ignore",
+        "fetchRecurse",
         "fetch",
         "update",
         "active",
@@ -1189,7 +1190,8 @@ impl GitManager {
     ];
 
     /// Known [defaults] key names.
-    const KNOWN_DEFAULTS_KEYS: &'static [&'static str] = &["ignore", "fetch", "update"];
+    const KNOWN_DEFAULTS_KEYS: &'static [&'static str] =
+        &["ignore", "fetchRecurse", "fetch", "update"];
 
     /// Return the key name if `line` is a key = value assignment for one of `known_keys`, else None.
     fn line_key<'a>(line: &str, known_keys: &[&'a str]) -> Option<&'a str> {
@@ -1201,9 +1203,10 @@ impl GitManager {
         for key in known_keys {
             // Match "key =" or "key=" at start of trimmed line
             if let Some(rest) = trimmed.strip_prefix(key)
-                && (rest.starts_with('=') || rest.starts_with(" =")) {
-                    return Some(key);
-                }
+                && (rest.starts_with('=') || rest.starts_with(" ="))
+            {
+                return Some(key);
+            }
         }
         None
     }
@@ -1283,9 +1286,9 @@ impl GitManager {
                 }
             }
             if let Some(fetch_recurse) = &defaults.fetch_recurse {
-                let val = fetch_recurse.to_string();
+                let val = fetch_recurse.as_config_value();
                 if !val.is_empty() {
-                    kv.push(("fetch".into(), format!("\"{val}\"")));
+                    kv.push(("fetchRecurse".into(), format!("\"{val}\"")));
                 }
             }
             if let Some(update) = &defaults.update {
@@ -1921,9 +1924,10 @@ impl GitManager {
                 .collect();
             for (name, path) in names_and_paths {
                 if let Ok(patterns) = git_ops.get_sparse_patterns(&path)
-                    && !patterns.is_empty() {
-                        entries.set_sparse_paths_for(&name, patterns);
-                    }
+                    && !patterns.is_empty()
+                {
+                    entries.set_sparse_paths_for(&name, patterns);
+                }
             }
 
             // Build a Config from the SubmoduleEntries
@@ -1983,10 +1987,7 @@ mod tests {
         let expected_paths: Vec<String> = vec!["path/a".to_string()];
 
         let status = manager
-            .check_sparse_checkout_status(
-                &submodule_path.to_string_lossy(),
-                &expected_paths,
-            )
+            .check_sparse_checkout_status(&submodule_path.to_string_lossy(), &expected_paths)
             .unwrap();
 
         assert_eq!(status, SparseStatus::NotConfigured);
@@ -2009,10 +2010,7 @@ mod tests {
         let expected_paths = vec!["path/a".to_string(), "path/b".to_string()];
 
         let status = manager
-            .check_sparse_checkout_status(
-                &submodule_path.to_string_lossy(),
-                &expected_paths,
-            )
+            .check_sparse_checkout_status(&submodule_path.to_string_lossy(), &expected_paths)
             .unwrap();
 
         assert_eq!(status, SparseStatus::Correct);
@@ -2037,13 +2035,54 @@ mod tests {
         let expected_paths = vec!["path/a".to_string(), "path/b".to_string()];
 
         let status = manager
-            .check_sparse_checkout_status(
-                &submodule_path.to_string_lossy(),
-                &expected_paths,
-            )
+            .check_sparse_checkout_status(&submodule_path.to_string_lossy(), &expected_paths)
             .unwrap();
 
         assert_eq!(status, SparseStatus::Correct);
+    }
+
+    #[test]
+    fn test_write_full_config_fetch_recurse_round_trips() {
+        // Regression for the fetch-recurse round-trip bug: submod must be able to
+        // read back the fetch-recurse setting it writes. The writer previously emitted
+        // `fetch = "true"/"false"` — both the wrong TOML key (neither the documented
+        // `fetchRecurse` nor the field `fetch_recurse`) and the git-config value form
+        // (`true`/`false` instead of `always`/`never`) — so reloading silently dropped it.
+        let temp_dir = tempdir().unwrap();
+        let config_path = temp_dir.path().join("submod.toml");
+        let mut manager = create_test_manager(temp_dir.path(), config_path.clone());
+
+        manager.config.defaults.fetch_recurse = Some(SerializableFetchRecurse::Always);
+        manager.config.add_submodule(
+            "mymod".to_string(),
+            SubmoduleEntry::new(
+                Some("https://example.com/repo.git".to_string()),
+                Some("libs/mymod".to_string()),
+                None,
+                None,
+                None,
+                Some(SerializableFetchRecurse::Never),
+                Some(true),
+                None,
+                None,
+            ),
+        );
+
+        manager.write_full_config().expect("write_full_config");
+
+        let written = fs::read_to_string(&config_path).unwrap();
+        let reloaded: Config = toml::from_str(&written)
+            .expect("config submod writes must be valid TOML it can parse back");
+        assert_eq!(
+            reloaded.defaults.fetch_recurse,
+            Some(SerializableFetchRecurse::Always),
+            "defaults fetch-recurse must survive a write/read round-trip; written file:\n{written}"
+        );
+        assert_eq!(
+            reloaded.submodules.get("mymod").unwrap().fetch_recurse,
+            Some(SerializableFetchRecurse::Never),
+            "per-submodule fetch-recurse must survive a write/read round-trip; written file:\n{written}"
+        );
     }
 
     #[test]
@@ -2066,10 +2105,7 @@ mod tests {
         ];
 
         let status = manager
-            .check_sparse_checkout_status(
-                &submodule_path.to_string_lossy(),
-                &expected_paths,
-            )
+            .check_sparse_checkout_status(&submodule_path.to_string_lossy(), &expected_paths)
             .unwrap();
 
         match status {
