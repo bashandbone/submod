@@ -50,8 +50,7 @@ fn line_key_new<'a>(line: &str, known_keys: &[&'a str]) -> Option<&'a str> {
         return None;
     }
     for key in known_keys {
-        if trimmed.starts_with(key) {
-            let rest = &trimmed[key.len()..];
+        if let Some(rest) = trimmed.strip_prefix(key) {
             if rest.starts_with('=') || rest.starts_with(" =") {
                 return Some(key);
             }
@@ -98,7 +97,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
             for line in &lines {
                 black_box(line_key_old(black_box(line), black_box(&keys)));
             }
-        })
+        });
     });
 
     c.bench_function("line_key_new", |b| {
@@ -106,7 +105,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
             for line in &lines {
                 black_box(line_key_new(black_box(line), black_box(&keys)));
             }
-        })
+        });
     });
 }
 

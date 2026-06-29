@@ -95,6 +95,120 @@ impl TryFrom<AotShell> for Shell {
     }
 }
 
+impl TryFrom<Shell> for AotShell {
+    type Error = String;
+
+    /// Attempts to convert a `Shell` to an `AotShell`.
+    fn try_from(shell: Shell) -> Result<Self, Self::Error> {
+        match shell {
+            Shell::Bash => Ok(Self::Bash),
+            Shell::Elvish => Ok(Self::Elvish),
+            Shell::Fish => Ok(Self::Fish),
+            Shell::PowerShell => Ok(Self::PowerShell),
+            Shell::Zsh => Ok(Self::Zsh),
+            Shell::Nushell => Err("Nushell is not supported in AOT mode".to_string()),
+        }
+    }
+}
+
+impl TryFrom<Shell> for NushellShell {
+    type Error = String;
+
+    /// Attempts to convert a `Shell` to a `NushellShell`.
+    fn try_from(shell: Shell) -> Result<Self, Self::Error> {
+        if shell == Shell::Nushell {
+            Ok(Self)
+        } else {
+            Err("Only Nushell can be converted to NushellShell".to_string())
+        }
+    }
+}
+
+impl TryFrom<NushellShell> for Shell {
+    type Error = String;
+    /// Converts a `NushellShell` to a `Shell`.
+    fn try_from(shell: NushellShell) -> Result<Self, String> {
+        match shell {
+            NushellShell => Ok(Self::Nushell),
+            _ => Err("Only NushellShell can be converted to Shell::Nushell".to_string()),
+        }
+    }
+}
+
+impl Shell {
+    /// Converts the `Shell` enum to a shell enum implementing `clap_complete::Generator` (as a Box pointer).
+    pub fn try_to_clap_complete(&self) -> Result<Box<dyn Generator>, String> {
+        match self {
+            Self::Bash => Ok(Box::new(AotShell::Bash)),
+            Self::Elvish => Ok(Box::new(AotShell::Elvish)),
+            Self::Fish => Ok(Box::new(AotShell::Fish)),
+            Self::PowerShell => Ok(Box::new(AotShell::PowerShell)),
+            Self::Zsh => Ok(Box::new(AotShell::Zsh)),
+            Self::Nushell => Ok(Box::new(NushellShell)),
+        }
+    }
+
+    /// Tries to find the shell from a path to its executable.
+    pub fn from_path<P: AsRef<std::path::Path>>(path: P) -> Option<Self> {
+        Self::parse_shell_from_path(path.as_ref())
+    }
+
+    fn parse_shell_from_path(path: &std::path::Path) -> Option<Self> {
+        let name = path.file_stem()?.to_str()?;
+        match name {
+            "bash" => Some(Self::Bash),
+            "elvish" => Some(Self::Elvish),
+            "fish" => Some(Self::Fish),
+            "powershell" | "pwsh" | "powershell_ise" => Some(Self::PowerShell),
+            "zsh" => Some(Self::Zsh),
+            "nu" | "nushell" => Some(Self::Nushell),
+            _ => None,
+        }
+    }
+
+    /// Attempts to find the shell from the `SHELL` environment variable.
+    #[must_use]
+    pub fn from_env() -> Option<Self> {
+        if let Some(env_shell) = std::env::var_os("SHELL") {
+            Self::parse_shell_from_path(std::path::Path::new(&env_shell))
+        } else {
+            None
+        }
+    }
+}
+
+impl Generator for Shell {
+    /// Returns the file name for the completion file.
+    fn file_name(&self, name: &str) -> String {
+        let shell_self = self.try_to_clap_complete();
+        shell_self.map_or_else(|_| format!("{name}.nu"), |s| s.file_name(name)) // Default to Nushell if conversion fails
+    }
+
+    /// Generates the completion file for the given command and writes it to the provided buffer.
+    fn generate(&self, cmd: &clap::Command, buf: &mut dyn std::io::Write) {
+        let shell_self = self.try_to_clap_complete();
+        shell_self
+            .map(|s| {
+                s.try_generate(cmd, buf)
+                    .unwrap_or_else(|e| panic!("failed to write completion file: {e}"));
+            })
+            .unwrap_or_else(|_| panic!("failed to write completion file"));
+    }
+
+    /// Attempts to generate the completion file for the given command and writes it to the provided buffer.
+    fn try_generate(
+        &self,
+        cmd: &clap::Command,
+        buf: &mut dyn std::io::Write,
+    ) -> Result<(), std::io::Error> {
+        let shell_self = self.try_to_clap_complete();
+        match shell_self {
+            Ok(s) => s.try_generate(cmd, buf),
+            Err(e) => Err(std::io::Error::other(e)),
+        }
+    }
+}
+
 #[cfg(test)]
 #[cfg_attr(coverage_nightly, coverage(off))]
 mod tests {
@@ -331,121 +445,7 @@ mod tests {
             let mut buf = Vec::new();
             // clap_complete::generate sets bin_name internally
             clap_complete::generate(*shell, &mut cmd, "test-cmd", &mut buf);
-            assert!(!buf.is_empty(), "Empty output for {:?}", shell);
-        }
-    }
-}
-
-impl TryFrom<Shell> for AotShell {
-    type Error = String;
-
-    /// Attempts to convert a `Shell` to an `AotShell`.
-    fn try_from(shell: Shell) -> Result<Self, Self::Error> {
-        match shell {
-            Shell::Bash => Ok(Self::Bash),
-            Shell::Elvish => Ok(Self::Elvish),
-            Shell::Fish => Ok(Self::Fish),
-            Shell::PowerShell => Ok(Self::PowerShell),
-            Shell::Zsh => Ok(Self::Zsh),
-            Shell::Nushell => Err("Nushell is not supported in AOT mode".to_string()),
-        }
-    }
-}
-
-impl TryFrom<Shell> for NushellShell {
-    type Error = String;
-
-    /// Attempts to convert a `Shell` to a `NushellShell`.
-    fn try_from(shell: Shell) -> Result<Self, Self::Error> {
-        if shell == Shell::Nushell {
-            Ok(Self)
-        } else {
-            Err("Only Nushell can be converted to NushellShell".to_string())
-        }
-    }
-}
-
-impl TryFrom<NushellShell> for Shell {
-    type Error = String;
-    /// Converts a `NushellShell` to a `Shell`.
-    fn try_from(shell: NushellShell) -> Result<Self, String> {
-        match shell {
-            NushellShell => Ok(Self::Nushell),
-            _ => Err("Only NushellShell can be converted to Shell::Nushell".to_string()),
-        }
-    }
-}
-
-impl Shell {
-    /// Converts the `Shell` enum to a shell enum implementing `clap_complete::Generator` (as a Box pointer).
-    pub fn try_to_clap_complete(&self) -> Result<Box<dyn Generator>, String> {
-        match self {
-            Self::Bash => Ok(Box::new(AotShell::Bash)),
-            Self::Elvish => Ok(Box::new(AotShell::Elvish)),
-            Self::Fish => Ok(Box::new(AotShell::Fish)),
-            Self::PowerShell => Ok(Box::new(AotShell::PowerShell)),
-            Self::Zsh => Ok(Box::new(AotShell::Zsh)),
-            Self::Nushell => Ok(Box::new(NushellShell)),
-        }
-    }
-
-    /// Tries to find the shell from a path to its executable.
-    pub fn from_path<P: AsRef<std::path::Path>>(path: P) -> Option<Self> {
-        Self::parse_shell_from_path(path.as_ref())
-    }
-
-    fn parse_shell_from_path(path: &std::path::Path) -> Option<Self> {
-        let name = path.file_stem()?.to_str()?;
-        match name {
-            "bash" => Some(Self::Bash),
-            "elvish" => Some(Self::Elvish),
-            "fish" => Some(Self::Fish),
-            "powershell" | "pwsh" | "powershell_ise" => Some(Self::PowerShell),
-            "zsh" => Some(Self::Zsh),
-            "nu" | "nushell" => Some(Self::Nushell),
-            _ => None,
-        }
-    }
-
-    /// Attempts to find the shell from the `SHELL` environment variable.
-    #[must_use]
-    pub fn from_env() -> Option<Self> {
-        if let Some(env_shell) = std::env::var_os("SHELL") {
-            Self::parse_shell_from_path(std::path::Path::new(&env_shell))
-        } else {
-            None
-        }
-    }
-}
-
-impl Generator for Shell {
-    /// Returns the file name for the completion file.
-    fn file_name(&self, name: &str) -> String {
-        let shell_self = self.try_to_clap_complete();
-        shell_self.map_or_else(|_| format!("{name}.nu"), |s| s.file_name(name)) // Default to Nushell if conversion fails
-    }
-
-    /// Generates the completion file for the given command and writes it to the provided buffer.
-    fn generate(&self, cmd: &clap::Command, buf: &mut dyn std::io::Write) {
-        let shell_self = self.try_to_clap_complete();
-        shell_self
-            .map(|s| {
-                s.try_generate(cmd, buf)
-                    .unwrap_or_else(|e| panic!("failed to write completion file: {e}"));
-            })
-            .unwrap_or_else(|_| panic!("failed to write completion file"));
-    }
-
-    /// Attempts to generate the completion file for the given command and writes it to the provided buffer.
-    fn try_generate(
-        &self,
-        cmd: &clap::Command,
-        buf: &mut dyn std::io::Write,
-    ) -> Result<(), std::io::Error> {
-        let shell_self = self.try_to_clap_complete();
-        match shell_self {
-            Ok(s) => s.try_generate(cmd, buf),
-            Err(e) => Err(std::io::Error::other(e)),
+            assert!(!buf.is_empty(), "Empty output for {shell:?}");
         }
     }
 }

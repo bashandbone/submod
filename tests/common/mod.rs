@@ -390,25 +390,24 @@ impl TestHarness {
             return git_path.join("info").join("sparse-checkout");
         } else if git_path.is_file() {
             // Gitlink - read the file to get the actual git directory
-            if let Ok(content) = std::fs::read_to_string(&git_path) {
-                if let Some(git_dir_line) =
+            if let Ok(content) = std::fs::read_to_string(&git_path)
+                && let Some(git_dir_line) =
                     content.lines().find(|line| line.starts_with("gitdir: "))
-                {
-                    let git_dir_path = git_dir_line.strip_prefix("gitdir: ").unwrap().trim();
+            {
+                let git_dir_path = git_dir_line.strip_prefix("gitdir: ").unwrap().trim();
 
-                    // Path might be relative to the submodule directory
-                    let absolute_path = if std::path::Path::new(git_dir_path).is_absolute() {
-                        std::path::PathBuf::from(git_dir_path)
-                    } else {
-                        self.work_dir.join(submodule_path).join(git_dir_path)
-                    };
+                // Path might be relative to the submodule directory
+                let absolute_path = if std::path::Path::new(git_dir_path).is_absolute() {
+                    std::path::PathBuf::from(git_dir_path)
+                } else {
+                    self.work_dir.join(submodule_path).join(git_dir_path)
+                };
 
-                    let sparse_file = absolute_path.join("info").join("sparse-checkout");
+                let sparse_file = absolute_path.join("info").join("sparse-checkout");
 
-                    // Check if the file exists in the actual git directory
-                    if sparse_file.exists() {
-                        return sparse_file;
-                    }
+                // Check if the file exists in the actual git directory
+                if sparse_file.exists() {
+                    return sparse_file;
                 }
             }
         }

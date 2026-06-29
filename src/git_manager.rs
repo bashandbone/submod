@@ -2002,7 +2002,7 @@ mod tests {
         // Create .git/info/sparse-checkout with the expected paths
         let info_dir = submodule_path.join(".git").join("info");
         fs::create_dir_all(&info_dir).unwrap();
-        let content = format!("{}\npath/a\npath/b\n", SPARSE_DENY_ALL);
+        let content = format!("{SPARSE_DENY_ALL}\npath/a\npath/b\n");
         fs::write(info_dir.join("sparse-checkout"), content).unwrap();
 
         let manager = create_test_manager(temp_dir.path(), temp_dir.path().join("submod.toml"));
@@ -2027,7 +2027,7 @@ mod tests {
         let info_dir = submodule_path.join(".git").join("info");
         fs::create_dir_all(&info_dir).unwrap();
         // File has path/a, path/b AND an extra path/c not in expected_paths
-        let content = format!("{}\npath/a\npath/b\npath/c\n", SPARSE_DENY_ALL);
+        let content = format!("{SPARSE_DENY_ALL}\npath/a\npath/b\npath/c\n");
         fs::write(info_dir.join("sparse-checkout"), content).unwrap();
 
         let manager = create_test_manager(temp_dir.path(), temp_dir.path().join("submod.toml"));
@@ -2094,7 +2094,7 @@ mod tests {
         // sparse-checkout has only path/a; path/b is expected but absent
         let info_dir = submodule_path.join(".git").join("info");
         fs::create_dir_all(&info_dir).unwrap();
-        let content = format!("{}\npath/a\n", SPARSE_DENY_ALL);
+        let content = format!("{SPARSE_DENY_ALL}\npath/a\n");
         fs::write(info_dir.join("sparse-checkout"), content).unwrap();
 
         let manager = create_test_manager(temp_dir.path(), temp_dir.path().join("submod.toml"));
@@ -2113,7 +2113,7 @@ mod tests {
                 assert_eq!(expected, vec!["path/a".to_string(), "path/b".to_string()]);
                 assert_eq!(actual, vec!["path/a".to_string()]);
             }
-            _ => panic!("Expected Mismatch, got {:?}", status),
+            _ => panic!("Expected Mismatch, got {status:?}"),
         }
     }
 }

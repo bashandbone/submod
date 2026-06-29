@@ -226,13 +226,13 @@ impl GitOpsManager {
 
     /// Whether the optimistic gix backend is currently active. When `false`,
     /// every operation is served by git2 (the fallback backend).
-    pub fn gix_enabled(&self) -> bool {
+    pub const fn gix_enabled(&self) -> bool {
         self.gix_ops.is_some()
     }
 
     /// Whether `add_submodule` is forced through its CLI last-resort path,
     /// bypassing both in-process backends. Normally `false`.
-    pub fn forces_cli_add(&self) -> bool {
+    pub const fn forces_cli_add(&self) -> bool {
         self.force_cli_add
     }
 
