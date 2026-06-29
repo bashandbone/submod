@@ -4,7 +4,7 @@
 
 //! Tests for the gix→git2 fallback architecture.
 //!
-//! The core design of the git_ops layer is "gix first, git2 fallback, CLI last resort".
+//! The core design of the `git_ops` layer is "gix first, git2 fallback, CLI last resort".
 //! These tests verify that:
 //! - When gix fails, the error propagates and git2 is invoked
 //! - The fallback produces correct results (not silent failures)
@@ -135,7 +135,7 @@ mod fallback_behavior_tests {
         );
     }
 
-    /// Verify set_config_value also uses fallback for 2-part keys.
+    /// Verify `set_config_value` also uses fallback for 2-part keys.
     #[test]
     fn set_config_value_falls_back_for_two_part_keys() {
         let harness = TestHarness::new().expect("harness");
@@ -187,7 +187,7 @@ mod fallback_submodule_tests {
         Ok(remote_url)
     }
 
-    /// add_submodule: gix explicitly doesn't implement this, so it must fall through
+    /// `add_submodule`: gix explicitly doesn't implement this, so it must fall through
     /// to git2, and if that fails, to CLI. Verify the result is correct.
     #[test]
     fn add_submodule_works_through_fallback() {
@@ -241,7 +241,7 @@ mod fallback_submodule_tests {
         );
     }
 
-    /// list_submodules should work regardless of which backend handles it.
+    /// `list_submodules` should work regardless of which backend handles it.
     #[test]
     fn list_submodules_after_add() {
         let harness = TestHarness::new().expect("harness");
@@ -252,7 +252,7 @@ mod fallback_submodule_tests {
         assert!(!subs.is_empty(), "should list the added submodule");
     }
 
-    /// apply_sparse_checkout has a triple fallback (gix → git2 → CLI).
+    /// `apply_sparse_checkout` has a triple fallback (gix → git2 → CLI).
     /// Both gix and git2 fail for this, so it must reach the CLI fallback.
     /// With a valid submodule path, the CLI fallback should succeed.
     #[test]
@@ -314,7 +314,7 @@ mod fallback_submodule_tests {
 mod backend_consistency_tests {
     use super::*;
 
-    /// Both backends should return the same result for read_gitmodules
+    /// Both backends should return the same result for `read_gitmodules`
     /// on the same repository state.
     #[test]
     fn read_gitmodules_consistent_across_backends() {
@@ -514,7 +514,7 @@ mod error_propagation_tests {
         );
     }
 
-    /// gix fetch_submodule on an invalid path should return Err.
+    /// gix `fetch_submodule` on an invalid path should return Err.
     #[test]
     fn gix_fetch_submodule_propagates_error() {
         let harness = TestHarness::new().expect("harness");
@@ -529,7 +529,7 @@ mod error_propagation_tests {
         );
     }
 
-    /// git2 fetch_submodule on an invalid path should return Err.
+    /// git2 `fetch_submodule` on an invalid path should return Err.
     #[test]
     fn git2_fetch_submodule_propagates_error() {
         let harness = TestHarness::new().expect("harness");
@@ -913,7 +913,7 @@ mod git2_fallback_injection_tests {
         );
     }
 
-    /// reopen() hazard (P0-1): in a single process, add → delete → reopen →
+    /// `reopen()` hazard (P0-1): in a single process, add → delete → reopen →
     /// re-add the same name+path must succeed and re-stage a gitlink. This
     /// exercises `GitOpsManager::reopen()` in-process, which refreshes the
     /// cached git2 repository so the re-add sees the post-delete state.

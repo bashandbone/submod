@@ -215,6 +215,41 @@ impl TestHarness {
         Ok(remote_dir)
     }
 
+    /// Advance the bare remote created by [`create_test_remote`] by one commit on
+    /// `main`, returning the new commit's full SHA. Reuses the working copy left
+    /// at `<temp>/<name>_work` so callers can move the remote forward and then
+    /// observe how `update`/`sync` react to a remote that has new history.
+    pub fn advance_test_remote(&self, name: &str) -> Result<String, Box<dyn std::error::Error>> {
+        let work_copy = self.temp_dir.path().join(format!("{name}_work"));
+
+        fs::write(work_copy.join("ADVANCE.txt"), format!("advanced {name}\n"))?;
+        self.git_cmd()
+            .args(["add", "."])
+            .current_dir(&work_copy)
+            .output()?;
+        self.git_cmd()
+            .args(["commit", "-m", "Advance remote"])
+            .current_dir(&work_copy)
+            .output()?;
+
+        let push_output = self
+            .git_cmd()
+            .args(["push", "--no-verify", "origin", "main"])
+            .current_dir(&work_copy)
+            .output()?;
+        if !push_output.status.success() {
+            let stderr = String::from_utf8_lossy(&push_output.stderr);
+            return Err(format!("Failed to push advance to remote: {stderr}").into());
+        }
+
+        let rev = self
+            .git_cmd()
+            .args(["rev-parse", "HEAD"])
+            .current_dir(&work_copy)
+            .output()?;
+        Ok(String::from_utf8_lossy(&rev.stdout).trim().to_string())
+    }
+
     /// Run submod command with given arguments
     pub fn run_submod(
         &self,
@@ -355,25 +390,24 @@ impl TestHarness {
             return git_path.join("info").join("sparse-checkout");
         } else if git_path.is_file() {
             // Gitlink - read the file to get the actual git directory
-            if let Ok(content) = std::fs::read_to_string(&git_path) {
-                if let Some(git_dir_line) =
+            if let Ok(content) = std::fs::read_to_string(&git_path)
+                && let Some(git_dir_line) =
                     content.lines().find(|line| line.starts_with("gitdir: "))
-                {
-                    let git_dir_path = git_dir_line.strip_prefix("gitdir: ").unwrap().trim();
+            {
+                let git_dir_path = git_dir_line.strip_prefix("gitdir: ").unwrap().trim();
 
-                    // Path might be relative to the submodule directory
-                    let absolute_path = if std::path::Path::new(git_dir_path).is_absolute() {
-                        std::path::PathBuf::from(git_dir_path)
-                    } else {
-                        self.work_dir.join(submodule_path).join(git_dir_path)
-                    };
+                // Path might be relative to the submodule directory
+                let absolute_path = if std::path::Path::new(git_dir_path).is_absolute() {
+                    std::path::PathBuf::from(git_dir_path)
+                } else {
+                    self.work_dir.join(submodule_path).join(git_dir_path)
+                };
 
-                    let sparse_file = absolute_path.join("info").join("sparse-checkout");
+                let sparse_file = absolute_path.join("info").join("sparse-checkout");
 
-                    // Check if the file exists in the actual git directory
-                    if sparse_file.exists() {
-                        return sparse_file;
-                    }
+                // Check if the file exists in the actual git directory
+                if sparse_file.exists() {
+                    return sparse_file;
                 }
             }
         }

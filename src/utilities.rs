@@ -117,6 +117,7 @@ pub fn path_to_string(path: &std::path::Path) -> Result<String, anyhow::Error> {
 }
 
 /// Convert a `Path` to a `String`, using lossy conversion for non-UTF-8 characters
+#[must_use]
 pub fn path_to_string_lossy(path: &std::path::Path) -> String {
     if let Some(s) = path.to_str() {
         return s.to_string();
@@ -127,6 +128,7 @@ pub fn path_to_string_lossy(path: &std::path::Path) -> String {
 }
 
 /// Convert a `Path` to an `OsString`
+#[must_use]
 pub fn path_to_os_string(path: &std::path::Path) -> std::ffi::OsString {
     path.as_os_str().to_owned()
 }
@@ -256,7 +258,7 @@ mod tests {
     fn test_get_name_empty_name_fallback_path() {
         assert_eq!(
             get_name(
-                Some("".to_string()),
+                Some(String::new()),
                 None,
                 Some(PathBuf::from_iter(["path", "to", "my-module"]).into_os_string())
             )

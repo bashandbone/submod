@@ -1240,7 +1240,7 @@ mod tests {
 
     #[test]
     fn test_branch_set_branch_empty_returns_default() {
-        let result = SerializableBranch::set_branch(Some("".to_string())).unwrap();
+        let result = SerializableBranch::set_branch(Some(String::new())).unwrap();
         // Empty string → default
         assert_eq!(result, SerializableBranch::default());
     }
