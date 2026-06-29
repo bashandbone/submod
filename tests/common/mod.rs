@@ -215,6 +215,41 @@ impl TestHarness {
         Ok(remote_dir)
     }
 
+    /// Advance the bare remote created by [`create_test_remote`] by one commit on
+    /// `main`, returning the new commit's full SHA. Reuses the working copy left
+    /// at `<temp>/<name>_work` so callers can move the remote forward and then
+    /// observe how `update`/`sync` react to a remote that has new history.
+    pub fn advance_test_remote(&self, name: &str) -> Result<String, Box<dyn std::error::Error>> {
+        let work_copy = self.temp_dir.path().join(format!("{name}_work"));
+
+        fs::write(work_copy.join("ADVANCE.txt"), format!("advanced {name}\n"))?;
+        self.git_cmd()
+            .args(["add", "."])
+            .current_dir(&work_copy)
+            .output()?;
+        self.git_cmd()
+            .args(["commit", "-m", "Advance remote"])
+            .current_dir(&work_copy)
+            .output()?;
+
+        let push_output = self
+            .git_cmd()
+            .args(["push", "--no-verify", "origin", "main"])
+            .current_dir(&work_copy)
+            .output()?;
+        if !push_output.status.success() {
+            let stderr = String::from_utf8_lossy(&push_output.stderr);
+            return Err(format!("Failed to push advance to remote: {stderr}").into());
+        }
+
+        let rev = self
+            .git_cmd()
+            .args(["rev-parse", "HEAD"])
+            .current_dir(&work_copy)
+            .output()?;
+        Ok(String::from_utf8_lossy(&rev.stdout).trim().to_string())
+    }
+
     /// Run submod command with given arguments
     pub fn run_submod(
         &self,

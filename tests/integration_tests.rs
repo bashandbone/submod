@@ -195,6 +195,134 @@ sparse_paths = ["src"]
         assert!(stdout.contains("Updated") || stdout.contains("Already up to date"));
     }
 
+    /// `update` must check the submodule worktree out to the commit recorded as
+    /// the superproject's gitlink — the defining job of `git submodule update`.
+    /// Regression test for the gix path silently treating checkout as a no-op
+    /// (it fetched but never moved the worktree), which left the submodule
+    /// stuck behind its recorded commit (#62 P1).
+    #[test]
+    fn update_checks_out_recorded_gitlink_commit() {
+        let harness = TestHarness::new().expect("Failed to create test harness");
+        harness.init_git_repo().expect("Failed to init git repo");
+
+        let remote_repo = harness
+            .create_test_remote("upd_pin")
+            .expect("Failed to create remote");
+        let remote_url = format!("file://{}", remote_repo.display());
+
+        harness
+            .run_submod_success(&["add", &remote_url, "--name", "upd-pin", "--path", "lib/upd"])
+            .expect("Failed to add submodule");
+
+        // C1 = the commit the submodule was added at.
+        let c1 = harness.git_stdout(&["-C", "lib/upd", "rev-parse", "HEAD"]);
+
+        // Create a second commit C2 inside the submodule, record it as the
+        // superproject's gitlink, then move the worktree back to C1 so the
+        // recorded gitlink is *ahead* of the checked-out worktree.
+        fs::write(harness.work_dir.join("lib/upd/NEW.txt"), "new content\n")
+            .expect("Failed to write file in submodule");
+        harness.git_stdout(&["-C", "lib/upd", "add", "."]);
+        harness.git_stdout(&["-C", "lib/upd", "commit", "-m", "c2"]);
+        let c2 = harness.git_stdout(&["-C", "lib/upd", "rev-parse", "HEAD"]);
+        assert_ne!(c1, c2, "the two submodule commits must differ");
+
+        harness.git_stdout(&["add", "lib/upd"]); // record gitlink at C2
+        harness.git_stdout(&["-C", "lib/upd", "checkout", &c1]); // worktree back to C1
+
+        // Preconditions (guard against a vacuous pass): worktree behind the
+        // recorded gitlink, which itself is a staged submodule pointing at C2.
+        assert_eq!(
+            harness.git_stdout(&["-C", "lib/upd", "rev-parse", "HEAD"]),
+            c1,
+            "precondition: submodule worktree must start at C1"
+        );
+        assert_eq!(
+            harness.index_gitlink_mode("lib/upd").as_deref(),
+            Some("160000"),
+            "precondition: lib/upd must be a staged submodule"
+        );
+        assert!(
+            harness
+                .git_stdout(&["ls-files", "--stage", "lib/upd"])
+                .contains(&c2),
+            "precondition: the recorded gitlink must point at C2"
+        );
+
+        harness
+            .run_submod_success(&["update"])
+            .expect("Failed to run update");
+
+        // update must have checked the worktree out to the recorded commit C2.
+        assert_eq!(
+            harness.git_stdout(&["-C", "lib/upd", "rev-parse", "HEAD"]),
+            c2,
+            "update must checkout the superproject-recorded gitlink commit (C2)"
+        );
+        assert!(
+            harness.file_exists("lib/upd/NEW.txt"),
+            "C2's tree must be materialized in the worktree after update"
+        );
+    }
+
+    /// Characterizes `update` against a remote that has moved forward: the fetch
+    /// genuinely happens (the new commit's object is pulled into the submodule),
+    /// but HEAD follows the superproject-recorded gitlink — it does NOT jump to
+    /// the remote tip. That is plain `git submodule update` semantics (only
+    /// `--remote` would follow the branch tip). Replaces the prior no-op smoke
+    /// test that updated against a remote which never advanced (#62 P1).
+    #[test]
+    fn update_against_advanced_remote_fetches_without_moving_head() {
+        let harness = TestHarness::new().expect("Failed to create test harness");
+        harness.init_git_repo().expect("Failed to init git repo");
+
+        let remote_repo = harness
+            .create_test_remote("upd_adv")
+            .expect("Failed to create remote");
+        let remote_url = format!("file://{}", remote_repo.display());
+
+        harness
+            .run_submod_success(&["add", &remote_url, "--name", "upd-adv", "--path", "lib/adv"])
+            .expect("Failed to add submodule");
+
+        // The recorded gitlink and the worktree both start at this commit.
+        let recorded = harness.git_stdout(&["-C", "lib/adv", "rev-parse", "HEAD"]);
+
+        // Move the remote forward; the new commit is not yet known locally.
+        let advanced = harness
+            .advance_test_remote("upd_adv")
+            .expect("Failed to advance remote");
+        assert_ne!(recorded, advanced, "the remote must have actually moved");
+        assert!(
+            harness
+                .git_stdout(&["-C", "lib/adv", "cat-file", "-t", &advanced])
+                .is_empty(),
+            "precondition: the advanced commit must be unknown before update"
+        );
+
+        harness
+            .run_submod_success(&["update"])
+            .expect("Failed to run update");
+
+        // The fetch really ran: the advanced commit's object is now present in
+        // the submodule's object store. (This is the non-vacuous part — it is
+        // false unless update actually fetched, since the object was absent in
+        // the precondition above.)
+        assert_eq!(
+            harness.git_stdout(&["-C", "lib/adv", "cat-file", "-t", &advanced]),
+            "commit",
+            "update must fetch the advanced remote commit into the submodule"
+        );
+
+        // But HEAD stayed at the recorded gitlink — update tracks the recorded
+        // commit, not the remote tip.
+        assert_eq!(
+            harness.git_stdout(&["-C", "lib/adv", "rev-parse", "HEAD"]),
+            recorded,
+            "HEAD must stay at the recorded gitlink, not jump to the remote tip"
+        );
+    }
+
     #[test]
     fn test_reset_command() {
         let harness = TestHarness::new().expect("Failed to create test harness");

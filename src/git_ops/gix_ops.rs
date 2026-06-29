@@ -469,7 +469,16 @@ impl GitOperations for GixOperations {
             match opts.strategy {
                 crate::options::SerializableUpdate::Checkout
                 | crate::options::SerializableUpdate::Unspecified => {
-                    // Fetch complete above
+                    // The fetch above only updated the object store and remote
+                    // tracking refs; the worktree still needs to be checked out
+                    // to the commit recorded as the superproject's gitlink. gix
+                    // has no worktree-checkout for an existing submodule here, so
+                    // delegate to git2's `submodule.update()`, which performs the
+                    // checkout. Without this, `update` silently fetched but left
+                    // the worktree stranded behind its recorded commit (#62 P1).
+                    return Err(anyhow::anyhow!(
+                        "gix cannot checkout submodule to its recorded commit; falling back to git2"
+                    ));
                 }
                 crate::options::SerializableUpdate::Merge => {
                     return Err(anyhow::anyhow!(
