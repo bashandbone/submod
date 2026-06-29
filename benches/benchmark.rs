@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Adam Poulemanos
+// SPDX-License-Identifier: LicenseRef-PlainMIT OR MIT
+
 //! Benchmarks comparing two implementations of `.gitmodules` line key parsing.
 //!
 //! The benchmarks measure the performance difference between:
