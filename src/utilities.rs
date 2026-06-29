@@ -13,7 +13,9 @@ use std::path::PathBuf;
 pub fn get_current_git2_repository(
     repo: Option<Git2Repository>,
 ) -> Result<Git2Repository, anyhow::Error> {
-    if let Some(r) = repo { Ok(r) } else {
+    if let Some(r) = repo {
+        Ok(r)
+    } else {
         let rep = Git2Repository::discover(".")
             .map_err(|e| anyhow::anyhow!("Failed to discover repository: {e}"))?;
         if rep.is_bare() {
@@ -48,18 +50,14 @@ pub fn get_cwd() -> Result<PathBuf, anyhow::Error> {
 }
 
 /// Get a thread-local repository from the given repository.
-pub fn get_thread_local_repo(
-    repo: &gix::Repository,
-) -> Result<gix::Repository, anyhow::Error> {
+pub fn get_thread_local_repo(repo: &gix::Repository) -> Result<gix::Repository, anyhow::Error> {
     // Get a full access repository from the given repository
     let safe_repo = repo.to_owned().into_sync().to_thread_local();
     Ok(safe_repo)
 }
 
 /// Get the main, or superproject, repository.
-pub fn get_main_repo(
-    repo: Option<&gix::Repository>,
-) -> Result<gix::Repository, anyhow::Error> {
+pub fn get_main_repo(repo: Option<&gix::Repository>) -> Result<gix::Repository, anyhow::Error> {
     let repo = match repo {
         Some(r) => r.to_owned(),
         None => get_current_repository()?,
@@ -93,7 +91,9 @@ pub fn get_current_branch(repo: Option<&gix::Repository>) -> Result<String, anyh
         }
         Err(anyhow::anyhow!("Failed to get current branch name"))
     }
-    if let Some(r) = repo { branch_from_repo(r) } else {
+    if let Some(r) = repo {
+        branch_from_repo(r)
+    } else {
         let owned = get_current_repository()?;
         branch_from_repo(&owned)
     }
@@ -122,9 +122,7 @@ pub fn path_to_string_lossy(path: &std::path::Path) -> String {
         return s.to_string();
     }
     let lossy = path.to_string_lossy();
-    eprintln!(
-        "Warning: Path contains non-UTF-8 characters, using lossy conversion: {lossy}"
-    );
+    eprintln!("Warning: Path contains non-UTF-8 characters, using lossy conversion: {lossy}");
     lossy.to_string()
 }
 
@@ -210,7 +208,11 @@ pub fn get_name(
 ) -> Result<String, anyhow::Error> {
     if let Some(name) = name {
         let trimmed_name = name.trim().to_string();
-        if trimmed_name.is_empty() { get_name(None, url, path) } else { Ok(trimmed_name) }
+        if trimmed_name.is_empty() {
+            get_name(None, url, path)
+        } else {
+            Ok(trimmed_name)
+        }
     } else if let Some(path) = path {
         name_from_osstring(path)
     } else if let Some(url) = url {

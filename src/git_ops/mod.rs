@@ -273,7 +273,10 @@ impl GitOpsManager {
 /// Implement `GitOperations` for `GitOpsManager`, using gix first and falling back to git2 if gix fails
 impl GitOperations for GitOpsManager {
     fn read_gitmodules(&self) -> Result<SubmoduleEntries> {
-        self.try_with_fallback(GitOperations::read_gitmodules, GitOperations::read_gitmodules)
+        self.try_with_fallback(
+            GitOperations::read_gitmodules,
+            GitOperations::read_gitmodules,
+        )
     }
 
     fn write_gitmodules(&mut self, config: &SubmoduleEntries) -> Result<()> {
@@ -465,7 +468,10 @@ impl GitOperations for GitOpsManager {
     }
 
     fn list_submodules(&self) -> Result<Vec<String>> {
-        self.try_with_fallback(GitOperations::list_submodules, GitOperations::list_submodules)
+        self.try_with_fallback(
+            GitOperations::list_submodules,
+            GitOperations::list_submodules,
+        )
     }
 
     fn fetch_submodule(&self, path: &str) -> Result<()> {

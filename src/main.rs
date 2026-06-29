@@ -131,9 +131,9 @@ fn main() -> Result<()> {
             } else {
                 let count = names.len();
                 for name in &names {
-                    manager.update_submodule(name).map_err(|e| {
-                        anyhow::anyhow!("Failed to update submodule {name}: {e}")
-                    })?;
+                    manager
+                        .update_submodule(name)
+                        .map_err(|e| anyhow::anyhow!("Failed to update submodule {name}: {e}"))?;
                 }
                 println!("Updated {count} submodule(s)");
             }

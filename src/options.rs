@@ -935,7 +935,10 @@ mod tests {
     fn test_fetch_recurse_as_config_value_uses_serde_form_not_git_bools() {
         // The submod.toml value form must be the serde kebab spelling so it round-trips
         // through Deserialize — NOT git's true/false encoding used by to_gitmodules.
-        assert_eq!(SerializableFetchRecurse::OnDemand.as_config_value(), "on-demand");
+        assert_eq!(
+            SerializableFetchRecurse::OnDemand.as_config_value(),
+            "on-demand"
+        );
         assert_eq!(SerializableFetchRecurse::Always.as_config_value(), "always");
         assert_eq!(SerializableFetchRecurse::Never.as_config_value(), "never");
         assert_eq!(SerializableFetchRecurse::Unspecified.as_config_value(), "");

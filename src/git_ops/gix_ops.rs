@@ -764,7 +764,6 @@ impl From<super::GitOpsManager> for GixOperations {
     fn from(git_ops: super::GitOpsManager) -> Self {
         git_ops
             .gix_ops
-            
             .expect("GixOperations should always be initialized")
     }
 }

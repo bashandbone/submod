@@ -49,11 +49,17 @@ mod tests {
         match result {
             Ok(output) => {
                 let stderr = String::from_utf8_lossy(&output.stderr);
-                assert!(!stderr.contains("unknown option: -c"), "Potential command injection detected: git interpreted path as a flag");
-            },
+                assert!(
+                    !stderr.contains("unknown option: -c"),
+                    "Potential command injection detected: git interpreted path as a flag"
+                );
+            }
             Err(e) => {
                 let err_msg = e.to_string();
-                assert!(!err_msg.contains("unknown option: -c"), "Potential command injection detected: git interpreted path as a flag");
+                assert!(
+                    !err_msg.contains("unknown option: -c"),
+                    "Potential command injection detected: git interpreted path as a flag"
+                );
             }
         }
     }
@@ -76,16 +82,18 @@ mod tests {
         // Ensure the directory exists to trigger the CLI fallback in apply_sparse_checkout if needed,
         // although apply_sparse_checkout is usually called after gix/git2 which might fail or be bypassed.
 
-        harness.run_submod_success(&[
-            "add",
-            &remote_url,
-            "--name",
-            "sparse-hyphen",
-            "--path",
-            path,
-            "--sparse-paths",
-            "src",
-        ]).expect("Failed to add submodule with hyphenated path");
+        harness
+            .run_submod_success(&[
+                "add",
+                &remote_url,
+                "--name",
+                "sparse-hyphen",
+                "--path",
+                path,
+                "--sparse-paths",
+                "src",
+            ])
+            .expect("Failed to add submodule with hyphenated path");
 
         // Verify it worked
         assert!(harness.dir_exists("sub/-sparse/src"));

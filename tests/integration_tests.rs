@@ -560,8 +560,8 @@ active = true
 
         // .gitmodules should show active = false
         let gitmodules_path = harness.work_dir.join(".gitmodules");
-        let gitmodules_content = std::fs::read_to_string(&gitmodules_path)
-            .expect("Failed to read .gitmodules");
+        let gitmodules_content =
+            std::fs::read_to_string(&gitmodules_path).expect("Failed to read .gitmodules");
         println!("GITMODULES CONTENT:\n{gitmodules_content}");
         assert!(gitmodules_content.contains("active = false"));
     }
@@ -586,7 +586,9 @@ path = \"lib/my\"
 url = \"https://example.com/my-lib.git\"
 active = true
 ";
-        harness.create_config(config_content).expect("Failed to create config");
+        harness
+            .create_config(config_content)
+            .expect("Failed to create config");
 
         let stdout = harness
             .run_submod_success(&["disable", "my-lib"])

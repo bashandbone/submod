@@ -216,7 +216,10 @@ impl GitOperations for Git2Operations {
         if let Some(submodules) = config.submodules().as_ref() {
             for (name, entry) in *submodules {
                 // Find or create the submodule
-                match self.repo.find_submodule(entry.path.as_deref().unwrap_or(name)) {
+                match self
+                    .repo
+                    .find_submodule(entry.path.as_deref().unwrap_or(name))
+                {
                     Ok(mut submodule) => {
                         // Update existing submodule configuration through git config
                         let mut config = self.repo.config()?;
@@ -246,9 +249,10 @@ impl GitOperations for Git2Operations {
                         }
                         // Set URL if different
                         if let Some(url) = &entry.url
-                            && submodule.url() != Some(url.as_str()) {
-                                config.set_str(&format!("submodule.{name}.url"), url)?;
-                            }
+                            && submodule.url() != Some(url.as_str())
+                        {
+                            config.set_str(&format!("submodule.{name}.url"), url)?;
+                        }
                         // Sync changes
                         submodule.sync()?;
                     }
@@ -339,36 +343,35 @@ impl GitOperations for Git2Operations {
 
         // Set ignore rule if specified and not the sentinel Unspecified value
         if let Some(ignore) = &opts.ignore
-            && !matches!(ignore, SerializableIgnore::Unspecified) {
-                let ignore_key = format!("submodule.{path_str}.ignore");
-                config
-                    .set_str(&ignore_key, &ignore.to_string())
-                    .with_context(|| {
-                        format!("Failed to set ignore for submodule '{}'", opts.name)
-                    })?;
-            }
+            && !matches!(ignore, SerializableIgnore::Unspecified)
+        {
+            let ignore_key = format!("submodule.{path_str}.ignore");
+            config
+                .set_str(&ignore_key, &ignore.to_string())
+                .with_context(|| format!("Failed to set ignore for submodule '{}'", opts.name))?;
+        }
 
         // Set fetch recurse if specified and not the sentinel Unspecified value
         if let Some(fetch_recurse) = &opts.fetch_recurse
-            && !matches!(fetch_recurse, SerializableFetchRecurse::Unspecified) {
-                let fetch_key = format!("submodule.{path_str}.fetchRecurseSubmodules");
-                config
-                    .set_str(&fetch_key, &fetch_recurse.to_string())
-                    .with_context(|| {
-                        format!("Failed to set fetchRecurse for submodule '{}'", opts.name)
-                    })?;
-            }
+            && !matches!(fetch_recurse, SerializableFetchRecurse::Unspecified)
+        {
+            let fetch_key = format!("submodule.{path_str}.fetchRecurseSubmodules");
+            config
+                .set_str(&fetch_key, &fetch_recurse.to_string())
+                .with_context(|| {
+                    format!("Failed to set fetchRecurse for submodule '{}'", opts.name)
+                })?;
+        }
 
         // Set update strategy if specified and not the sentinel Unspecified value
         if let Some(update) = &opts.update
-            && !matches!(update, SerializableUpdate::Unspecified) {
-                let update_key = format!("submodule.{path_str}.update");
-                config
-                    .set_str(&update_key, &update.to_string())
-                    .with_context(|| {
-                        format!("Failed to set update for submodule '{}'", opts.name)
-                    })?;
-            }
+            && !matches!(update, SerializableUpdate::Unspecified)
+        {
+            let update_key = format!("submodule.{path_str}.update");
+            config
+                .set_str(&update_key, &update.to_string())
+                .with_context(|| format!("Failed to set update for submodule '{}'", opts.name))?;
+        }
 
         Ok(())
     }
@@ -585,24 +588,24 @@ impl GitOperations for Git2Operations {
         // Remove untracked files
         for entry in statuses.iter() {
             if entry.status().is_wt_new()
-                && let Some(file_path) = entry.path() {
-                    let full_path = sub_repo
-                        .workdir()
-                        .ok_or_else(|| anyhow::anyhow!("Submodule has no working directory"))?
-                        .join(file_path);
-                    if full_path.is_file() {
-                        if force {
-                            std::fs::remove_file(&full_path).with_context(|| {
-                                format!("Failed to remove file: {}", full_path.display())
-                            })?;
-                        }
-                    } else if full_path.is_dir() && remove_directories
-                        && force {
-                            std::fs::remove_dir_all(&full_path).with_context(|| {
-                                format!("Failed to remove directory: {}", full_path.display())
-                            })?;
-                        }
+                && let Some(file_path) = entry.path()
+            {
+                let full_path = sub_repo
+                    .workdir()
+                    .ok_or_else(|| anyhow::anyhow!("Submodule has no working directory"))?
+                    .join(file_path);
+                if full_path.is_file() {
+                    if force {
+                        std::fs::remove_file(&full_path).with_context(|| {
+                            format!("Failed to remove file: {}", full_path.display())
+                        })?;
+                    }
+                } else if full_path.is_dir() && remove_directories && force {
+                    std::fs::remove_dir_all(&full_path).with_context(|| {
+                        format!("Failed to remove directory: {}", full_path.display())
+                    })?;
                 }
+            }
         }
         Ok(())
     }
@@ -665,9 +668,7 @@ impl GitOperations for Git2Operations {
         // Write patterns
         let content = patterns.join("\n");
         std::fs::write(&sparse_checkout_file, content).with_context(|| {
-            format!(
-                "Failed to write sparse checkout patterns for submodule: {path}"
-            )
+            format!("Failed to write sparse checkout patterns for submodule: {path}")
         })?;
         Ok(())
     }
@@ -687,9 +688,7 @@ impl GitOperations for Git2Operations {
             return Ok(Vec::new());
         }
         let content = std::fs::read_to_string(&sparse_checkout_file).with_context(|| {
-            format!(
-                "Failed to read sparse checkout patterns for submodule: {path}"
-            )
+            format!("Failed to read sparse checkout patterns for submodule: {path}")
         })?;
         let patterns = content
             .lines()

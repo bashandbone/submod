@@ -406,20 +406,26 @@ mod git2_ops_tests {
             entry.active = Some(false);
             entries.update_entry(name.to_string(), entry);
         }
-        ops.write_gitmodules(&entries).expect("write_gitmodules active false");
+        ops.write_gitmodules(&entries)
+            .expect("write_gitmodules active false");
 
         // Check git2 config manually or via read_gitmodules? Actually read_gitmodules in git2
         // doesn't read active from .git/config, but wait, it is set in `.git/config`!
         let config_path = harness.work_dir.join(".git").join("config");
         let config_content = std::fs::read_to_string(&config_path).expect("read git config");
-        assert!(config_content.contains("active = false"), "submodule should be inactive in config");
+        assert!(
+            config_content.contains("active = false"),
+            "submodule should be inactive in config"
+        );
     }
 
     #[test]
     fn test_with_submodule_write_gitmodules_active_none() {
         let harness = TestHarness::new().expect("harness");
         harness.init_git_repo().expect("init repo");
-        let remote = harness.create_test_remote("g2_write_sub_none").expect("remote");
+        let remote = harness
+            .create_test_remote("g2_write_sub_none")
+            .expect("remote");
         let remote_url = format!("file://{}", remote.display());
 
         harness
@@ -446,11 +452,15 @@ mod git2_ops_tests {
             entry.active = None;
             entries.update_entry(name.to_string(), entry);
         }
-        ops.write_gitmodules(&entries).expect("write_gitmodules active none");
+        ops.write_gitmodules(&entries)
+            .expect("write_gitmodules active none");
 
         let config_path = harness.work_dir.join(".git").join("config");
         let config_content = std::fs::read_to_string(&config_path).expect("read git config");
-        assert!(!config_content.contains("active ="), "submodule active should be untouched");
+        assert!(
+            !config_content.contains("active ="),
+            "submodule active should be untouched"
+        );
     }
 }
 

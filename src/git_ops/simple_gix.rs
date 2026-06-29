@@ -37,7 +37,8 @@ pub fn setup_line_renderer_range(
 }
 
 /// Get a progress tree for use with prodash.
-#[must_use] pub fn progress_tree(trace: bool) -> std::sync::Arc<prodash::tree::Root> {
+#[must_use]
+pub fn progress_tree(trace: bool) -> std::sync::Arc<prodash::tree::Root> {
     prodash::tree::root::Options {
         message_buffer_capacity: if trace { 10_000 } else { 200 },
         ..Default::default()

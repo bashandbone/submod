@@ -408,7 +408,8 @@ impl Shell {
     }
 
     /// Attempts to find the shell from the `SHELL` environment variable.
-    #[must_use] pub fn from_env() -> Option<Self> {
+    #[must_use]
+    pub fn from_env() -> Option<Self> {
         if let Some(env_shell) = std::env::var_os("SHELL") {
             Self::parse_shell_from_path(std::path::Path::new(&env_shell))
         } else {
