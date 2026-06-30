@@ -105,12 +105,17 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@67ef31d5b988238dd797d409d6f9574278e20537
         with:
-          toolchain: nightly
-          components: llvm-tools-preview, cargo-nextest, cargo-llvm-cov
+          toolchain: 1.91
+          components: llvm-tools-preview
       - name: Setup git
         run: |
           git config --global user.email "ci@example.com"
           git config --global user.name "CI"
+      - name: install other components
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-nextest,cargo-llvm-cov
+
 
       - name: Generate code coverage
         run: |
