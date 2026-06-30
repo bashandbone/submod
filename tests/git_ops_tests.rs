@@ -336,6 +336,55 @@ mod git2_ops_tests {
             .expect("get_submodule_status");
         assert_eq!(status.path, "lib/statussub");
         assert!(!status.name.is_empty(), "name should not be empty");
+
+        // The OIDs and status flags are the substance of `get_submodule_status`,
+        // yet were previously never asserted (#62 P1). Pin them against the real
+        // git state of a freshly added submodule.
+
+        // Index OID: the gitlink recorded in the superproject index.
+        let stage = harness.git_stdout(&["ls-files", "--stage", "--", "lib/statussub"]);
+        let gitlink_oid = stage
+            .split_whitespace()
+            .nth(1)
+            .expect("ls-files --stage should report the gitlink OID");
+        assert_eq!(
+            status.index_oid.as_deref(),
+            Some(gitlink_oid),
+            "index_oid must equal the staged gitlink OID"
+        );
+
+        // Workdir OID: the commit the submodule worktree is actually checked out
+        // at. For a fresh add it equals the recorded gitlink.
+        let workdir_head = harness.git_stdout(&["-C", "lib/statussub", "rev-parse", "HEAD"]);
+        assert_eq!(
+            status.workdir_oid.as_deref(),
+            Some(workdir_head.as_str()),
+            "workdir_oid must equal the submodule worktree HEAD"
+        );
+        assert_eq!(
+            status.index_oid, status.workdir_oid,
+            "a freshly added submodule's worktree must sit at the recorded gitlink"
+        );
+
+        // Status flags: the submodule is staged in the index, recorded in
+        // `.gitmodules`, and populated in the working directory.
+        assert!(
+            status.status_flags.contains(SubmoduleStatusFlags::IN_INDEX),
+            "IN_INDEX must be set, got {:?}",
+            status.status_flags
+        );
+        assert!(
+            status
+                .status_flags
+                .contains(SubmoduleStatusFlags::IN_CONFIG),
+            "IN_CONFIG must be set, got {:?}",
+            status.status_flags
+        );
+        assert!(
+            status.status_flags.contains(SubmoduleStatusFlags::IN_WD),
+            "IN_WD must be set, got {:?}",
+            status.status_flags
+        );
     }
 
     #[test]
