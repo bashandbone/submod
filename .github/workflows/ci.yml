@@ -105,7 +105,7 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@67ef31d5b988238dd797d409d6f9574278e20537
         with:
-          toolchain: 1.91
+          toolchain: nightly
           components: llvm-tools-preview, cargo-nextest, cargo-llvm-cov
       - name: Setup git
         run: |
