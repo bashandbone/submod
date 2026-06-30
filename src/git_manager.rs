@@ -206,108 +206,15 @@ impl GitManager {
         self.save_config()
     }
 
-    /// Save the current in-memory configuration to the config file
+    /// Save the current in-memory configuration to the config file.
+    ///
+    /// Delegates to [`write_full_config`], which rewrites the file
+    /// section-by-section: it preserves the preamble, comments, `[defaults]`,
+    /// and any unknown keys, *updates* the bodies of sections that already
+    /// exist, and appends sections that are new. The previous implementation
+    /// was append-only and silently dropped edits to existing sections (#62 P1).
     fn save_config(&self) -> Result<(), SubmoduleError> {
-        // Read existing TOML to preserve content (defaults, comments, existing entries)
-        let existing = if self.config_path.exists() {
-            std::fs::read_to_string(&self.config_path)
-                .map_err(|e| SubmoduleError::ConfigError(format!("Failed to read config: {e}")))?
-        } else {
-            String::new()
-        };
-
-        let mut output = existing.clone();
-
-        // Append any new submodule sections not already in the file
-        for (name, entry) in self.config.get_submodules() {
-            // Determine whether this name needs quoting (contains TOML-special characters).
-            // Simple names (alphanumeric, hyphens, underscores) can use the bare [name] form.
-            let needs_quoting = name
-                .chars()
-                .any(|c| !c.is_alphanumeric() && c != '-' && c != '_');
-            let escaped_name = name.replace('\\', "\\\\").replace('"', "\\\"");
-            let section_header = if needs_quoting {
-                format!("[\"{escaped_name}\"]")
-            } else {
-                format!("[{name}]")
-            };
-            // Check at line boundaries to avoid false positives from comments/values.
-            // Accept either quoted or unquoted form so existing files written before this
-            // change are recognised.
-            let already_present = existing.lines().any(|line| {
-                let trimmed = line.trim();
-                trimmed == section_header
-                    || trimmed == format!("[{name}]")
-                    || trimmed == format!("[\"{escaped_name}\"]")
-            });
-            if !already_present {
-                output.push('\n');
-                output.push_str(&section_header);
-                output.push('\n');
-                if let Some(path) = &entry.path {
-                    output.push_str(&format!(
-                        "path = \"{}\"\n",
-                        path.replace('\\', "\\\\").replace('"', "\\\"")
-                    ));
-                }
-                if let Some(url) = &entry.url {
-                    output.push_str(&format!(
-                        "url = \"{}\"\n",
-                        url.replace('\\', "\\\\").replace('"', "\\\"")
-                    ));
-                }
-                if let Some(branch) = &entry.branch {
-                    let val = branch.to_string();
-                    if !val.is_empty() {
-                        output.push_str(&format!(
-                            "branch = \"{}\"\n",
-                            val.replace('\\', "\\\\").replace('"', "\\\"")
-                        ));
-                    }
-                }
-                if let Some(ignore) = &entry.ignore {
-                    let val = ignore.to_string();
-                    if !val.is_empty() {
-                        output.push_str(&format!("ignore = \"{val}\"\n"));
-                    }
-                }
-                if let Some(fetch_recurse) = &entry.fetch_recurse {
-                    let val = fetch_recurse.as_config_value();
-                    if !val.is_empty() {
-                        output.push_str(&format!("fetchRecurse = \"{val}\"\n"));
-                    }
-                }
-                if let Some(update) = &entry.update {
-                    let val = update.to_string();
-                    if !val.is_empty() {
-                        output.push_str(&format!("update = \"{val}\"\n"));
-                    }
-                }
-                if let Some(active) = entry.active {
-                    output.push_str(&format!("active = {active}\n"));
-                }
-                if let Some(shallow) = entry.shallow
-                    && shallow
-                {
-                    output.push_str("shallow = true\n");
-                }
-                if let Some(sparse_paths) = &entry.sparse_paths
-                    && !sparse_paths.is_empty()
-                {
-                    let joined = sparse_paths
-                        .iter()
-                        .map(|p| format!("\"{}\"", p.replace('\\', "\\\\").replace('"', "\\\"")))
-                        .collect::<Vec<_>>()
-                        .join(", ");
-                    output.push_str(&format!("sparse_paths = [{joined}]\n"));
-                }
-            }
-        }
-
-        std::fs::write(&self.config_path, &output).map_err(|e| {
-            SubmoduleError::ConfigError(format!("Failed to write config file: {e}"))
-        })?;
-        Ok(())
+        self.write_full_config()
     }
 
     /// Creates a new `GitManager` by loading configuration from the given path
@@ -2077,6 +1984,71 @@ mod tests {
             reloaded.submodules.get("mymod").unwrap().fetch_recurse,
             Some(SerializableFetchRecurse::Never),
             "per-submodule fetch-recurse must survive a write/read round-trip; written file:\n{written}"
+        );
+    }
+
+    #[test]
+    fn test_save_config_persists_edits_to_existing_section() {
+        // `save_config` (the writer used by `add`) was append-only: once a
+        // submodule's section existed in submod.toml, later edits to that entry
+        // were silently not written back, because the section header was
+        // "already present". A load→modify→save→reload must reflect the edit
+        // (#62 P1).
+        let temp_dir = tempdir().unwrap();
+        let config_path = temp_dir.path().join("submod.toml");
+        let mut manager = create_test_manager(temp_dir.path(), config_path.clone());
+
+        // Seed an existing [mymod] section tracking branch = "main".
+        manager.config.add_submodule(
+            "mymod".to_string(),
+            SubmoduleEntry::new(
+                Some("https://example.com/repo.git".to_string()),
+                Some("libs/mymod".to_string()),
+                Some(SerializableBranch::Name("main".to_string())),
+                None,
+                None,
+                None,
+                Some(true),
+                None,
+                None,
+            ),
+        );
+        manager.save_config().expect("initial save");
+
+        // Precondition (guards against a vacuous pass): the section was written
+        // with branch = "main".
+        let first = fs::read_to_string(&config_path).unwrap();
+        let parsed_first: Config = toml::from_str(&first).expect("initial save must be valid TOML");
+        assert_eq!(
+            parsed_first.submodules.get("mymod").unwrap().branch,
+            Some(SerializableBranch::Name("main".to_string())),
+            "precondition: initial save must record branch=main; file:\n{first}"
+        );
+
+        // Modify the existing entry: branch main → develop.
+        manager.config.add_submodule(
+            "mymod".to_string(),
+            SubmoduleEntry::new(
+                Some("https://example.com/repo.git".to_string()),
+                Some("libs/mymod".to_string()),
+                Some(SerializableBranch::Name("develop".to_string())),
+                None,
+                None,
+                None,
+                Some(true),
+                None,
+                None,
+            ),
+        );
+        manager.save_config().expect("second save");
+
+        // The edit must be persisted, not dropped because the section pre-existed.
+        let second = fs::read_to_string(&config_path).unwrap();
+        let reloaded: Config = toml::from_str(&second).expect("second save must be valid TOML");
+        assert_eq!(
+            reloaded.submodules.get("mymod").unwrap().branch,
+            Some(SerializableBranch::Name("develop".to_string())),
+            "save_config must persist edits to an existing section; file:\n{second}"
         );
     }
 
