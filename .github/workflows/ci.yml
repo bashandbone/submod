@@ -24,7 +24,7 @@ jobs:
           - beta
           - nightly
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           submodules: recursive
 
@@ -35,36 +35,51 @@ jobs:
           components: rustfmt, clippy
 
       - name: Cache cargo registry
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.cargo/registry
           key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
 
       - name: Cache cargo index
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.cargo/git
           key: ${{ runner.os }}-cargo-index-${{ hashFiles('**/Cargo.lock') }}
 
       - name: Cache cargo build
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: target
           key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
 
-      - name: Set up mise
-        run: |
-          curl https://mise.run | sh
-          echo "$HOME/.local/share/mise/bin" >> $GITHUB_PATH
-          echo "$HOME/.local/share/mise/shims" >> $GITHUB_PATH
-          MISE="$HOME/.local/bin/mise"
-          $MISE trust -y
-          $MISE install -y
-          $MISE reshim
-          $HOME/.local/share/mise/shims/hk install --mise
+      - name: Install hk with mise
+        uses: jdx/mise-action@v4
+        env:
+          HK_MISE: 1
+          MISE_YES: 1
+        with:
+          experimental: true
+          github_token: ${{ secrets.GITHUB_TOKEN || github.token }}
+          reshim: true
+          install: true
+          mise_toml: |
+            [tools]
+            rust = "1.89"
+            act = "latest"
+            "cargo:cargo-audit" = { version = "latest", depends = ["rust"] }
+            "cargo:cargo-deny" = { version = "latest", depends = ["rust"] }
+            "cargo:cargo-nextest" = { version = "latest", depends = ["rust"] }
+            hk = { version = "latest", depends = ["pkl"], postinstall = 'hk install --mise'}
+            pkl = "latest"
+            typos = { version = "latest", depends = ["rust"] }
 
       - name: Run hk ci workflow
-        run: $HOME/.local/share/mise/shims/hk run ci
+        env:
+          HK_MISE: 1
+          MISE_YES: 1
+        run: |
+          hkbin="$(command -v hk || which hk || $HOME/.local/share/mise/installs/hk/latest/hk)"
+          "$hkbin" run ci
 
   security_audit:
     name: Security Audit
@@ -73,33 +88,29 @@ jobs:
       checks: write
       contents: read
     steps:
-      - uses: actions/checkout@v6
-      - uses: rustsec/audit-check@v1.4.1
+      - uses: actions/checkout@v7
+      - uses: rustsec/audit-check@v2
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.GITHUB_TOKEN || github.token }}
           ignore: RUSTSEC-2024-0364,RUSTSEC-2024-0436
 
   coverage:
     name: Code Coverage
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           submodules: recursive
 
       - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@v7
         with:
-          components: llvm-tools-preview
+          toolchain: stable
+          components: llvm-tools-preview, nextest, cargo-llvm-cov
       - name: Setup git
         run: |
           git config --global user.email "ci@example.com"
           git config --global user.name "CI"
-
-      - name: Install cargo-llvm-cov
-        uses: taiki-e/install-action@cargo-llvm-cov
-      - name: Install nextest
-        uses: taiki-e/install-action@nextest
 
       - name: Generate code coverage
         run: |
@@ -109,7 +120,7 @@ jobs:
             --ignore-filename-regex '\.cargo[/\\]registry|\.cargo[/\\]git|rustup[/\\]toolchains|/rustc/|scripts[/\\]|tests[/\\]|examples[/\\]|benches[/\\]|target[/\\]|.*long_about.rs|.*lib.rs' \
             --manifest-path Cargo.toml
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@v7
         with:
           files: lcov.info
           token: ${{ secrets.CODECOV_TOKEN }}
