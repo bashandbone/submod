@@ -52,6 +52,12 @@ jobs:
           path: target
           key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}-${{ matrix.rust }}
 
+  lint:
+    name: lint
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
       - name: Install hk with mise
         uses: jdx/mise-action@v4
         env:
@@ -64,22 +70,21 @@ jobs:
           install: true
           mise_toml: |
             [tools]
-            rust = "${{ matrix.rust }}"
+            rust = "1.89"
             act = "latest"
-            "cargo:cargo-audit" = { version = "latest", depends = ["rust"] }
             "cargo:cargo-deny" = { version = "latest", depends = ["rust"] }
             "cargo:cargo-nextest" = { version = "latest", depends = ["rust"] }
-            hk = { version = "1.48", depends = ["pkl"], postinstall = 'hk install --mise'}
+            hk = { version = "1.48", depends = ["pkl"], postinstall = 'hk install --mise || true'}
             pkl = "latest"
             typos = { version = "latest", depends = ["rust"] }
-
+    
       - name: Run hk ci workflow
         env:
           HK_MISE: 1
           MISE_YES: 1
         run: |
           hkbin="$(command -v hk || which hk || $HOME/.local/share/mise/installs/hk/latest/hk)"
-          "$hkbin" run ci
+          "$hkbin" run lint
 
   security_audit:
     name: Security Audit
@@ -97,6 +102,8 @@ jobs:
   coverage:
     name: Code Coverage
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v7
         with:
