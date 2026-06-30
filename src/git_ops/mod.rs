@@ -394,10 +394,15 @@ impl GitOperations for GitOpsManager {
                 if let Ok(content) = std::fs::read_to_string(&gitmodules_path) {
                     let mut new_content = String::new();
                     let mut in_target_section = false;
+                    // git2 may key the `.gitmodules` section by either the name or the
+                    // path (it uses the path as the section key when name != path), so
+                    // match both to avoid leaving a stale entry behind.
                     let target_name = format!("\"{}\"", opts.name);
+                    let target_path = format!("\"{}\"", opts.path.display());
                     for line in content.lines() {
                         if line.starts_with("[submodule \"") {
-                            in_target_section = line.contains(&target_name);
+                            in_target_section =
+                                line.contains(&target_name) || line.contains(&target_path);
                         }
                         if !in_target_section {
                             new_content.push_str(line);
