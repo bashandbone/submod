@@ -1391,4 +1391,129 @@ active = true
             "re-added submodule should be staged as a gitlink again"
         );
     }
+
+    /// Adding the same submodule (same name + path) a second time is idempotent:
+    /// it succeeds without creating duplicate `.gitmodules` or config entries.
+    #[test]
+    fn test_add_same_submodule_twice_is_idempotent() {
+        let harness = TestHarness::new().expect("Failed to create test harness");
+        harness.init_git_repo().expect("Failed to init git repo");
+
+        let remote = harness
+            .create_test_remote("idem-remote")
+            .expect("Failed to create remote");
+        let url = format!("file://{}", remote.display());
+
+        harness
+            .run_submod_success(&["add", &url, "--name", "idem", "--path", "lib/idem"])
+            .expect("first add should succeed");
+        harness
+            .run_submod_success(&["add", &url, "--name", "idem", "--path", "lib/idem"])
+            .expect("re-adding the same submodule should be a graceful no-op");
+
+        // Exactly one entry must exist in .gitmodules, git config, and submod.toml.
+        let gm_raw = std::fs::read_to_string(harness.work_dir.join(".gitmodules"))
+            .expect("read .gitmodules");
+        assert_eq!(
+            gm_raw.matches("[submodule \"lib/idem\"]").count(),
+            1,
+            ".gitmodules must hold exactly one section for the re-added submodule, got:\n{gm_raw}"
+        );
+        let cfg = harness.submodule_config_entries();
+        assert_eq!(
+            cfg.matches("submodule.lib/idem.url").count(),
+            1,
+            "git config must hold exactly one entry for the submodule, got:\n{cfg}"
+        );
+        let toml = std::fs::read_to_string(harness.config_path()).expect("read submod.toml");
+        assert_eq!(
+            toml.matches("[idem]").count(),
+            1,
+            "submod.toml must hold exactly one [idem] section, got:\n{toml}"
+        );
+    }
+
+    /// Deleting a submodule that does not exist must fail with a specific,
+    /// informative error — not silently succeed.
+    #[test]
+    fn test_delete_nonexistent_submodule_fails() {
+        let harness = TestHarness::new().expect("Failed to create test harness");
+        harness.init_git_repo().expect("Failed to init git repo");
+
+        let output = harness
+            .run_submod(&["delete", "ghost"])
+            .expect("Failed to run submod");
+        assert!(
+            !output.status.success(),
+            "deleting a nonexistent submodule must exit non-zero"
+        );
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        assert!(
+            stderr.contains("ghost") && stderr.contains("not found"),
+            "error must name the missing submodule and say it was not found, got: {stderr}"
+        );
+    }
+
+    /// A failed `add` (e.g. an unreachable URL) must not leave partial state
+    /// behind when a submodule already exists. Regression for the #62 audit (P2):
+    /// the fallback cleanup matched the `.gitmodules` section by name, but git2
+    /// writes the section keyed by path, so a stale `[submodule "<path>"]` entry
+    /// lingered after the failed add.
+    #[test]
+    fn test_failed_add_leaves_no_partial_state() {
+        let harness = TestHarness::new().expect("Failed to create test harness");
+        harness.init_git_repo().expect("Failed to init git repo");
+
+        let remote = harness
+            .create_test_remote("survivor-remote")
+            .expect("Failed to create remote");
+        let url = format!("file://{}", remote.display());
+
+        // A real submodule so .gitmodules already exists when the bad add runs.
+        harness
+            .run_submod_success(&["add", &url, "--name", "good", "--path", "lib/good"])
+            .expect("baseline add should succeed");
+
+        // A failed add against an unreachable URL.
+        let bad = harness
+            .run_submod(&[
+                "add",
+                "file:///nonexistent/definitely-not-here.git",
+                "--name",
+                "bad",
+                "--path",
+                "lib/bad",
+            ])
+            .expect("Failed to run submod");
+        assert!(
+            !bad.status.success(),
+            "an add against an unreachable URL must fail"
+        );
+
+        // No stale `bad`/`lib/bad` entry may remain in .gitmodules or git config.
+        let gm = harness.gitmodules_entries();
+        assert!(
+            !gm.contains("lib/bad") && !gm.contains("\"bad\""),
+            "failed add left a stale .gitmodules entry:\n{gm}"
+        );
+        let cfg = harness.submodule_config_entries();
+        assert!(
+            !cfg.contains("lib/bad") && !cfg.contains("submodule.bad."),
+            "failed add left a stale git config entry:\n{cfg}"
+        );
+        assert!(
+            !harness.dir_exists("lib/bad"),
+            "failed add left an orphan working-tree directory"
+        );
+        assert!(
+            !harness.git_modules_dir_exists("bad") && !harness.git_modules_dir_exists("lib/bad"),
+            "failed add left a dangling .git/modules directory"
+        );
+
+        // Non-vacuity: the pre-existing good submodule must survive the cleanup.
+        assert!(
+            gm.contains("lib/good"),
+            "cleanup of the failed add must not remove the existing submodule:\n{gm}"
+        );
+    }
 }
