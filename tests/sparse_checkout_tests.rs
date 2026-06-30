@@ -327,31 +327,35 @@ sparse_paths = ["src", "docs", "*.md"]
             .expect("Failed to create remote");
         let remote_url = format!("file://{}", remote_repo.display());
 
-        // Try to add with empty sparse paths - should handle gracefully
-        let output = harness.run_submod(&[
-            "add",
-            &remote_url,
-            "--name",
-            "sparse-empty",
-            "--path",
-            "lib/sparse-empty",
-            "--sparse-paths",
-            "",
-        ]);
+        // Adding with an empty sparse-paths value succeeds and simply does not
+        // enable sparse checkout (an empty pattern set is a no-op, not an error).
+        let output = harness
+            .run_submod(&[
+                "add",
+                &remote_url,
+                "--name",
+                "sparse-empty",
+                "--path",
+                "lib/sparse-empty",
+                "--sparse-paths",
+                "",
+            ])
+            .expect("Failed to run submod");
 
-        // Should either succeed without sparse checkout or provide clear error
-        if let Ok(process_output) = output {
-            if process_output.status.success() {
-                // If successful, sparse checkout should not be enabled
-                let sparse_file = harness.get_sparse_checkout_file_path("lib/sparse-empty");
-                assert!(
-                    !sparse_file.exists()
-                        || fs::read_to_string(&sparse_file).unwrap().trim().is_empty()
-                );
-            }
-        } else {
-            // If it fails, that's also acceptable for empty patterns
-        }
+        assert!(
+            output.status.success(),
+            "empty sparse-paths should be a graceful no-op, exit was {:?}; stderr: {}",
+            output.status.code(),
+            String::from_utf8_lossy(&output.stderr)
+        );
+
+        // Sparse checkout must not be enabled: either no sparse-checkout file, or
+        // an empty one.
+        let sparse_file = harness.get_sparse_checkout_file_path("lib/sparse-empty");
+        assert!(
+            !sparse_file.exists() || fs::read_to_string(&sparse_file).unwrap().trim().is_empty(),
+            "empty sparse-paths must not enable a non-empty sparse checkout"
+        );
     }
 
     #[test]

@@ -5,7 +5,6 @@
 //! Common utilities for integration tests
 
 use std::fs;
-use std::os::unix::process::ExitStatusExt;
 use std::path::PathBuf;
 use std::process::Command;
 use tempfile::TempDir;
@@ -255,18 +254,10 @@ impl TestHarness {
         &self,
         args: &[&str],
     ) -> Result<std::process::Output, Box<dyn std::error::Error>> {
-        // Check for null bytes in arguments which would cause process execution to fail
-        for arg in args {
-            if arg.contains('\0') {
-                // Return a simulated failed output for null byte arguments
-                return Ok(std::process::Output {
-                    status: std::process::ExitStatus::from_raw(1),
-                    stdout: Vec::new(),
-                    stderr: b"Error: Invalid argument contains null byte\n".to_vec(),
-                });
-            }
-        }
-
+        // NOTE: arguments containing an interior NUL byte cannot be passed to a
+        // process at all — std's Command rejects them before spawn, so `.output()`
+        // below returns an Err. We deliberately do NOT fabricate a fake failure
+        // here; tests assert the real process-boundary rejection.
         let output = Command::new(&self.submod_bin)
             .args(args)
             .current_dir(&self.work_dir)

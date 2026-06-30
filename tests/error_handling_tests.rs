@@ -69,13 +69,34 @@ mod tests {
         let harness = TestHarness::new().expect("Failed to create test harness");
         harness.init_git_repo().expect("Failed to init git repo");
 
-        // Try to use a non-existent config file
-        harness
+        // A non-existent config path is handled gracefully: `check` falls back to
+        // defaults and exits 0 (there are no submodules to report on).
+        let missing = harness
             .run_submod(&["--config", "/nonexistent/path/config.toml", "check"])
             .expect("Failed to run submod");
+        assert!(
+            missing.status.success(),
+            "a missing config file should be handled gracefully, exit was {:?}; stderr: {}",
+            missing.status.code(),
+            String::from_utf8_lossy(&missing.stderr)
+        );
 
-        // Should handle missing config file gracefully (create default or error)
-        // The exact behavior depends on implementation
+        // A config file that exists but is malformed must NOT be swallowed: it
+        // fails with a specific parse diagnostic, not a generic catch-all.
+        let bad_config = harness.work_dir.join("bad.toml");
+        fs::write(&bad_config, "this is = = not toml [[[\n").expect("write bad config");
+        let malformed = harness
+            .run_submod(&["--config", "bad.toml", "check"])
+            .expect("Failed to run submod");
+        assert!(
+            !malformed.status.success(),
+            "a malformed config must cause a non-zero exit"
+        );
+        let stderr = String::from_utf8_lossy(&malformed.stderr);
+        assert!(
+            stderr.contains("TOML parse error") || stderr.contains("parse error"),
+            "malformed config error must name the parse failure, got: {stderr}"
+        );
     }
 
     #[test]
@@ -202,16 +223,25 @@ mod tests {
             .expect("Failed to create remote");
         let remote_url = format!("file://{}", remote_repo.display());
 
-        // Test various potentially problematic sparse patterns
-        let problematic_patterns = vec![
-            "//invalid//path",
-            "..",
-            "../../../escape",
-            "path/with/\0/null",
-        ];
+        // A path-traversal sentinel: if any pattern lets the tool write outside the
+        // superproject working tree, this file/dir would appear one level up.
+        let escape_sentinel = harness
+            .work_dir
+            .parent()
+            .expect("work_dir has a parent")
+            .join("escape");
+        assert!(
+            !escape_sentinel.exists(),
+            "sentinel must not pre-exist before the test"
+        );
 
-        for pattern in problematic_patterns {
-            let output = harness
+        // Traversal / malformed patterns. The security-relevant property is
+        // CONTAINMENT: regardless of success or failure, nothing is written
+        // outside the superproject working tree.
+        let traversal_patterns = vec!["//invalid//path", "..", "../../../escape", "../escape"];
+
+        for pattern in traversal_patterns {
+            let _output = harness
                 .run_submod(&[
                     "add",
                     &remote_url,
@@ -224,15 +254,41 @@ mod tests {
                 ])
                 .expect("Failed to run submod");
 
-            // Should either succeed and handle the pattern safely, or fail gracefully
-            if !output.status.success() {
-                let stderr = String::from_utf8_lossy(&output.stderr);
-                assert!(!stderr.is_empty());
-            }
+            // Containment: the traversal pattern must never materialize a path
+            // outside the working tree, nor at an absolute system location.
+            assert!(
+                !escape_sentinel.exists(),
+                "path traversal escaped the working tree for pattern {pattern:?}: {} was created",
+                escape_sentinel.display()
+            );
+            assert!(
+                !std::path::Path::new("/escape").exists(),
+                "path traversal reached an absolute location for pattern {pattern:?}"
+            );
 
             // Clean up for next iteration
             let _ = fs::remove_dir_all(harness.work_dir.join("lib/sparse-test"));
         }
+
+        // A NUL byte in an argument cannot be handed to a process at all: std's
+        // Command rejects it before spawn, so run_submod returns an Err. Assert
+        // that real boundary rejection (previously faked by the harness).
+        let nul_result = harness.run_submod(&[
+            "add",
+            &remote_url,
+            "--name",
+            "sparse-test",
+            "--path",
+            "lib/sparse-test",
+            "--sparse-paths",
+            "path/with/\0/null",
+        ]);
+        let err =
+            nul_result.expect_err("a NUL-byte argument must be rejected at the process boundary");
+        assert!(
+            err.to_string().to_lowercase().contains("nul"),
+            "expected a NUL-byte rejection error, got: {err}"
+        );
     }
 
     #[test]
