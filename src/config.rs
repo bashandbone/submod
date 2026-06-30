@@ -2404,4 +2404,99 @@ update = "rebase"
 
         assert!(config.get_submodule("non-existent").is_none());
     }
+
+    // ================================================================
+    // git2 option bridges: Git2SubmoduleOptions / SubmoduleUpdateOptions
+    // (#62 P1 — these conversions ship into every git2-backed add/update
+    // but had no test coverage.)
+    // ================================================================
+
+    #[test]
+    fn test_git2_options_try_from_maps_every_field() {
+        let opts = SubmoduleGitOptions::new(
+            Some(SerializableIgnore::All),
+            Some(SerializableFetchRecurse::Always),
+            Some(SerializableBranch::Name("feature".to_string())),
+            Some(SerializableUpdate::Rebase),
+        );
+        let git2 = Git2SubmoduleOptions::try_from(opts).expect("conversion should succeed");
+        assert_eq!(git2.ignore, git2::SubmoduleIgnore::All);
+        assert_eq!(git2.update, git2::SubmoduleUpdate::Rebase);
+        assert_eq!(git2.branch.as_deref(), Some("feature"));
+        // fetch_recurse bridges through `to_gitmodules` → git's `true`/`false`
+        // encoding, NOT the `always`/`never` serde spelling.
+        assert_eq!(git2.fetch_recurse.as_deref(), Some("true"));
+    }
+
+    #[test]
+    fn test_git2_options_try_from_none_uses_git2_defaults() {
+        let opts = SubmoduleGitOptions::new(None, None, None, None);
+        let git2 = Git2SubmoduleOptions::try_from(opts).expect("conversion should succeed");
+        // Absent ignore/update become git2's neutral sentinels, not a panic.
+        assert_eq!(git2.ignore, git2::SubmoduleIgnore::Unspecified);
+        assert_eq!(git2.update, git2::SubmoduleUpdate::Default);
+        assert_eq!(git2.branch, None);
+        assert_eq!(git2.fetch_recurse, None);
+    }
+
+    #[test]
+    fn test_git2_options_fetch_recurse_on_demand_encoding() {
+        // OnDemand must NOT collapse to the same string as Always — proves the
+        // bridge preserves the distinction git cares about.
+        let opts =
+            SubmoduleGitOptions::new(None, Some(SerializableFetchRecurse::OnDemand), None, None);
+        let git2 = Git2SubmoduleOptions::try_from(opts).expect("conversion should succeed");
+        assert_eq!(git2.fetch_recurse.as_deref(), Some("on-demand"));
+    }
+
+    #[test]
+    fn test_update_options_from_options_recursive_only_when_fetch_always() {
+        // fetchRecurse = always is the one value that flips `recursive` on.
+        let always = SubmoduleUpdateOptions::from_options(SubmoduleGitOptions::new(
+            None,
+            Some(SerializableFetchRecurse::Always),
+            None,
+            Some(SerializableUpdate::Merge),
+        ));
+        assert!(always.recursive, "fetchRecurse=always must set recursive");
+        assert_eq!(always.strategy, SerializableUpdate::Merge);
+        assert!(!always.force, "from_options never forces");
+
+        // Every other fetch_recurse value (incl. None) leaves recursive off.
+        for fr in [
+            None,
+            Some(SerializableFetchRecurse::OnDemand),
+            Some(SerializableFetchRecurse::Never),
+        ] {
+            let opts = SubmoduleUpdateOptions::from_options(SubmoduleGitOptions::new(
+                None, fr, None, None,
+            ));
+            assert!(
+                !opts.recursive,
+                "only fetchRecurse=always should set recursive, got {fr:?}"
+            );
+            // An absent update strategy falls back to the Checkout default.
+            assert_eq!(opts.strategy, SerializableUpdate::Checkout);
+        }
+    }
+
+    #[test]
+    fn test_entry_to_git2_options_reflects_entry_git_options() {
+        let entry = SubmoduleEntry::new(
+            Some("https://example.com/repo.git".to_string()),
+            Some("libs/repo".to_string()),
+            None,
+            Some(SerializableIgnore::Dirty),
+            Some(SerializableUpdate::Checkout),
+            None,
+            Some(true),
+            None,
+            None,
+        );
+        let git2 = entry
+            .to_git2_options()
+            .expect("to_git2_options should succeed");
+        assert_eq!(git2.ignore, git2::SubmoduleIgnore::Dirty);
+        assert_eq!(git2.update, git2::SubmoduleUpdate::Checkout);
+    }
 }
