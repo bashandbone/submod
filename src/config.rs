@@ -1091,14 +1091,50 @@ impl Config {
         Ok(())
     }
 
+    /// Overlay CLI-supplied options onto this configuration.
+    ///
+    /// Only fields explicitly set on the CLI override the current values: a
+    /// `None` `[defaults]` field (or an empty submodule set) leaves the existing
+    /// value intact, so an absent CLI flag never erases configuration the file
+    /// provided. Merging the whole `cli_options` struct through figment instead
+    /// would serialize its unset `[defaults]` fields as nulls and clobber the
+    /// file's values (#62 P1).
+    fn merge_cli_overrides(&mut self, cli: Self) {
+        let cli_defaults = cli.defaults;
+        if cli_defaults.ignore.is_some() {
+            self.defaults.ignore = cli_defaults.ignore;
+        }
+        if cli_defaults.fetch_recurse.is_some() {
+            self.defaults.fetch_recurse = cli_defaults.fetch_recurse;
+        }
+        if cli_defaults.update.is_some() {
+            self.defaults.update = cli_defaults.update;
+        }
+        if cli_defaults.use_git_default_sparse_checkout.is_some() {
+            self.defaults.use_git_default_sparse_checkout =
+                cli_defaults.use_git_default_sparse_checkout;
+        }
+        // CLI submodule entries override/extend by name (no-op when none given).
+        for (name, entry) in cli.submodules {
+            self.submodules.update_entry(name, entry);
+        }
+    }
+
     /// Load configuration from a file, merging with CLI options
     pub fn load(&self, path: impl AsRef<Path>, cli_options: Self) -> anyhow::Result<Self> {
-        let fig = Figment::from(Self::default()) // 1) start from Rust-side defaults
-            .merge(Toml::file(path)) // 2) file-based overrides
-            .merge(cli_options); // 3) CLI overrides file
+        // 1) Read the file's values. NOTE: layering an empty `Config::default()`
+        //    provider beneath the file (the previous approach) actively *erased*
+        //    the file's `[defaults]` — that provider emits all-`None` defaults
+        //    under its own figment profile (`REPO`), which then overrode the
+        //    file's values. Rust-side defaults are filled by `apply_defaults()`
+        //    below, not by a figment base layer (#62 P1).
+        let mut cfg: Self = Figment::from(Toml::file(path)).extract()?;
 
-        // 4) extract into Config, then post-process submodules
-        let cfg: Self = fig.extract()?;
+        // 2) CLI overrides the file, but only where the CLI actually set a value
+        //    (None-aware — see `merge_cli_overrides`).
+        cfg.merge_cli_overrides(cli_options);
+
+        // 3) post-process submodules
         Ok(cfg.apply_defaults())
     }
 
@@ -1108,9 +1144,10 @@ impl Config {
             Some(ref p) => p,
             None => &".",
         };
-        let fig = Figment::from(Self::default()).merge(Toml::file(p));
-        // Extract the configuration from Figment
-        let cfg: Self = fig.extract()?;
+        // See `load`: an empty `Config::default()` base layer erases the file's
+        // `[defaults]`, so read the file directly and let `apply_defaults()`
+        // supply Rust-side defaults (#62 P1).
+        let cfg: Self = Figment::from(Toml::file(p)).extract()?;
         Ok(cfg.apply_defaults())
     }
 
@@ -2163,6 +2200,118 @@ active = true
             Some(SerializableFetchRecurse::Never),
             "per-submodule fetchRecurse should parse into fetch_recurse"
         );
+    }
+
+    // ================================================================
+    // Config::load — CLI-over-file precedence
+    // ================================================================
+
+    #[test]
+    fn test_config_load_cli_overrides_file_but_preserves_unspecified() {
+        // `Config::load` layers three sources: Rust-side defaults → submod.toml
+        // → cli_options. A value supplied via `cli_options` must override the
+        // same key from the file, while a key the CLI leaves unset must keep the
+        // file's value — an absent CLI flag must not erase file configuration.
+        // This precedence contract was previously untested (#62 P1).
+        figment::Jail::expect_with(|jail| {
+            jail.create_file(
+                "submod.toml",
+                r#"
+[defaults]
+ignore = "all"
+update = "rebase"
+"#,
+            )?;
+
+            // The CLI overrides `ignore` and leaves `update` unspecified.
+            let mut cli_options = Config::default();
+            cli_options.defaults.ignore = Some(SerializableIgnore::Dirty);
+
+            let cfg = Config::default()
+                .load("submod.toml", cli_options)
+                .expect("load should succeed");
+
+            assert_eq!(
+                cfg.defaults.ignore,
+                Some(SerializableIgnore::Dirty),
+                "CLI-supplied `ignore` must override the file's value"
+            );
+            assert_eq!(
+                cfg.defaults.update,
+                Some(SerializableUpdate::Rebase),
+                "file's `update` must survive when the CLI leaves it unspecified"
+            );
+
+            Ok(())
+        });
+    }
+
+    #[test]
+    fn test_config_load_default_cli_preserves_file_defaults() {
+        // The production callers (`GitManager::with_verbose`) load config with
+        // `cli_options = Config::default()`, whose `[defaults]` are all `None`.
+        // Those unset CLI fields must not erase the file's `[defaults]`; the
+        // whole `[defaults]` block was previously clobbered to `None` on every
+        // load (#62 P1).
+        figment::Jail::expect_with(|jail| {
+            jail.create_file(
+                "submod.toml",
+                r#"
+[defaults]
+ignore = "all"
+update = "rebase"
+fetchRecurse = "always"
+"#,
+            )?;
+
+            let cfg = Config::default()
+                .load("submod.toml", Config::default())
+                .expect("load should succeed");
+
+            assert_eq!(
+                cfg.defaults.ignore,
+                Some(SerializableIgnore::All),
+                "file `[defaults] ignore` must survive a default-CLI load"
+            );
+            assert_eq!(
+                cfg.defaults.update,
+                Some(SerializableUpdate::Rebase),
+                "file `[defaults] update` must survive a default-CLI load"
+            );
+            assert_eq!(
+                cfg.defaults.fetch_recurse,
+                Some(SerializableFetchRecurse::Always),
+                "file `[defaults] fetchRecurse` must survive a default-CLI load"
+            );
+
+            Ok(())
+        });
+    }
+
+    #[test]
+    fn test_config_load_from_file_preserves_file_defaults() {
+        // `load_from_file` shares the figment-base hazard with `load`: an empty
+        // default provider layered beneath the file erased the file's
+        // `[defaults]`. The file's values must survive (#62 P1).
+        figment::Jail::expect_with(|jail| {
+            jail.create_file(
+                "submod.toml",
+                r#"
+[defaults]
+ignore = "all"
+update = "rebase"
+"#,
+            )?;
+
+            let cfg = Config::default()
+                .load_from_file(Some("submod.toml"))
+                .expect("load_from_file should succeed");
+
+            assert_eq!(cfg.defaults.ignore, Some(SerializableIgnore::All));
+            assert_eq!(cfg.defaults.update, Some(SerializableUpdate::Rebase));
+
+            Ok(())
+        });
     }
 
     // ================================================================
