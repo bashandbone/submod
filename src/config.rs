@@ -209,6 +209,9 @@ impl SubmoduleDefaults {
         if other.update.is_some() {
             mut_self.update = other.update;
         }
+        if other.use_git_default_sparse_checkout.is_some() {
+            mut_self.use_git_default_sparse_checkout = other.use_git_default_sparse_checkout;
+        }
         {
             let ignore = mut_self.ignore;
             let update = mut_self.update;
@@ -1281,6 +1284,70 @@ mod tests {
             Some(SerializableFetchRecurse::default())
         );
         assert_eq!(merged.update, Some(SerializableUpdate::default()));
+    }
+
+    #[test]
+    fn test_defaults_merge_from_carries_other_sparse_default() {
+        // Regression (#62 P2): merge_from dropped other.use_git_default_sparse_checkout.
+        let base = SubmoduleDefaults {
+            ignore: None,
+            fetch_recurse: None,
+            update: None,
+            use_git_default_sparse_checkout: None,
+        };
+        let other = SubmoduleDefaults {
+            ignore: None,
+            fetch_recurse: None,
+            update: None,
+            use_git_default_sparse_checkout: Some(true),
+        };
+        let merged = base.merge_from(other);
+        assert_eq!(
+            merged.use_git_default_sparse_checkout,
+            Some(true),
+            "other.use_git_default_sparse_checkout must override an unset base value"
+        );
+    }
+
+    #[test]
+    fn test_defaults_merge_from_other_sparse_default_overrides_base() {
+        // The override must win even when base already holds a value.
+        let base = SubmoduleDefaults {
+            ignore: None,
+            fetch_recurse: None,
+            update: None,
+            use_git_default_sparse_checkout: Some(true),
+        };
+        let other = SubmoduleDefaults {
+            ignore: None,
+            fetch_recurse: None,
+            update: None,
+            use_git_default_sparse_checkout: Some(false),
+        };
+        let merged = base.merge_from(other);
+        assert_eq!(
+            merged.use_git_default_sparse_checkout,
+            Some(false),
+            "other's explicit sparse default must override base's"
+        );
+    }
+
+    #[test]
+    fn test_defaults_merge_from_unset_other_sparse_default_preserves_base() {
+        // When other leaves it unset, base's value must survive.
+        let base = SubmoduleDefaults {
+            ignore: None,
+            fetch_recurse: None,
+            update: None,
+            use_git_default_sparse_checkout: Some(true),
+        };
+        let other = SubmoduleDefaults::default();
+        let merged = base.merge_from(other);
+        assert_eq!(
+            merged.use_git_default_sparse_checkout,
+            Some(true),
+            "an unset other must not clobber base's sparse default"
+        );
     }
 
     // ================================================================
