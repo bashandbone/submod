@@ -83,8 +83,7 @@ jobs:
           HK_MISE: 1
           MISE_YES: 1
         run: |
-          hkbin="$(command -v hk || which hk || $HOME/.local/share/mise/installs/hk/latest/hk)"
-          "$hkbin" check
+          hk check
 
   security_audit:
     name: Security Audit
