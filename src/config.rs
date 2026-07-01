@@ -337,7 +337,10 @@ impl SubmoduleUpdateOptions {
     pub fn from_options(options: SubmoduleGitOptions) -> Self {
         Self {
             strategy: options.update.unwrap_or_default(),
-            recursive: matches!(options.fetch_recurse, Some(SerializableFetchRecurse::Always)),
+            recursive: matches!(
+                options.fetch_recurse,
+                Some(SerializableFetchRecurse::Always)
+            ),
             force: false, // Default to not force
         }
     }
@@ -531,10 +534,10 @@ impl SubmoduleEntry {
         entries: &std::collections::HashMap<String, String>,
     ) -> Self {
         let url = entries.get("url").cloned();
-        let path = entries.get("path").cloned().map_or_else(
-            || Some(name.to_string()),
-            Some,
-        );
+        let path = entries
+            .get("path")
+            .cloned()
+            .map_or_else(|| Some(name.to_string()), Some);
         let branch =
             SerializableBranch::from_gitmodules(entries.get("branch").map_or("", |b| b.as_str()))
                 .ok();

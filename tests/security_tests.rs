@@ -170,9 +170,7 @@ mod tests {
         let sentinel = harness.work_dir.join("GC_INJECTED");
         let sentinel_str = sentinel.to_string_lossy().replace('\\', "/");
         let gitmodules = format!(
-            "[submodule \"evil\"]\n\tpath = lib/evil\n\turl = ext::sh -c \"touch {}\"\n\tbranch = --upload-pack=touch {}\n",
-            sentinel_str,
-            sentinel_str
+            "[submodule \"evil\"]\n\tpath = lib/evil\n\turl = ext::sh -c \"touch {sentinel_str}\"\n\tbranch = --upload-pack=touch {sentinel_str}\n"
         );
         fs::write(harness.work_dir.join(".gitmodules"), gitmodules)
             .expect("Failed to write .gitmodules");

@@ -619,11 +619,12 @@ impl GitManager {
             .config
             .get_submodule(submodule_name)
             .and_then(|e| e.use_git_default_sparse_checkout);
-        per_submodule.unwrap_or_else(|| self
-            .config
-            .defaults
-            .use_git_default_sparse_checkout
-            .unwrap_or(false))
+        per_submodule.unwrap_or_else(|| {
+            self.config
+                .defaults
+                .use_git_default_sparse_checkout
+                .unwrap_or(false)
+        })
     }
 
     /// Get the actual git directory path, handling gitlinks in submodules

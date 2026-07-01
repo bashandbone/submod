@@ -60,10 +60,7 @@ impl GixOperations {
 
     /// Convert gix submodule file to `SubmoduleEntries`
     #[allow(clippy::unused_self, clippy::redundant_closure_for_method_calls)]
-    fn convert_gitmodules_to_entries(
-        &self,
-        gitmodules: gix_submodule::File,
-    ) -> SubmoduleEntries {
+    fn convert_gitmodules_to_entries(&self, gitmodules: gix_submodule::File) -> SubmoduleEntries {
         let as_config_file = gitmodules.into_config();
         let mut sections_map = std::collections::HashMap::new();
         for section in as_config_file.sections() {
