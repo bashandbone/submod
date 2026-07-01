@@ -73,41 +73,38 @@ impl Git2Operations {
         let config = self.repo.config()?;
         let key = format!("submodule.{name}.branch");
 
-        match config.get_string(&key) {
-            Ok(branch_str) => {
+        config.get_string(&key).map_or_else(
+            |_| Ok(None),
+            |branch_str| {
                 if branch_str == "." {
                     Ok(Some(SerializableBranch::CurrentInSuperproject))
                 } else {
                     Ok(Some(SerializableBranch::Name(branch_str)))
                 }
-            }
-            Err(_) => Ok(None),
-        }
+            },
+        )
     }
     /// Get fetch recurse configuration for a submodule
     fn get_submodule_fetch_recurse(&self, name: &str) -> Result<Option<SerializableFetchRecurse>> {
         let config = self.repo.config()?;
         let key = format!("submodule.{name}.fetchRecurseSubmodules");
 
-        match config.get_string(&key) {
-            Ok(fetch_str) => match fetch_str.as_str() {
+        config.get_string(&key).map_or_else(
+            |_| Ok(None),
+            |fetch_str| match fetch_str.as_str() {
                 "true" => Ok(Some(SerializableFetchRecurse::Always)),
                 "on-demand" => Ok(Some(SerializableFetchRecurse::OnDemand)),
                 "false" | "no" => Ok(Some(SerializableFetchRecurse::Never)),
                 _ => Ok(None),
             },
-            Err(_) => Ok(None),
-        }
+        )
     }
     /// Check if a submodule is active
     fn is_submodule_active(&self, name: &str) -> Result<bool> {
         let config = self.repo.config()?;
         let key = format!("submodule.{name}.active");
 
-        match config.get_bool(&key) {
-            Ok(active) => Ok(active),
-            Err(_) => Ok(true), // Default to active if not specified
-        }
+        config.get_bool(&key).map_or(Ok(true), Ok)
     }
     /// Check if a submodule is shallow
     fn is_submodule_shallow(&self, path: &str) -> Result<bool> {
@@ -125,7 +122,7 @@ impl Git2Operations {
         Ok(shallow_file.exists())
     }
     /// Convert git2 status flags to our status flags
-    #[allow(dead_code)]
+    #[allow(dead_code, clippy::unused_self)]
     fn convert_git2_status_to_flags(&self, status: git2::SubmoduleStatus) -> SubmoduleStatusFlags {
         let mut flags = SubmoduleStatusFlags::empty();
         if status.contains(git2::SubmoduleStatus::IN_HEAD) {
@@ -216,51 +213,44 @@ impl GitOperations for Git2Operations {
         if let Some(submodules) = config.submodules().as_ref() {
             for (name, entry) in *submodules {
                 // Find or create the submodule
-                match self
+                if let Ok(mut submodule) = self
                     .repo
                     .find_submodule(entry.path.as_deref().unwrap_or(name))
                 {
-                    Ok(mut submodule) => {
-                        // Update existing submodule configuration through git config
-                        let mut config = self.repo.config()?;
-                        if let Some(ignore) = &entry.ignore {
-                            let ignore_str = match ignore {
-                                SerializableIgnore::All => "all",
-                                SerializableIgnore::Dirty => "dirty",
-                                SerializableIgnore::Untracked => "untracked",
-                                SerializableIgnore::None => "none",
-                                SerializableIgnore::Unspecified => continue, // Skip unspecified
-                            };
-                            config.set_str(&format!("submodule.{name}.ignore"), ignore_str)?;
-                        }
-                        if let Some(update) = &entry.update {
-                            let update_str = match update {
-                                SerializableUpdate::Checkout => "checkout",
-                                SerializableUpdate::Rebase => "rebase",
-                                SerializableUpdate::Merge => "merge",
-                                SerializableUpdate::None => "none",
-                                SerializableUpdate::Unspecified => continue, // Skip unspecified
-                            };
-                            config.set_str(&format!("submodule.{name}.update"), update_str)?;
-                        }
-                        if let Some(active) = entry.active {
-                            let active_str = if active { "true" } else { "false" };
-                            config.set_str(&format!("submodule.{name}.active"), active_str)?;
-                        }
-                        // Set URL if different
-                        if let Some(url) = &entry.url
-                            && submodule.url() != Some(url.as_str())
-                        {
-                            config.set_str(&format!("submodule.{name}.url"), url)?;
-                        }
-                        // Sync changes
-                        submodule.sync()?;
+                    // Update existing submodule configuration through git config
+                    let mut config = self.repo.config()?;
+                    if let Some(ignore) = &entry.ignore {
+                        let ignore_str = match ignore {
+                            SerializableIgnore::All => "all",
+                            SerializableIgnore::Dirty => "dirty",
+                            SerializableIgnore::Untracked => "untracked",
+                            SerializableIgnore::None => "none",
+                            SerializableIgnore::Unspecified => continue, // Skip unspecified
+                        };
+                        config.set_str(&format!("submodule.{name}.ignore"), ignore_str)?;
                     }
-                    Err(_) => {
-                        // Submodule doesn't exist, we'd need to add it
-                        // This is handled by add_submodule method
-                        continue;
+                    if let Some(update) = &entry.update {
+                        let update_str = match update {
+                            SerializableUpdate::Checkout => "checkout",
+                            SerializableUpdate::Rebase => "rebase",
+                            SerializableUpdate::Merge => "merge",
+                            SerializableUpdate::None => "none",
+                            SerializableUpdate::Unspecified => continue, // Skip unspecified
+                        };
+                        config.set_str(&format!("submodule.{name}.update"), update_str)?;
                     }
+                    if let Some(active) = entry.active {
+                        let active_str = if active { "true" } else { "false" };
+                        config.set_str(&format!("submodule.{name}.active"), active_str)?;
+                    }
+                    // Set URL if different
+                    if let Some(url) = &entry.url
+                        && submodule.url() != Some(url.as_str())
+                    {
+                        config.set_str(&format!("submodule.{name}.url"), url)?;
+                    }
+                    // Sync changes
+                    submodule.sync()?;
                 }
             }
         }
@@ -394,9 +384,6 @@ impl GitOperations for Git2Operations {
         update_opts.allow_fetch(true);
         // Set update strategy (git2 has limited support for different strategies)
         match opts.strategy {
-            SerializableUpdate::Checkout => {
-                // Default behavior
-            }
             SerializableUpdate::Rebase | SerializableUpdate::Merge => {
                 // git2 doesn't support rebase/merge directly, use checkout
                 eprintln!(
@@ -404,8 +391,8 @@ impl GitOperations for Git2Operations {
                 );
             }
             SerializableUpdate::None => return Ok(()),
-            SerializableUpdate::Unspecified => {
-                // Use default
+            SerializableUpdate::Checkout | SerializableUpdate::Unspecified => {
+                // Default behavior / Use default
             }
         }
         submodule.update(true, Some(&mut update_opts))?;

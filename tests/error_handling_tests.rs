@@ -8,6 +8,7 @@
 //! and provides meaningful error messages to users.
 
 use std::fs;
+#[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
 
 mod common;
@@ -100,6 +101,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(unix)]
     fn test_permission_denied_scenarios() {
         // Check if running as root - permission tests don't work as root
         let is_root = std::process::Command::new("id")
@@ -460,6 +462,7 @@ active = true
     }
 
     #[test]
+    #[cfg(unix)]
     fn test_config_file_locked() {
         // Check if running as root - permission tests don't work as root
         let is_root = std::process::Command::new("id")

@@ -112,6 +112,7 @@ pub enum SubmoduleError {
 
 /// Status information for a submodule
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[allow(clippy::struct_excessive_bools)]
 pub struct SubmoduleStatus {
     /// Path to the submodule directory
     #[allow(dead_code)]
@@ -167,6 +168,7 @@ pub struct GitManager {
 
 impl GitManager {
     /// Helper method to map git operations errors
+    #[allow(clippy::needless_pass_by_value)]
     fn map_git_ops_error(err: anyhow::Error) -> SubmoduleError {
         SubmoduleError::ConfigError(format!("Git operation failed: {err}"))
     }
@@ -289,10 +291,10 @@ impl GitManager {
         let is_dirty = submodule_repo.is_dirty().unwrap_or(true);
 
         // GITOXIDE API: Use reference APIs for current commit
-        let current_commit = match submodule_repo.head() {
-            Ok(head) => head.id().map(|id| id.to_string()),
-            Err(_) => None,
-        };
+        let current_commit = submodule_repo
+            .head()
+            .ok()
+            .and_then(|head| head.id().map(|id| id.to_string()));
 
         // GITOXIDE API: Use remote APIs to check if remotes exist
         let has_remotes = !submodule_repo.remote_names().is_empty();
@@ -385,7 +387,7 @@ impl GitManager {
     }
 
     /// Add a submodule using the fallback chain: gitoxide -> git2 -> CLI
-    #[allow(clippy::too_many_arguments)]
+    #[allow(clippy::too_many_arguments, clippy::needless_pass_by_value)]
     pub fn add_submodule(
         &mut self,
         name: String,
@@ -402,7 +404,7 @@ impl GitManager {
     ) -> Result<(), SubmoduleError> {
         if no_init {
             self.update_toml_config(
-                name.clone(),
+                name,
                 SubmoduleEntry {
                     path: Some(path.clone()),
                     url: Some(url),
@@ -423,7 +425,7 @@ impl GitManager {
         }
 
         // Clean up any existing submodule state using git commands
-        self.cleanup_existing_submodule(&path)?;
+        self.cleanup_existing_submodule(&path);
 
         let opts = crate::config::SubmoduleAddOptions {
             name: name.clone(),
@@ -487,7 +489,7 @@ impl GitManager {
     }
 
     /// Clean up existing submodule state using git commands only
-    fn cleanup_existing_submodule(&mut self, path: &str) -> Result<(), SubmoduleError> {
+    fn cleanup_existing_submodule(&mut self, path: &str) {
         // Best-effort cleanup of any existing submodule state
         // These operations may fail if the submodule doesn't exist yet, which is fine,
         // but other errors (permissions, corruption, etc.) should at least be visible.
@@ -497,12 +499,11 @@ impl GitManager {
         if let Err(e) = self.git_ops.delete_submodule(path) {
             eprintln!("Warning: failed to delete submodule at '{path}': {e:?}");
         }
-        Ok(())
     }
 
     /// Configure submodule for post-creation setup
     fn configure_submodule_post_creation(
-        &mut self,
+        &self,
         name: &str,
         path: &str,
         sparse_paths: Option<Vec<String>>,
@@ -527,7 +528,7 @@ impl GitManager {
     /// When `use_git_default = true` the patterns are written as-is, matching git's own
     /// sparse-checkout semantics.
     pub fn configure_sparse_checkout(
-        &mut self,
+        &self,
         submodule_path: &str,
         patterns: &[String],
         use_git_default: bool,
@@ -618,17 +619,15 @@ impl GitManager {
             .config
             .get_submodule(submodule_name)
             .and_then(|e| e.use_git_default_sparse_checkout);
-        match per_submodule {
-            Some(v) => v,
-            None => self
-                .config
-                .defaults
-                .use_git_default_sparse_checkout
-                .unwrap_or(false),
-        }
+        per_submodule.unwrap_or_else(|| self
+            .config
+            .defaults
+            .use_git_default_sparse_checkout
+            .unwrap_or(false))
     }
 
     /// Get the actual git directory path, handling gitlinks in submodules
+    #[allow(clippy::unused_self)]
     fn get_git_directory(
         &self,
         submodule_path: &str,
@@ -664,11 +663,9 @@ impl GitManager {
             Ok(absolute_path)
         } else {
             // Use gix as fallback
-            if let Ok(repo) = gix::open(submodule_path) {
-                Ok(repo.git_dir().to_path_buf())
-            } else {
-                Err(SubmoduleError::RepositoryError)
-            }
+            gix::open(submodule_path)
+                .map(|repo| repo.git_dir().to_path_buf())
+                .map_err(|_| SubmoduleError::RepositoryError)
         }
     }
     // Removed: apply_sparse_checkout_cli is obsolete; sparse checkout is handled by GitOpsManager abstraction.
@@ -703,7 +700,7 @@ impl GitManager {
     }
 
     /// Reset submodule using CLI operations
-    pub fn reset_submodule(&mut self, name: &str) -> Result<(), SubmoduleError> {
+    pub fn reset_submodule(&self, name: &str) -> Result<(), SubmoduleError> {
         let config =
             self.config
                 .submodules
@@ -862,6 +859,7 @@ impl GitManager {
     }
 
     /// Check all submodules using gitoxide APIs where possible
+    #[allow(clippy::unnecessary_wraps)]
     pub fn check_all_submodules(&self) -> Result<(), SubmoduleError> {
         if self.verbose {
             println!("Checking submodule configurations...");
@@ -869,9 +867,7 @@ impl GitManager {
 
         for (submodule_name, submodule) in self.config.get_submodules() {
             // Handle missing path gracefully - report but don't fail
-            let path_str = if let Some(path) = submodule.path.as_ref() {
-                path
-            } else {
+            let Some(path_str) = submodule.path.as_ref() else {
                 // Always show errors regardless of verbosity
                 println!("  ❌ {submodule_name}: No path configured");
                 continue;
@@ -966,6 +962,7 @@ impl GitManager {
         Ok(())
     }
 
+    #[allow(clippy::unused_self)]
     fn show_effective_settings(&self, _name: &str, config: &SubmoduleEntry) {
         println!("  📋 Effective settings:");
 
@@ -1123,6 +1120,7 @@ impl GitManager {
     /// Sections in the in-memory config that were not in the original file are appended at the end.
     ///
     /// The `[defaults]` section is handled similarly (updated in place or added if absent).
+    #[allow(clippy::cognitive_complexity)]
     fn write_full_config(&self) -> Result<(), SubmoduleError> {
         let existing = if self.config_path.exists() {
             std::fs::read_to_string(&self.config_path)
@@ -1249,7 +1247,8 @@ impl GitManager {
         if !seen_defaults && !defaults_kv.is_empty() {
             output.push_str("[defaults]\n");
             for (key, val) in &defaults_kv {
-                output.push_str(&format!("{key} = {val}\n"));
+                use std::fmt::Write as _;
+                let _ = writeln!(output, "{key} = {val}");
             }
             output.push('\n');
         }
@@ -1269,7 +1268,8 @@ impl GitManager {
                 output.push_str(&section_header);
                 output.push('\n');
                 for (key, val) in Self::entry_to_kv_lines(entry) {
-                    output.push_str(&format!("{key} = {val}\n"));
+                    use std::fmt::Write as _;
+                    let _ = writeln!(output, "{key} = {val}");
                 }
                 output.push('\n');
             }
@@ -1352,6 +1352,7 @@ impl GitManager {
 
     /// List all submodules from the config. If `recursive` is true, also lists
     /// submodules found in the git repository (which may include nested ones).
+    #[allow(clippy::unnecessary_wraps)]
     pub fn list_submodules(&self, recursive: bool) -> Result<(), SubmoduleError> {
         let submodules: Vec<_> = self.config.get_submodules().collect();
 
@@ -1538,7 +1539,7 @@ impl GitManager {
         }
 
         // Remove from config
-        self.config.submodules.remove_submodule(name);
+        let _ = self.config.submodules.remove_submodule(name);
         self.write_full_config()?;
 
         // Reopen the git repository to flush any cached state (git2 caches internal state
@@ -1555,7 +1556,7 @@ impl GitManager {
 
     /// Change settings of an existing submodule. If `path` changes, the submodule is
     /// deleted and re-cloned at the new location.
-    #[allow(clippy::too_many_arguments)]
+    #[allow(clippy::too_many_arguments, clippy::needless_pass_by_value)]
     pub fn change_submodule(
         &mut self,
         name: &str,

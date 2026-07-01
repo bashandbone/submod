@@ -9,6 +9,42 @@ use std::path::PathBuf;
 use std::process::Command;
 use tempfile::TempDir;
 
+/// Helper struct for test paths that formats display paths with forward slashes on Windows
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct TestPath(pub std::path::PathBuf);
+
+impl std::ops::Deref for TestPath {
+    type Target = std::path::PathBuf;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl AsRef<std::path::Path> for TestPath {
+    fn as_ref(&self) -> &std::path::Path {
+        &self.0
+    }
+}
+
+impl TestPath {
+    pub fn display(&self) -> TestPathDisplay<'_> {
+        TestPathDisplay(&self.0)
+    }
+}
+
+pub struct TestPathDisplay<'a>(pub &'a std::path::Path);
+
+impl<'a> std::fmt::Display for TestPathDisplay<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let s = self.0.to_string_lossy().replace('\\', "/");
+        if s.starts_with('/') {
+            write!(f, "{s}")
+        } else {
+            write!(f, "/{s}")
+        }
+    }
+}
+
 /// Test harness for integration tests
 pub struct TestHarness {
     /// Temporary directory for test operations
@@ -40,7 +76,7 @@ impl TestHarness {
         let git_config_global = temp_dir.path().join("gitconfig");
         fs::write(
             &git_config_global,
-            "[protocol \"file\"]\n\tallow = always\n",
+            "[protocol \"file\"]\n\tallow = always\n[core]\n\tautocrlf = false\n\tfilemode = false\n[user]\n\tname = Test User\n\temail = test@example.com\n",
         )?;
 
         Ok(Self {
@@ -128,7 +164,7 @@ impl TestHarness {
     }
 
     /// Create a test remote repository
-    pub fn create_test_remote(&self, name: &str) -> Result<PathBuf, Box<dyn std::error::Error>> {
+    pub fn create_test_remote(&self, name: &str) -> Result<TestPath, Box<dyn std::error::Error>> {
         let remote_dir = self.temp_dir.path().join(format!("{name}.git"));
 
         // Initialize bare repository
@@ -177,6 +213,7 @@ impl TestHarness {
             "#ifndef HEADER_H\n#define HEADER_H\n#endif\n",
         )?;
         fs::write(work_copy.join("LICENSE"), "MIT License\n")?;
+        fs::write(work_copy.join(".gitattributes"), "* -text\n")?;
 
         // Configure git and commit
         self.git_cmd()
@@ -211,13 +248,10 @@ impl TestHarness {
             return Err(format!("Failed to push to remote: {stderr}").into());
         }
 
-        Ok(remote_dir)
+        Ok(TestPath(remote_dir))
     }
 
-    /// Advance the bare remote created by [`create_test_remote`] by one commit on
-    /// `main`, returning the new commit's full SHA. Reuses the working copy left
-    /// at `<temp>/<name>_work` so callers can move the remote forward and then
-    /// observe how `update`/`sync` react to a remote that has new history.
+    #[allow(dead_code)]
     pub fn advance_test_remote(&self, name: &str) -> Result<String, Box<dyn std::error::Error>> {
         let work_copy = self.temp_dir.path().join(format!("{name}_work"));
 
@@ -447,7 +481,7 @@ impl TestHarness {
     pub fn create_complex_remote(
         &self,
         name: &str,
-    ) -> Result<std::path::PathBuf, Box<dyn std::error::Error>> {
+    ) -> Result<TestPath, Box<dyn std::error::Error>> {
         let remote_dir = self.temp_dir.path().join(format!("{name}.git"));
 
         // Initialize bare repository
@@ -515,6 +549,7 @@ impl TestHarness {
             "[package]\nname = \"test-lib\"\nversion = \"0.1.0\"\n",
         )?;
         fs::write(work_copy.join("README.md"), "# Test Library\n")?;
+        fs::write(work_copy.join(".gitattributes"), "* -text\n")?;
 
         self.git_cmd()
             .args(["add", "."])
@@ -587,6 +622,6 @@ impl TestHarness {
             return Err(format!("Failed to push tags: {stderr}").into());
         }
 
-        Ok(remote_dir)
+        Ok(TestPath(remote_dir))
     }
 }

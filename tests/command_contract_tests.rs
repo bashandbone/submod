@@ -426,7 +426,7 @@ mod tests {
         let content = fs::read_to_string(&output_path).expect("Failed to read generated config");
         // The generated config should reference the submodule's URL (the most reliable identifier)
         assert!(
-            content.contains(remote.to_str().unwrap_or("")),
+            content.contains(&remote.display().to_string()),
             "Generated config should reference the submodule URL; got: {content}"
         );
     }

@@ -36,7 +36,7 @@ pub enum ConfigLevel {
 }
 
 /// Trait for converting between git submodule configuration enums and their gitmodules representation
-#[allow(dead_code)]
+#[allow(dead_code, clippy::result_unit_err)]
 pub trait GitmodulesConvert {
     /// Get the git key for a submodule by the submodule's name (in git config)
     fn gitmodules_key_path(&self, name: &str) -> String {
@@ -85,7 +85,7 @@ pub trait OptionsChecks {
 }
 
 /// Trait for converting between `git2` and `gix_submodule` types
-#[allow(dead_code)]
+#[allow(dead_code, clippy::result_unit_err)]
 pub trait GixGit2Convert {
     /// The git2 source type
     type Git2Type;
@@ -299,7 +299,7 @@ impl SerializableFetchRecurse {
     /// writers must use this form so values round-trip back through the `Deserialize`
     /// impl (which expects the kebab-case spelling).
     #[must_use]
-    pub const fn as_config_value(&self) -> &'static str {
+    pub const fn as_config_value(self) -> &'static str {
         match self {
             Self::OnDemand => "on-demand",
             Self::Always => "always",
@@ -550,18 +550,16 @@ impl Default for SerializableBranch {
 impl SerializableBranch {
     /// Parse an optional branch string into a `SerializableBranch`, defaulting to the repo's current branch.
     pub fn set_branch(branch: Option<String>) -> Result<Self, anyhow::Error> {
-        let branch = if let Some(b) = branch {
-            if b.is_empty() {
-                Some(Ok(Self::default()))
-            } else {
-                Some(
-                    Self::from_str(b.trim()).map_err(|()| anyhow::anyhow!("Invalid branch string")),
-                )
-            }
-        } else {
-            Some(Ok(Self::default()))
-        };
-        branch.unwrap_or_else(|| Ok(Self::default()))
+        branch.map_or_else(
+            || Ok(Self::default()),
+            |b| {
+                if b.is_empty() {
+                    Ok(Self::default())
+                } else {
+                    Self::from_str(b.trim()).map_err(|()| anyhow::anyhow!("Invalid branch string"))
+                }
+            },
+        )
     }
 }
 
@@ -1118,10 +1116,7 @@ mod tests {
         let default = SerializableBranch::default();
         // Default should be a Name variant (either from gix default or "main" fallback)
         match &default {
-            SerializableBranch::Name(_) => {} // expected
-            SerializableBranch::CurrentInSuperproject => {
-                // also acceptable if gix default is CurrentInSuperproject
-            }
+            SerializableBranch::Name(_) | SerializableBranch::CurrentInSuperproject => {}
         }
     }
 
@@ -1204,7 +1199,7 @@ mod tests {
             .unwrap();
         match gix_name {
             Branch::Name(n) => assert_eq!(n.to_string(), "main"),
-            _ => panic!("Expected Branch::Name"),
+            Branch::CurrentInSuperproject => panic!("Expected Branch::Name"),
         }
 
         let ours: SerializableBranch = Branch::CurrentInSuperproject.try_into().unwrap();

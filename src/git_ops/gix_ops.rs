@@ -15,7 +15,7 @@ fn gix_file_from_bytes(bytes: Vec<u8>) -> Result<gix::config::File<'static>> {
     gix::config::File::from_bytes_owned(
         &mut owned_bytes,
         gix::config::file::Metadata::from(gix::config::Source::Local),
-        Default::default(),
+        gix::config::file::init::Options::default(),
     )
     .map_err(|e| anyhow::anyhow!("Failed to parse gix config file: {e}"))
 }
@@ -59,20 +59,20 @@ impl GixOperations {
     }
 
     /// Convert gix submodule file to `SubmoduleEntries`
+    #[allow(clippy::unused_self, clippy::redundant_closure_for_method_calls)]
     fn convert_gitmodules_to_entries(
         &self,
         gitmodules: gix_submodule::File,
-    ) -> Result<SubmoduleEntries> {
+    ) -> SubmoduleEntries {
         let as_config_file = gitmodules.into_config();
         let mut sections_map = std::collections::HashMap::new();
         for section in as_config_file.sections() {
             // we need to convert everything to String and add to map
             let mut section_entries = std::collections::HashMap::new();
-            let name = if let Some(subsection) = section.header().subsection_name() {
-                subsection.to_string()
-            } else {
-                section.header().name().to_string()
-            };
+            let name = section.header().subsection_name().map_or_else(
+                || section.header().name().to_string(),
+                |subsection| subsection.to_string(),
+            );
             let body_entries = section
                 .body()
                 .clone()
@@ -83,9 +83,7 @@ impl GixOperations {
             }
             sections_map.insert(name, section_entries);
         }
-        let submodule_entries = crate::config::SubmoduleEntries::from_gitmodules(sections_map);
-
-        Ok(submodule_entries)
+        crate::config::SubmoduleEntries::from_gitmodules(sections_map)
     }
     /// Get the name of the current branch in the superproject
     fn get_superproject_branch(&self) -> Result<String> {
@@ -97,7 +95,7 @@ impl GixOperations {
     }
 
     /// Convert gix submodule status to our status flags
-    #[allow(dead_code)]
+    #[allow(dead_code, clippy::unused_self)]
     fn convert_gix_status_to_flags(&self, status: &gix::submodule::Status) -> SubmoduleStatusFlags {
         let mut flags = SubmoduleStatusFlags::empty();
         // Map gix status to our flags
@@ -129,7 +127,7 @@ impl GitOperations for GixOperations {
             let submodule_file =
                 gix_submodule::File::from_bytes(&content, Some(gitmodules_path), &config)?;
 
-            mutable_self.convert_gitmodules_to_entries(submodule_file)
+            Ok(mutable_self.convert_gitmodules_to_entries(submodule_file))
         })
     }
 
@@ -303,8 +301,6 @@ impl GitOperations for GixOperations {
 
     /// Set a configuration value in the repository
     fn set_config_value(&self, key: &str, value: &str, level: ConfigLevel) -> Result<()> {
-        let mut entries = HashMap::new();
-        entries.insert(key.to_string(), value.to_string());
         // Merge with existing config
         let existing = self.read_git_config(level)?;
         let mut merged = existing.entries;
@@ -511,7 +507,7 @@ impl GitOperations for GixOperations {
             .ok_or_else(|| anyhow::anyhow!("Submodule '{path}' not found in .gitmodules"))?;
 
         // 3. Remove from .gitmodules
-        entries.remove_submodule(&submodule_name);
+        let _ = entries.remove_submodule(&submodule_name);
         self.write_gitmodules(&entries)?;
 
         self.try_gix_operation_mut(|repo| {
@@ -700,9 +696,9 @@ impl GitOperations for GixOperations {
             Ok(submodule_paths)
         })
     }
-    fn fetch_submodule(&self, _path: &str) -> Result<()> {
+    fn fetch_submodule(&self, path: &str) -> Result<()> {
         // Pass None to let gix resolve the default remote (which has refspecs configured).
-        let submodule_repo = utilities::repo_from_path(&std::path::PathBuf::from(_path))?;
+        let submodule_repo = utilities::repo_from_path(&std::path::PathBuf::from(path))?;
         fetch_repo(submodule_repo, None, false)
             .map_err(|e| anyhow::anyhow!("Failed to fetch submodule: {e}"))
     }
@@ -743,10 +739,10 @@ impl GitOperations for GixOperations {
             "gix get sparse patterns not implemented for submodule paths, falling back to git2"
         ))
     }
-    fn apply_sparse_checkout(&self, _path: &str) -> Result<()> {
+    fn apply_sparse_checkout(&self, path: &str) -> Result<()> {
         self.try_gix_operation(|repo| {
             // Get sparse checkout patterns
-            let patterns = self.get_sparse_patterns(_path)?;
+            let patterns = self.get_sparse_patterns(path)?;
             if patterns.is_empty() {
                 return Ok(()); // No patterns to apply
             }

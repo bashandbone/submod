@@ -14,6 +14,7 @@ use clap_complete_nushell::Nushell as NushellShell;
 /// Wraps the `clap_complete::aot::Shell` and `clap_complete_nushell::Nushell` shells,
 #[non_exhaustive]
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[allow(clippy::enum_variant_names)]
 pub enum Shell {
     /// Bourne Again `SHell` (bash)
     Bash,
@@ -137,14 +138,15 @@ impl TryFrom<NushellShell> for Shell {
 
 impl Shell {
     /// Converts the `Shell` enum to a shell enum implementing `clap_complete::Generator` (as a Box pointer).
-    pub fn try_to_clap_complete(&self) -> Result<Box<dyn Generator>, String> {
+    #[must_use]
+    pub fn try_to_clap_complete(self) -> Box<dyn Generator> {
         match self {
-            Self::Bash => Ok(Box::new(AotShell::Bash)),
-            Self::Elvish => Ok(Box::new(AotShell::Elvish)),
-            Self::Fish => Ok(Box::new(AotShell::Fish)),
-            Self::PowerShell => Ok(Box::new(AotShell::PowerShell)),
-            Self::Zsh => Ok(Box::new(AotShell::Zsh)),
-            Self::Nushell => Ok(Box::new(NushellShell)),
+            Self::Bash => Box::new(AotShell::Bash),
+            Self::Elvish => Box::new(AotShell::Elvish),
+            Self::Fish => Box::new(AotShell::Fish),
+            Self::PowerShell => Box::new(AotShell::PowerShell),
+            Self::Zsh => Box::new(AotShell::Zsh),
+            Self::Nushell => Box::new(NushellShell),
         }
     }
 
@@ -169,30 +171,24 @@ impl Shell {
     /// Attempts to find the shell from the `SHELL` environment variable.
     #[must_use]
     pub fn from_env() -> Option<Self> {
-        if let Some(env_shell) = std::env::var_os("SHELL") {
-            Self::parse_shell_from_path(std::path::Path::new(&env_shell))
-        } else {
-            None
-        }
+        std::env::var_os("SHELL")
+            .and_then(|env_shell| Self::parse_shell_from_path(std::path::Path::new(&env_shell)))
     }
 }
 
 impl Generator for Shell {
     /// Returns the file name for the completion file.
     fn file_name(&self, name: &str) -> String {
-        let shell_self = self.try_to_clap_complete();
-        shell_self.map_or_else(|_| format!("{name}.nu"), |s| s.file_name(name)) // Default to Nushell if conversion fails
+        let shell_self = (*self).try_to_clap_complete();
+        shell_self.file_name(name)
     }
 
     /// Generates the completion file for the given command and writes it to the provided buffer.
     fn generate(&self, cmd: &clap::Command, buf: &mut dyn std::io::Write) {
-        let shell_self = self.try_to_clap_complete();
+        let shell_self = (*self).try_to_clap_complete();
         shell_self
-            .map(|s| {
-                s.try_generate(cmd, buf)
-                    .unwrap_or_else(|e| panic!("failed to write completion file: {e}"));
-            })
-            .unwrap_or_else(|_| panic!("failed to write completion file"));
+            .try_generate(cmd, buf)
+            .unwrap_or_else(|e| panic!("failed to write completion file: {e}"));
     }
 
     /// Attempts to generate the completion file for the given command and writes it to the provided buffer.
@@ -201,11 +197,8 @@ impl Generator for Shell {
         cmd: &clap::Command,
         buf: &mut dyn std::io::Write,
     ) -> Result<(), std::io::Error> {
-        let shell_self = self.try_to_clap_complete();
-        match shell_self {
-            Ok(s) => s.try_generate(cmd, buf),
-            Err(e) => Err(std::io::Error::other(e)),
-        }
+        let shell_self = (*self).try_to_clap_complete();
+        shell_self.try_generate(cmd, buf)
     }
 }
 
@@ -399,12 +392,12 @@ mod tests {
     #[test]
     fn test_try_to_clap_complete_all_variants() {
         // All shell variants should successfully convert
-        assert!(Shell::Bash.try_to_clap_complete().is_ok());
-        assert!(Shell::Zsh.try_to_clap_complete().is_ok());
-        assert!(Shell::Fish.try_to_clap_complete().is_ok());
-        assert!(Shell::PowerShell.try_to_clap_complete().is_ok());
-        assert!(Shell::Elvish.try_to_clap_complete().is_ok());
-        assert!(Shell::Nushell.try_to_clap_complete().is_ok());
+        let _ = Shell::Bash.try_to_clap_complete();
+        let _ = Shell::Zsh.try_to_clap_complete();
+        let _ = Shell::Fish.try_to_clap_complete();
+        let _ = Shell::PowerShell.try_to_clap_complete();
+        let _ = Shell::Elvish.try_to_clap_complete();
+        let _ = Shell::Nushell.try_to_clap_complete();
     }
 
     // ================================================================

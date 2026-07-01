@@ -34,7 +34,7 @@ pub fn repo_from_path(path: &PathBuf) -> Result<gix::Repository, anyhow::Error> 
     let options = Options::isolated();
     gix::ThreadSafeRepository::open_opts(path, options)
         .map(|repo| repo.to_thread_local())
-        .map_err(|e| anyhow::anyhow!("Failed to open repository at {path:?}: {e}"))
+        .map_err(|e| anyhow::anyhow!("Failed to open repository at {}: {e}", path.display()))
 }
 
 /// Get the current repository. The returned repository is isolated (has very limited access to the working tree and environment).
@@ -50,10 +50,10 @@ pub fn get_cwd() -> Result<PathBuf, anyhow::Error> {
 }
 
 /// Get a thread-local repository from the given repository.
-pub fn get_thread_local_repo(repo: &gix::Repository) -> Result<gix::Repository, anyhow::Error> {
+#[must_use]
+pub fn get_thread_local_repo(repo: &gix::Repository) -> gix::Repository {
     // Get a full access repository from the given repository
-    let safe_repo = repo.to_owned().into_sync().to_thread_local();
-    Ok(safe_repo)
+    repo.to_owned().into_sync().to_thread_local()
 }
 
 /// Get the main, or superproject, repository.
@@ -135,12 +135,13 @@ pub fn path_to_os_string(path: &std::path::Path) -> std::ffi::OsString {
 
 /// Set the path from an OS string, converting to UTF-8 if possible
 /// Used for CLI arguments and other scenarios where the path may not be valid UTF-8
-pub fn set_path(path: std::ffi::OsString) -> Result<String, anyhow::Error> {
-    match path.to_str() {
-        Some(path) => Ok(path.to_string()),
-        None => {
-            Ok(path_to_string_lossy(&PathBuf::from(path))) // Use lossy conversion if the path is not valid UTF-8
-        }
+#[must_use]
+#[allow(clippy::option_if_let_else)]
+pub fn set_path(path: std::ffi::OsString) -> String {
+    if let Some(s) = path.to_str() {
+        s.to_string()
+    } else {
+        path_to_string_lossy(&PathBuf::from(path))
     }
 }
 
@@ -419,7 +420,7 @@ mod tests {
     #[test]
     fn test_set_path_valid_utf8() {
         let os = std::ffi::OsString::from("/valid/path");
-        assert_eq!(set_path(os).unwrap(), "/valid/path");
+        assert_eq!(set_path(os), "/valid/path");
     }
 
     // ================================================================

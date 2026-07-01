@@ -348,6 +348,9 @@ sparse_paths = ["src"]
             ])
             .expect("Failed to add submodule");
 
+        // Force checkout with LF line endings using test global config to prevent CRLF dirty status on Windows
+        let _ = harness.git_stdout(&["-C", "lib/dirty", "checkout", "--", "."]);
+
         // Precondition (guards against a vacuous pass): a clean worktree is
         // reported clean. If this ever fails, the dirty assertion below would
         // be meaningless.

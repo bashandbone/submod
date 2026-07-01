@@ -168,15 +168,16 @@ mod tests {
         harness.init_git_repo().expect("Failed to init git repo");
 
         let sentinel = harness.work_dir.join("GC_INJECTED");
+        let sentinel_str = sentinel.to_string_lossy().replace('\\', "/");
         let gitmodules = format!(
             "[submodule \"evil\"]\n\tpath = lib/evil\n\turl = ext::sh -c \"touch {}\"\n\tbranch = --upload-pack=touch {}\n",
-            sentinel.display(),
-            sentinel.display()
+            sentinel_str,
+            sentinel_str
         );
         fs::write(harness.work_dir.join(".gitmodules"), gitmodules)
             .expect("Failed to write .gitmodules");
 
-        harness
+        let output = harness
             .run_submod(&[
                 "generate-config",
                 "--from-setup",
@@ -185,6 +186,12 @@ mod tests {
                 "--force",
             ])
             .expect("Failed to run submod");
+        assert!(
+            output.status.success(),
+            "generate-config failed!\nstdout: {}\nstderr: {}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        );
 
         assert!(
             !sentinel.exists(),

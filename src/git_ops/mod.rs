@@ -73,7 +73,7 @@ bitflags! {
 }
 
 /// Comprehensive submodule status information
-#[allow(dead_code)]
+#[allow(dead_code, clippy::struct_excessive_bools)]
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct DetailedSubmoduleStatus {
     /// Path of the submodule
@@ -197,6 +197,7 @@ impl GitOpsManager {
     /// is designed to fall straight through to git2 for every operation. This
     /// constructor makes that git2-only mode reachable so the fallback path can
     /// be exercised for correct results rather than left as dead code.
+    #[allow(dead_code)]
     pub fn without_gix(repo_path: Option<&Path>, verbose: bool) -> Result<Self> {
         let git2_ops = Git2Operations::new(repo_path)
             .with_context(|| "Failed to initialize git2 operations")?;
@@ -218,6 +219,7 @@ impl GitOpsManager {
     /// fault-injection seam makes that otherwise-unreachable last resort
     /// exercisable for correct results: the entire CLI branch — including its
     /// cleanup of partial state left by a failed git2 attempt — runs unmodified.
+    #[allow(dead_code)]
     pub fn forcing_cli_add(repo_path: Option<&Path>, verbose: bool) -> Result<Self> {
         let mut manager = Self::new(repo_path, verbose)?;
         manager.force_cli_add = true;
@@ -226,12 +228,14 @@ impl GitOpsManager {
 
     /// Whether the optimistic gix backend is currently active. When `false`,
     /// every operation is served by git2 (the fallback backend).
+    #[allow(dead_code)]
     pub const fn gix_enabled(&self) -> bool {
         self.gix_ops.is_some()
     }
 
     /// Whether `add_submodule` is forced through its CLI last-resort path,
     /// bypassing both in-process backends. Normally `false`.
+    #[allow(dead_code)]
     pub const fn forces_cli_add(&self) -> bool {
         self.force_cli_add
     }
@@ -461,7 +465,8 @@ impl GitOperations for GitOpsManager {
                 .output();
 
             let mut cmd = std::process::Command::new("git");
-            cmd.current_dir(workdir)
+            cmd.args(["-c", "protocol.file.allow=always"])
+                .current_dir(workdir)
                 .arg("submodule")
                 .arg("add")
                 .arg("--name")

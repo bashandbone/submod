@@ -64,10 +64,7 @@ fn main() -> Result<()> {
             let set_name = get_name(name, Some(url.clone()), path.clone())
                 .map_err(|e| anyhow::anyhow!("Failed to get submodule name: {e}"))?;
 
-            let set_path = path
-                .map(|p| set_path(p).map_err(|e| anyhow::anyhow!("Invalid path: {e}")))
-                .transpose()?
-                .unwrap_or_else(|| set_name.clone());
+            let set_path = path.map_or_else(|| set_name.clone(), set_path);
 
             let set_url = url.trim().to_string();
 
@@ -139,7 +136,7 @@ fn main() -> Result<()> {
             }
         }
         Commands::Reset { all, names } => {
-            let mut manager = GitManager::with_verbose(config_path, verbose)
+            let manager = GitManager::with_verbose(config_path, verbose)
                 .map_err(|e| anyhow::anyhow!("Failed to create manager: {e}"))?;
 
             let submodules_to_reset: Vec<String> = if all {

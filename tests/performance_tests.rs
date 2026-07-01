@@ -103,7 +103,9 @@ update = "checkout"
         );
 
         for i in 0..100 {
-            large_config.push_str(&format!(
+            use std::fmt::Write as _;
+            let _ = write!(
+                large_config,
                 r#"[large-submodule-{i}]
 path = "lib/large{i}"
 url = "https://github.com/example/repo{i}.git"
@@ -112,7 +114,7 @@ sparse_paths = ["src/", "docs/", "include/"]
 ignore = "all"
 
 "#
-            ));
+            );
         }
 
         let config_start = Instant::now();

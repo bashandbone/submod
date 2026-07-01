@@ -50,11 +50,10 @@ fn line_key_new<'a>(line: &str, known_keys: &[&'a str]) -> Option<&'a str> {
         return None;
     }
     for key in known_keys {
-        if let Some(rest) = trimmed.strip_prefix(key) {
-            if rest.starts_with('=') || rest.starts_with(" =") {
+        if let Some(rest) = trimmed.strip_prefix(key)
+            && (rest.starts_with('=') || rest.starts_with(" =")) {
                 return Some(key);
             }
-        }
     }
     None
 }
