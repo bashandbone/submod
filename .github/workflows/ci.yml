@@ -58,6 +58,8 @@ jobs:
     permissions:
       contents: read
     steps:
+      - uses: actions/checkout@v7
+
       - name: Install hk with mise
         uses: jdx/mise-action@v4
         env:
