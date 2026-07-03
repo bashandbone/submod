@@ -85,7 +85,7 @@ jobs:
           HK_MISE: 1
           MISE_YES: 1
         run: |
-          hk check
+          hk check || cd ../ && hk check
 
   security_audit:
     name: Security Audit
