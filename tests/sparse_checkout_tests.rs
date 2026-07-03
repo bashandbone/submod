@@ -90,7 +90,7 @@ mod tests {
                 "--path",
                 "lib/sparse-patterns",
                 "--sparse-paths",
-                "src/,*.md,Cargo.toml",
+                "src/,/*.md,Cargo.toml",
             ])
             .expect("Failed to add submodule");
 
@@ -98,13 +98,18 @@ mod tests {
         let sparse_content = fs::read_to_string(&sparse_file).expect("Failed to read sparse file");
 
         assert!(sparse_content.contains("src/"));
-        assert!(sparse_content.contains("*.md"));
+        assert!(sparse_content.contains("/*.md"));
         assert!(sparse_content.contains("Cargo.toml"));
 
         // Verify pattern matching works
         assert!(harness.dir_exists("lib/sparse-patterns/src"));
         assert!(harness.file_exists("lib/sparse-patterns/README.md"));
         assert!(harness.file_exists("lib/sparse-patterns/Cargo.toml"));
+
+        // Verify excluded paths are absent (proving sparseness)
+        assert!(!harness.dir_exists("lib/sparse-patterns/docs"));
+        assert!(!harness.dir_exists("lib/sparse-patterns/tests"));
+        assert!(!harness.dir_exists("lib/sparse-patterns/examples"));
     }
 
     #[test]
@@ -225,6 +230,13 @@ sparse_paths = ["src", "docs"]
         assert!(sparse_content.contains("*.md"));
         assert!(sparse_content.contains("!tests/"));
         assert!(sparse_content.contains("!examples/"));
+
+        // Verify matching paths are present and excluded paths are absent
+        assert!(harness.dir_exists("lib/sparse-complex/src"));
+        assert!(harness.dir_exists("lib/sparse-complex/docs"));
+        assert!(harness.file_exists("lib/sparse-complex/README.md"));
+        assert!(!harness.dir_exists("lib/sparse-complex/tests"));
+        assert!(!harness.dir_exists("lib/sparse-complex/examples"));
     }
 
     #[test]
@@ -268,6 +280,10 @@ sparse_paths = ["src", "docs", "*.md"]
         assert!(harness.dir_exists("lib/sparse-init/src"));
         assert!(harness.dir_exists("lib/sparse-init/docs"));
         assert!(harness.file_exists("lib/sparse-init/README.md"));
+
+        // Verify excluded paths are absent (proving sparseness)
+        assert!(!harness.dir_exists("lib/sparse-init/tests"));
+        assert!(!harness.dir_exists("lib/sparse-init/examples"));
     }
 
     #[test]
@@ -399,6 +415,10 @@ sparse_paths = ["src", "docs", "README.md"]
         assert!(harness.dir_exists("lib/sparse-sync/src"));
         assert!(harness.dir_exists("lib/sparse-sync/docs"));
         assert!(harness.file_exists("lib/sparse-sync/README.md"));
+
+        // Verify excluded paths are absent (proving sparseness)
+        assert!(!harness.dir_exists("lib/sparse-sync/tests"));
+        assert!(!harness.dir_exists("lib/sparse-sync/examples"));
     }
 
     /// Verify that the deny-all-by-default (modified cone) pattern `!/*` is

@@ -225,6 +225,87 @@ pub fn get_name(
     }
 }
 
+/// Validate a submodule path to ensure it is not absolute and does not escape
+/// the repository root via directory traversal (`..`) or symbolic links.
+pub fn validate_submodule_path(repo_root: &std::path::Path, path: &std::path::Path) -> Result<(), anyhow::Error> {
+    if path.is_absolute() {
+        return Err(anyhow::anyhow!("Submodule path cannot be absolute"));
+    }
+
+    let repo_root = repo_root.canonicalize().unwrap_or_else(|_| repo_root.to_path_buf());
+
+    let mut current = repo_root.clone();
+    for component in path.components() {
+        match component {
+            std::path::Component::Normal(c) => {
+                current.push(c);
+                // If current exists and is a symlink, read it and check target
+                if current.is_symlink() {
+                    let target = std::fs::read_link(&current)?;
+                    let resolved = if target.is_absolute() {
+                        target
+                    } else {
+                        current.parent().unwrap().join(target)
+                    };
+                    let canonical_resolved = resolved.canonicalize().unwrap_or_else(|_| {
+                        normalize_path_only(&resolved)
+                    });
+                    if !canonical_resolved.starts_with(&repo_root) {
+                        return Err(anyhow::anyhow!(
+                            "Submodule path escapes repository root via symlink: {}",
+                            canonical_resolved.display()
+                        ));
+                    }
+                    current = canonical_resolved;
+                }
+            }
+            std::path::Component::ParentDir => {
+                current.pop();
+                if !current.starts_with(&repo_root) {
+                    return Err(anyhow::anyhow!("Submodule path escapes repository root"));
+                }
+            }
+            std::path::Component::CurDir => {}
+            std::path::Component::Prefix(_) | std::path::Component::RootDir => {
+                return Err(anyhow::anyhow!("Submodule path cannot contain root or prefix components"));
+            }
+        }
+    }
+
+    // Also check the final resolved path
+    let final_canonical = current.canonicalize().unwrap_or_else(|_| {
+        normalize_path_only(&current)
+    });
+    if !final_canonical.starts_with(&repo_root) {
+        return Err(anyhow::anyhow!("Submodule path resolves outside repository root"));
+    }
+
+    Ok(())
+}
+
+fn normalize_path_only(path: &std::path::Path) -> std::path::PathBuf {
+    use std::path::{Component, PathBuf};
+    let mut normalized = PathBuf::new();
+    for component in path.components() {
+        match component {
+            Component::ParentDir => {
+                normalized.pop();
+            }
+            Component::CurDir => {}
+            Component::Normal(c) => {
+                normalized.push(c);
+            }
+            Component::RootDir => {
+                normalized.push(Component::RootDir);
+            }
+            Component::Prefix(p) => {
+                normalized.push(Component::Prefix(p));
+            }
+        }
+    }
+    normalized
+}
+
 #[cfg(test)]
 #[cfg_attr(coverage_nightly, coverage(off))]
 mod tests {

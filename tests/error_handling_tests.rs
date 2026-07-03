@@ -27,6 +27,7 @@ mod tests {
             .run_submod(&["check"])
             .expect("Failed to run submod");
         assert!(!output.status.success());
+        assert_eq!(output.status.code(), Some(1));
 
         let stderr = String::from_utf8_lossy(&output.stderr);
         assert!(
@@ -60,6 +61,7 @@ mod tests {
                 .expect("Failed to run submod");
 
             assert!(!output.status.success());
+            assert_eq!(output.status.code(), Some(1));
             let stderr = String::from_utf8_lossy(&output.stderr);
             assert!(stderr.contains("Failed to add submodule") || stderr.contains("clone failed"));
         }
@@ -103,55 +105,78 @@ mod tests {
     #[test]
     #[cfg(unix)]
     fn test_permission_denied_scenarios() {
-        // Check if running as root - permission tests don't work as root
         let is_root = std::process::Command::new("id")
             .arg("-u")
             .output()
             .map(|output| String::from_utf8_lossy(&output.stdout).trim() == "0")
             .unwrap_or(false);
 
-        if is_root {
-            println!("Skipping permission test - running as root");
-            return;
-        }
-
         let harness = TestHarness::new().expect("Failed to create test harness");
         harness.init_git_repo().expect("Failed to init git repo");
-
-        // Create a directory we can't write to
-        let readonly_dir = harness.work_dir.join("readonly");
-        fs::create_dir_all(&readonly_dir).expect("Failed to create readonly dir");
-
-        // Make directory read-only
-        let mut perms = fs::metadata(&readonly_dir).unwrap().permissions();
-        perms.set_mode(0o444);
-        fs::set_permissions(&readonly_dir, perms).expect("Failed to set permissions");
 
         let remote_repo = harness
             .create_test_remote("perm_test")
             .expect("Failed to create remote");
         let remote_url = format!("file://{}", remote_repo.display());
 
-        // Try to add submodule to read-only directory
-        let output = harness
-            .run_submod(&[
-                "add",
-                &remote_url,
-                "--name",
-                "perm-test",
-                "--path",
-                "readonly/submodule",
-            ])
-            .expect("Failed to run submod");
+        if is_root {
+            // For root, create a file where a directory is expected to trigger an IO error
+            let path_as_file = harness.work_dir.join("readonly");
+            fs::write(&path_as_file, "not a directory").expect("Failed to create file");
 
-        assert!(!output.status.success());
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        assert!(stderr.contains("Permission denied") || stderr.contains("Failed to add submodule"));
+            let output = harness
+                .run_submod(&[
+                    "add",
+                    &remote_url,
+                    "--name",
+                    "perm-test",
+                    "--path",
+                    "readonly/submodule",
+                ])
+                .expect("Failed to run submod");
 
-        // Restore permissions for cleanup
-        let mut perms = fs::metadata(&readonly_dir).unwrap().permissions();
-        perms.set_mode(0o755);
-        fs::set_permissions(&readonly_dir, perms).expect("Failed to restore permissions");
+            assert!(!output.status.success());
+            assert_eq!(output.status.code(), Some(1));
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            assert!(
+                stderr.contains("Failed to add submodule") || stderr.contains("Not a directory") || stderr.contains("not a directory"),
+                "Expected directory collision/IO failure message, got: {stderr}"
+            );
+        } else {
+            // Create a directory we can't write to
+            let readonly_dir = harness.work_dir.join("readonly");
+            fs::create_dir_all(&readonly_dir).expect("Failed to create readonly dir");
+
+            // Make directory read-only
+            let mut perms = fs::metadata(&readonly_dir).unwrap().permissions();
+            perms.set_mode(0o444);
+            fs::set_permissions(&readonly_dir, perms).expect("Failed to set permissions");
+
+            // Try to add submodule to read-only directory
+            let output = harness
+                .run_submod(&[
+                    "add",
+                    &remote_url,
+                    "--name",
+                    "perm-test",
+                    "--path",
+                    "readonly/submodule",
+                ])
+                .expect("Failed to run submod");
+
+            assert!(!output.status.success());
+            assert_eq!(output.status.code(), Some(1));
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            assert!(
+                stderr.contains("Permission denied") || stderr.contains("Failed to add submodule"),
+                "Expected permission denied/add failure message, got: {stderr}"
+            );
+
+            // Restore permissions for cleanup
+            let mut perms = fs::metadata(&readonly_dir).unwrap().permissions();
+            perms.set_mode(0o755);
+            fs::set_permissions(&readonly_dir, perms).expect("Failed to restore permissions");
+        }
     }
 
     #[test]
@@ -176,6 +201,7 @@ mod tests {
                 .run_submod(&["check"])
                 .expect("Failed to run submod");
             assert!(!output.status.success());
+            assert_eq!(output.status.code(), Some(1));
 
             let stderr = String::from_utf8_lossy(&output.stderr);
             assert!(
@@ -203,6 +229,7 @@ mod tests {
             match operation[0] {
                 "reset" => {
                     assert!(!output.status.success());
+                    assert_eq!(output.status.code(), Some(1));
                     let stderr = String::from_utf8_lossy(&output.stderr);
                     assert!(stderr.contains("not found") || stderr.contains("Failed to reset"));
                 }
@@ -366,8 +393,12 @@ active = true
 
         // Should either succeed or fail with a meaningful error
         if !output.status.success() {
+            assert_eq!(output.status.code(), Some(1));
             let stderr = String::from_utf8_lossy(&output.stderr);
-            assert!(!stderr.is_empty());
+            assert!(
+                stderr.contains("Failed to add submodule") || stderr.contains("space") || stderr.contains("disk"),
+                "Expected failure message containing space/disk details, got: {stderr}"
+            );
         }
     }
 
@@ -387,10 +418,10 @@ active = true
         for args in invalid_args {
             let output = harness.run_submod(&args).expect("Failed to run submod");
             assert!(!output.status.success());
+            let code = output.status.code().unwrap_or(1);
+            assert!(code == 1 || code == 2);
 
             let stderr = String::from_utf8_lossy(&output.stderr);
-            assert!(!stderr.is_empty());
-            // Should provide helpful error messages
             assert!(
                 stderr.contains("error") || stderr.contains("Usage") || stderr.contains("help")
             );
@@ -417,6 +448,7 @@ active = true
             .expect("Failed to run submod");
 
         assert!(!output.status.success());
+        assert_eq!(output.status.code(), Some(1));
         let stderr = String::from_utf8_lossy(&output.stderr);
         assert!(
             stderr.contains("Failed to add submodule")
@@ -455,6 +487,7 @@ active = true
             .expect("Failed to run submod");
 
         assert!(!output.status.success());
+        assert_eq!(output.status.code(), Some(1));
         let stderr = String::from_utf8_lossy(&output.stderr);
         assert!(
             stderr.contains("Failed to add submodule") || stderr.contains("not a git repository")
@@ -464,17 +497,11 @@ active = true
     #[test]
     #[cfg(unix)]
     fn test_config_file_locked() {
-        // Check if running as root - permission tests don't work as root
         let is_root = std::process::Command::new("id")
             .arg("-u")
             .output()
             .map(|output| String::from_utf8_lossy(&output.stdout).trim() == "0")
             .unwrap_or(false);
-
-        if is_root {
-            println!("Skipping config file lock test - running as root");
-            return;
-        }
 
         let harness = TestHarness::new().expect("Failed to create test harness");
         harness.init_git_repo().expect("Failed to init git repo");
@@ -486,37 +513,70 @@ active = true
             )
             .expect("Failed to create config");
 
-        // Make config file read-only to simulate lock
         let config_path = harness.config_path();
-        let mut perms = fs::metadata(&config_path).unwrap().permissions();
-        perms.set_mode(0o444);
-        fs::set_permissions(&config_path, perms).expect("Failed to set permissions");
 
         let remote_repo = harness
             .create_test_remote("locked_config")
             .expect("Failed to create remote");
         let remote_url = format!("file://{}", remote_repo.display());
 
-        // Try to add submodule (which requires writing to config)
-        let output = harness
-            .run_submod(&[
-                "add",
-                &remote_url,
-                "--name",
-                "locked-test",
-                "--path",
-                "lib/locked",
-            ])
-            .expect("Failed to run submod");
+        if is_root {
+            // For root, make the config file a directory. Writing to it will fail with EISDIR.
+            fs::remove_file(&config_path).expect("Failed to remove config file");
+            fs::create_dir(&config_path).expect("Failed to create config directory");
 
-        assert!(!output.status.success());
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        assert!(stderr.contains("Permission denied") || stderr.contains("Failed to save config"));
+            let output = harness
+                .run_submod(&[
+                    "add",
+                    &remote_url,
+                    "--name",
+                    "locked-test",
+                    "--path",
+                    "lib/locked",
+                ])
+                .expect("Failed to run submod");
 
-        // Restore permissions for cleanup
-        let mut perms = fs::metadata(&config_path).unwrap().permissions();
-        perms.set_mode(0o644);
-        fs::set_permissions(&config_path, perms).expect("Failed to restore permissions");
+            assert!(!output.status.success());
+            assert_eq!(output.status.code(), Some(1));
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            assert!(
+                stderr.contains("Is a directory") || stderr.contains("Failed to save config") || stderr.contains("is a directory"),
+                "Expected directory write/config save failure message, got: {stderr}"
+            );
+
+            // Cleanup
+            fs::remove_dir(&config_path).expect("Failed to remove config directory");
+        } else {
+            // Make config file read-only to simulate lock
+            let mut perms = fs::metadata(&config_path).unwrap().permissions();
+            perms.set_mode(0o444);
+            fs::set_permissions(&config_path, perms).expect("Failed to set permissions");
+
+            // Try to add submodule (which requires writing to config)
+            let output = harness
+                .run_submod(&[
+                    "add",
+                    &remote_url,
+                    "--name",
+                    "locked-test",
+                    "--path",
+                    "lib/locked",
+                ])
+                .expect("Failed to run submod");
+
+            assert!(!output.status.success());
+            assert_eq!(output.status.code(), Some(1));
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            assert!(
+                stderr.contains("Permission denied") || stderr.contains("Failed to save config"),
+                "Expected permission denied/config save failure message, got: {stderr}"
+            );
+
+            // Restore permissions for cleanup
+            let mut perms = fs::metadata(&config_path).unwrap().permissions();
+            perms.set_mode(0o644);
+            fs::set_permissions(&config_path, perms).expect("Failed to restore permissions");
+        }
     }
 
     #[test]
@@ -549,8 +609,8 @@ active = true
 
         // Should handle existing directory appropriately
         if !output.status.success() {
+            assert_eq!(output.status.code(), Some(1));
             let stderr = String::from_utf8_lossy(&output.stderr);
-            assert!(!stderr.is_empty());
             assert!(
                 stderr.contains("already exists") || stderr.contains("Failed to add submodule")
             );

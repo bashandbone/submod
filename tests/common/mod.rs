@@ -428,52 +428,18 @@ impl TestHarness {
                     self.work_dir.join(submodule_path).join(git_dir_path)
                 };
 
-                let sparse_file = absolute_path.join("info").join("sparse-checkout");
-
-                // Check if the file exists in the actual git directory
-                if sparse_file.exists() {
-                    return sparse_file;
-                }
+                return absolute_path.join("info").join("sparse-checkout");
             }
         }
 
-        // For submodules, try multiple possible locations
-        let locations = vec![
-            // Try the gitlink location first (actual git directory)
-            self.work_dir
-                .join(submodule_path)
-                .join(".git")
-                .join("info")
-                .join("sparse-checkout"),
-            // Try relative to main repo's .git/modules
-            self.work_dir
-                .join(".git")
-                .join("modules")
-                .join(submodule_path)
-                .join("info")
-                .join("sparse-checkout"),
-            // Try with just the last component of the path
-            self.work_dir
-                .join(".git")
-                .join("modules")
-                .join(
-                    std::path::Path::new(submodule_path)
-                        .file_name()
-                        .unwrap_or_else(|| std::ffi::OsStr::new("")),
-                )
-                .join("info")
-                .join("sparse-checkout"),
-        ];
-
-        // Return the first location that exists, or the first one as fallback
-        for location in &locations {
-            if location.exists() {
-                return location.clone();
-            }
-        }
-
-        // Fallback to the expected location for tests
-        locations[0].clone()
+        // If no gitlink/directory exists at the submodule path, default to the expected
+        // location in the superproject's .git/modules directory.
+        self.work_dir
+            .join(".git")
+            .join("modules")
+            .join(submodule_path)
+            .join("info")
+            .join("sparse-checkout")
     }
 
     /// Create a complex test repository with multiple branches and tags

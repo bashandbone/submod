@@ -80,7 +80,7 @@ After destructive operations (delete, nuke), `GitOpsManager::reopen()` must be c
 
 ### Key Conventions
 
-- **Unsafe code is forbidden** (`unsafe_code = "forbid"` in `Cargo.toml`)
+- **Unsafe code is denied by default** (`unsafe_code = "deny"` in `Cargo.toml`)
 - Clippy is configured at `pedantic` + `nursery` warn level; `correctness` is deny
 - `missing_docs` is warn — public items need doc comments
 - `module_name_repetitions` and `too_many_lines` are allowed

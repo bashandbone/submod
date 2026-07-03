@@ -7,8 +7,8 @@ use crate::config::{
     SubmoduleAddOptions, SubmoduleEntries, SubmoduleEntry, SubmoduleUpdateOptions,
 };
 use crate::options::{
-    ConfigLevel, SerializableBranch, SerializableFetchRecurse, SerializableIgnore,
-    SerializableUpdate,
+    ConfigLevel, GitmodulesConvert, SerializableBranch, SerializableFetchRecurse,
+    SerializableIgnore, SerializableUpdate,
 };
 use anyhow::{Context, Result};
 use std::collections::HashMap;
@@ -208,50 +208,79 @@ impl GitOperations for Git2Operations {
         ))
     }
     fn write_gitmodules(&mut self, config: &SubmoduleEntries) -> Result<()> {
-        // git2 doesn't have direct .gitmodules writing, but we can manipulate submodules
-        // For now, we'll update individual submodule configurations
-        if let Some(submodules) = config.submodules().as_ref() {
-            for (name, entry) in *submodules {
-                // Find or create the submodule
-                if let Ok(mut submodule) = self
-                    .repo
-                    .find_submodule(entry.path.as_deref().unwrap_or(name))
-                {
-                    // Update existing submodule configuration through git config
-                    let mut config = self.repo.config()?;
-                    if let Some(ignore) = &entry.ignore {
-                        let ignore_str = match ignore {
-                            SerializableIgnore::All => "all",
-                            SerializableIgnore::Dirty => "dirty",
-                            SerializableIgnore::Untracked => "untracked",
-                            SerializableIgnore::None => "none",
-                            SerializableIgnore::Unspecified => continue, // Skip unspecified
-                        };
-                        config.set_str(&format!("submodule.{name}.ignore"), ignore_str)?;
-                    }
-                    if let Some(update) = &entry.update {
-                        let update_str = match update {
-                            SerializableUpdate::Checkout => "checkout",
-                            SerializableUpdate::Rebase => "rebase",
-                            SerializableUpdate::Merge => "merge",
-                            SerializableUpdate::None => "none",
-                            SerializableUpdate::Unspecified => continue, // Skip unspecified
-                        };
-                        config.set_str(&format!("submodule.{name}.update"), update_str)?;
-                    }
-                    if let Some(active) = entry.active {
-                        let active_str = if active { "true" } else { "false" };
-                        config.set_str(&format!("submodule.{name}.active"), active_str)?;
-                    }
-                    // Set URL if different
-                    if let Some(url) = &entry.url
-                        && submodule.url() != Some(url.as_str())
-                    {
-                        config.set_str(&format!("submodule.{name}.url"), url)?;
-                    }
-                    // Sync changes
-                    submodule.sync()?;
+        let workdir = self.repo.workdir()
+            .ok_or_else(|| anyhow::anyhow!("Repository has no working directory"))?;
+        let gitmodules_path = workdir.join(".gitmodules");
+
+        // Ensure the .gitmodules file exists so git2 can open it.
+        if !gitmodules_path.exists() {
+            std::fs::write(&gitmodules_path, "")?;
+        }
+
+        let mut gitmodules_config = git2::Config::open(&gitmodules_path)?;
+
+        for (name, entry) in config.submodule_iter() {
+            let section = format!("submodule.{name}");
+
+            // 1. Write to .gitmodules
+            if let Some(path) = &entry.path {
+                gitmodules_config.set_str(&format!("{section}.path"), path)?;
+            }
+            if let Some(url) = &entry.url {
+                gitmodules_config.set_str(&format!("{section}.url"), url)?;
+            }
+            if let Some(branch) = &entry.branch {
+                gitmodules_config.set_str(&format!("{section}.branch"), &branch.to_string())?;
+            }
+            if let Some(update) = &entry.update {
+                gitmodules_config.set_str(&format!("{section}.update"), &update.to_gitmodules())?;
+            }
+            if let Some(ignore) = &entry.ignore {
+                gitmodules_config.set_str(&format!("{section}.ignore"), &ignore.to_gitmodules())?;
+            }
+            if let Some(fetch_recurse) = &entry.fetch_recurse {
+                gitmodules_config.set_str(&format!("{section}.fetchRecurseSubmodules"), &fetch_recurse.to_gitmodules())?;
+            }
+            if let Some(active) = entry.active {
+                gitmodules_config.set_str(&format!("{section}.active"), if active { "true" } else { "false" })?;
+            }
+
+            // 2. Sync to local repository config (.git/config) if the submodule exists in the repository
+            if let Ok(mut submodule) = self
+                .repo
+                .find_submodule(entry.path.as_deref().unwrap_or(name))
+            {
+                let mut repo_config = self.repo.config()?;
+                if let Some(ignore) = &entry.ignore {
+                    let ignore_str = match ignore {
+                        SerializableIgnore::All => "all",
+                        SerializableIgnore::Dirty => "dirty",
+                        SerializableIgnore::Untracked => "untracked",
+                        SerializableIgnore::None => "none",
+                        SerializableIgnore::Unspecified => continue,
+                    };
+                    repo_config.set_str(&format!("submodule.{name}.ignore"), ignore_str)?;
                 }
+                if let Some(update) = &entry.update {
+                    let update_str = match update {
+                        SerializableUpdate::Checkout => "checkout",
+                        SerializableUpdate::Rebase => "rebase",
+                        SerializableUpdate::Merge => "merge",
+                        SerializableUpdate::None => "none",
+                        SerializableUpdate::Unspecified => continue,
+                    };
+                    repo_config.set_str(&format!("submodule.{name}.update"), update_str)?;
+                }
+                if let Some(active) = entry.active {
+                    let active_str = if active { "true" } else { "false" };
+                    repo_config.set_str(&format!("submodule.{name}.active"), active_str)?;
+                }
+                if let Some(url) = &entry.url
+                    && submodule.url() != Some(url.as_str())
+                {
+                    repo_config.set_str(&format!("submodule.{name}.url"), url)?;
+                }
+                submodule.sync()?;
             }
         }
         Ok(())

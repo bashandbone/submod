@@ -2,6 +2,10 @@
 #
 # SPDX-License-Identifier: LicenseRef-PlainMIT OR MIT
 
+[settings]
+experimental = true
+
+
 [tools]
 act = "latest"
 cargo-binstall = "latest"
@@ -15,7 +19,7 @@ cargo-binstall = "latest"
 hk = "latest"  # Handles git hooks, like pre-commit.
 jq = "latest"
 pkl = "latest"  # pkl for `hk`, which handles git hooks
-rust = "1.89"   # The minimum Rust version we support; mise just makes sure it's there.
+rust = "1.96"
 typos = "latest"
 "pipx:reuse" = { version = "latest", uvx_args = '-p 3.13' }
 "cargo:licet" = "0.2.2"

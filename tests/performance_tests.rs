@@ -1,7 +1,8 @@
 // SPDX-FileCopyrightText: 2025 Adam Poulemanos <89049923+bashandbone@users.noreply.github.com>
 //
 // SPDX-License-Identifier: LicenseRef-PlainMIT OR MIT
-
+#![allow(unsafe_code)]
+#![allow(unstable_features)]
 //! Performance and stress tests for the submod CLI tool
 //!
 //! These tests verify that the tool performs well under various conditions
@@ -12,6 +13,54 @@ use std::time::Instant;
 
 mod common;
 use common::TestHarness;
+
+use std::alloc::{GlobalAlloc, Layout, System};
+use std::sync::atomic::{AtomicUsize, Ordering};
+
+struct TrackingAllocator;
+
+static ALLOCATED: AtomicUsize = AtomicUsize::new(0);
+static PEAK_ALLOCATED: AtomicUsize = AtomicUsize::new(0);
+
+unsafe impl GlobalAlloc for TrackingAllocator {
+
+    unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
+        let ptr = unsafe { System.alloc(layout) };
+        if !ptr.is_null() {
+            let size = layout.size();
+            let prev = ALLOCATED.fetch_add(size, Ordering::Relaxed);
+            let current = prev + size;
+            loop {
+                let peak = PEAK_ALLOCATED.load(Ordering::Relaxed);
+                if current <= peak || PEAK_ALLOCATED.compare_exchange_weak(peak, current, Ordering::Relaxed, Ordering::Relaxed).is_ok() {
+                    break;
+                }
+            }
+        }
+        ptr
+    }
+
+    unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
+        unsafe { System.dealloc(ptr, layout) };
+        ALLOCATED.fetch_sub(layout.size(), Ordering::Relaxed);
+    }
+}
+
+#[global_allocator]
+static A: TrackingAllocator = TrackingAllocator;
+
+fn reset_peak_memory() {
+    let current = ALLOCATED.load(Ordering::Relaxed);
+    PEAK_ALLOCATED.store(current, Ordering::Relaxed);
+}
+
+fn get_peak_memory() -> usize {
+    PEAK_ALLOCATED.load(Ordering::Relaxed)
+}
+
+fn get_current_memory() -> usize {
+    ALLOCATED.load(Ordering::Relaxed)
+}
 
 #[cfg(test)]
 mod tests {
@@ -318,21 +367,32 @@ ignore = "all"
                 .expect("Failed to add submodule");
         }
 
-        // Run multiple check operations rapidly
+        // Run multiple check operations concurrently using threads
         let start_time = Instant::now();
+        let mut handles = Vec::new();
+        let harness_arc = std::sync::Arc::new(harness);
+
         for _ in 0..10 {
-            harness
-                .run_submod_success(&["check", "--verbose"])
-                .expect("Failed to run check");
+            let h = harness_arc.clone();
+            let handle = std::thread::spawn(move || {
+                h.run_submod_success(&["check", "--verbose"])
+                    .expect("Failed to run concurrent check");
+            });
+            handles.push(handle);
         }
+
+        for handle in handles {
+            handle.join().expect("Thread panicked");
+        }
+
         let duration = start_time.elapsed();
 
-        println!("10 consecutive check operations time: {duration:?}");
+        println!("10 concurrent check operations time: {duration:?}");
 
         // Performance assertion
         assert!(
             duration.as_secs() < 30,
-            "Consecutive checks too slow: {duration:?}"
+            "Concurrent checks too slow: {duration:?}"
         );
     }
 
@@ -341,11 +401,8 @@ ignore = "all"
         let harness = TestHarness::new().expect("Failed to create test harness");
         harness.init_git_repo().expect("Failed to init git repo");
 
-        // This test is more about ensuring operations complete without memory issues
-        // rather than measuring actual memory usage
-
         // Create a substantial number of submodules
-        for i in 0..25 {
+        for i in 0..10 {
             let remote_repo = harness
                 .create_test_remote(&format!("memory_test_{i}"))
                 .expect("Failed to create remote");
@@ -365,25 +422,57 @@ ignore = "all"
                 .expect("Failed to add submodule");
         }
 
-        // Run comprehensive operations
+        // Switch directory to the test workspace to run in-process
+        let orig_dir = std::env::current_dir().expect("Failed to get current directory");
+        std::env::set_current_dir(&harness.work_dir).expect("Failed to set CWD");
+
+        reset_peak_memory();
+        let mem_start = get_current_memory();
         let start_time = Instant::now();
 
-        harness
-            .run_submod_success(&["check", "--verbose"])
-            .expect("Failed to run check");
-        harness
-            .run_submod_success(&["update"])
-            .expect("Failed to run update");
-        harness
-            .run_submod_success(&["sync"])
-            .expect("Failed to run sync");
+        // Run comprehensive operations in-process
+        let mut manager = submod::git_manager::GitManager::new(harness.config_path())
+            .expect("Failed to load GitManager");
+
+        manager.check_all_submodules().expect("Failed to check");
+
+        let names: Vec<String> = manager
+            .config()
+            .get_submodules()
+            .map(|(n, _)| n.clone())
+            .collect();
+
+        for name in &names {
+            manager.update_submodule(name).expect("Failed to update");
+        }
+
+        // Run sync sequence in-process
+        manager.check_all_submodules().expect("Failed to check");
+        for name in &names {
+            manager.init_submodule(name).expect("Failed to init");
+            manager.update_submodule(name).expect("Failed to update");
+        }
 
         let duration = start_time.elapsed();
-        println!("Large operations time: {duration:?}");
+        let peak_mem = get_peak_memory();
+        let net_peak = peak_mem.saturating_sub(mem_start);
+
+        // Restore working directory
+        std::env::set_current_dir(orig_dir).ok();
+
+        println!("Large operations in-process time: {duration:?}");
+        println!("Peak memory usage during large operations: {} KB", net_peak / 1024);
+
+        // Assert memory usage is within reasonable bounds (e.g. less than 20 MB)
+        assert!(
+            net_peak < 20 * 1024 * 1024,
+            "Peak memory usage too high: {} bytes",
+            net_peak
+        );
 
         // If we reach here without OOM or crashes, the test passes
         assert!(
-            duration.as_secs() < 120,
+            duration.as_secs() < 60,
             "Large operations too slow: {duration:?}"
         );
     }
@@ -475,5 +564,84 @@ active = true
             duration.as_millis() < 2000,
             "Unicode processing too slow: {duration:?}"
         );
+    }
+
+    #[test]
+    fn test_lock_contention_handling() {
+        let harness = TestHarness::new().expect("Failed to create test harness");
+        harness.init_git_repo().expect("Failed to init git repo");
+
+        let remote_repo = harness
+            .create_test_remote("lock_test")
+            .expect("Failed to create remote");
+        let remote_url = format!("file://{}", remote_repo.display());
+
+        harness
+            .run_submod_success(&[
+                "add",
+                &remote_url,
+                "--name",
+                "lock-sub",
+                "--path",
+                "lib/lock-sub",
+            ])
+            .expect("Failed to add submodule");
+
+        // Manually create .git/index.lock in the superproject to simulate a lock.
+        let super_lock_path = harness.work_dir.join(".git").join("index.lock");
+        fs::write(&super_lock_path, "locked").expect("Failed to create superproject lock file");
+
+        // Running an operation that modifies the superproject (like adding a new submodule)
+        // should fail gracefully due to the locked index.
+        let remote_repo2 = harness
+            .create_test_remote("lock_test2")
+            .expect("Failed to create remote 2");
+        let remote_url2 = format!("file://{}", remote_repo2.display());
+
+        let output = harness.run_submod(&[
+            "add",
+            &remote_url2,
+            "--name",
+            "lock-sub2",
+            "--path",
+            "lib/lock-sub2",
+        ]).expect("Failed to run submod");
+
+        assert!(!output.status.success(), "Command should fail when index is locked");
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        assert!(
+            stderr.contains("index.lock") || stderr.contains("lock") || stderr.contains("failed"),
+            "Error message should mention lock or failure, got: {stderr}"
+        );
+
+        // Remove the lock
+        fs::remove_file(&super_lock_path).expect("Failed to remove lock file");
+
+        // Now it should succeed
+        harness.run_submod_success(&[
+            "add",
+            &remote_url2,
+            "--name",
+            "lock-sub2",
+            "--path",
+            "lib/lock-sub2",
+        ]).expect("Failed to add submodule after lock release");
+
+        // Lock the submodule's index
+        let sub_git_dir = harness.get_sparse_checkout_file_path("lib/lock-sub")
+            .parent() // info
+            .unwrap()
+            .parent() // gitdir root
+            .unwrap()
+            .to_path_buf();
+        let sub_lock_path = sub_git_dir.join("index.lock");
+        fs::write(&sub_lock_path, "locked").expect("Failed to create submodule lock file");
+
+        // Run reset which modifies the submodule index, and verify failure
+        let output2 = harness.run_submod(&["reset", "lock-sub"]).expect("Failed to run reset");
+        assert!(!output2.status.success(), "Reset should fail when submodule index is locked");
+
+        // Clean up lock
+        fs::remove_file(&sub_lock_path).expect("Failed to remove submodule lock");
     }
 }

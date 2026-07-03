@@ -108,6 +108,10 @@ pub enum SubmoduleError {
     #[error("Repository not found or invalid")]
     #[allow(dead_code)]
     RepositoryError,
+
+    /// Submodule path is invalid or escapes repository root
+    #[error("Invalid path: {0}")]
+    InvalidPath(String),
 }
 
 /// Status information for a submodule
@@ -402,6 +406,11 @@ impl GitManager {
         no_init: bool,
         use_git_default_sparse_checkout: Option<bool>,
     ) -> Result<(), SubmoduleError> {
+        let repo_root = self.git_ops.workdir().ok_or(SubmoduleError::RepositoryError)?;
+        if let Err(e) = crate::utilities::validate_submodule_path(repo_root, std::path::Path::new(&path)) {
+            return Err(SubmoduleError::InvalidPath(e.to_string()));
+        }
+
         if no_init {
             self.update_toml_config(
                 name,
