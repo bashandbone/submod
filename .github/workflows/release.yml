@@ -32,6 +32,17 @@ jobs:
     needs: [create-release]
     permissions:
       contents: write
+    env:
+      # Force curl-sys to build libcurl from source instead of probing pkg-config
+      # for whatever the build image happens to expose. A release binary that
+      # dynamically links the builder's libcurl is not portable, and on musl a
+      # glibc-linked one would not work at all.
+      #
+      # Set unconditionally rather than per-target: this variable is presence-
+      # checked, so a `${{ ... && '1' || '' }}` expression would still read as set
+      # on every target. It only affects Linux anyway — curl-sys returns early
+      # with the system libcurl on Apple targets and uses vcpkg on Windows.
+      LIBCURL_NO_PKG_CONFIG: "1"
     strategy:
       fail-fast: false
       matrix:
@@ -43,6 +54,16 @@ jobs:
             os: ubuntu-latest
             build-tool: cross
           - target: aarch64-unknown-linux-gnu
+            os: ubuntu-latest
+            build-tool: cross
+          # musl targets link every native dependency statically — OpenSSL (shared
+          # by curl and libgit2 since submod dropped rustls), libgit2 and libssh2
+          # come from the vendored features below, and musl itself replaces the
+          # glibc the -gnu targets link dynamically. The result runs on any Linux.
+          - target: x86_64-unknown-linux-musl
+            os: ubuntu-latest
+            build-tool: cross
+          - target: aarch64-unknown-linux-musl
             os: ubuntu-latest
             build-tool: cross
           - target: x86_64-pc-windows-msvc
@@ -73,6 +94,11 @@ jobs:
   publish:
     name: Publish to crates.io
     needs: [build]
+    # workflow_dispatch is the dry run: `build` already honors it via its
+    # dry-run input, but this job and `github_release` did not, so a manual
+    # dispatch still ran `cargo publish` against crates.io and cut a real
+    # GitHub release. Only a v* tag push publishes anything.
+    if: github.event_name != 'workflow_dispatch'
     runs-on: ubuntu-latest
     environment: cratesio
     permissions:
@@ -92,6 +118,7 @@ jobs:
   github_release:
     name: Publish GitHub Release
     needs: [build, publish]
+    if: github.event_name != 'workflow_dispatch'
     runs-on: ubuntu-latest
     permissions:
       contents: write

@@ -126,7 +126,7 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN || github.token }}
           # Keep in sync with the `ignore` list in deny.toml, which documents why
           # each of these is accepted.
-          ignore: RUSTSEC-2024-0364,RUSTSEC-2024-0436,RUSTSEC-2026-0044,RUSTSEC-2026-0048
+          ignore: RUSTSEC-2024-0364
 
   coverage:
     name: Code Coverage
