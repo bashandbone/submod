@@ -216,14 +216,16 @@ mod tests {
         let remote_url = format!("file://{}", remote_repo.display());
 
         // 1. Check direct path traversal escape
-        let result_traversal = harness.run_submod(&[
-            "add",
-            &remote_url,
-            "--name",
-            "escaped-sub",
-            "--path",
-            "../escaped-path",
-        ]).expect("Failed to run submod");
+        let result_traversal = harness
+            .run_submod(&[
+                "add",
+                &remote_url,
+                "--name",
+                "escaped-sub",
+                "--path",
+                "../escaped-path",
+            ])
+            .expect("Failed to run submod");
 
         assert!(!result_traversal.status.success());
         let stderr = String::from_utf8_lossy(&result_traversal.stderr);
@@ -239,7 +241,7 @@ mod tests {
 
         // Create a symlink in the repository pointing to the outside directory
         let symlink_path = harness.work_dir.join("lib_escaped");
-        
+
         #[cfg(unix)]
         {
             std::os::unix::fs::symlink(&outside_dir, &symlink_path)
@@ -252,14 +254,16 @@ mod tests {
         }
 
         // Try to add submodule that goes through this symlink
-        let result_symlink = harness.run_submod(&[
-            "add",
-            &remote_url,
-            "--name",
-            "symlink-sub",
-            "--path",
-            "lib_escaped/submodule",
-        ]).expect("Failed to run submod");
+        let result_symlink = harness
+            .run_submod(&[
+                "add",
+                &remote_url,
+                "--name",
+                "symlink-sub",
+                "--path",
+                "lib_escaped/submodule",
+            ])
+            .expect("Failed to run submod");
 
         assert!(!result_symlink.status.success());
         let stderr = String::from_utf8_lossy(&result_symlink.stderr);

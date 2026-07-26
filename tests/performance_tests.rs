@@ -23,7 +23,6 @@ static ALLOCATED: AtomicUsize = AtomicUsize::new(0);
 static PEAK_ALLOCATED: AtomicUsize = AtomicUsize::new(0);
 
 unsafe impl GlobalAlloc for TrackingAllocator {
-
     unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
         let ptr = unsafe { System.alloc(layout) };
         if !ptr.is_null() {
@@ -32,7 +31,11 @@ unsafe impl GlobalAlloc for TrackingAllocator {
             let current = prev + size;
             loop {
                 let peak = PEAK_ALLOCATED.load(Ordering::Relaxed);
-                if current <= peak || PEAK_ALLOCATED.compare_exchange_weak(peak, current, Ordering::Relaxed, Ordering::Relaxed).is_ok() {
+                if current <= peak
+                    || PEAK_ALLOCATED
+                        .compare_exchange_weak(peak, current, Ordering::Relaxed, Ordering::Relaxed)
+                        .is_ok()
+                {
                     break;
                 }
             }
@@ -461,7 +464,10 @@ ignore = "all"
         std::env::set_current_dir(orig_dir).ok();
 
         println!("Large operations in-process time: {duration:?}");
-        println!("Peak memory usage during large operations: {} KB", net_peak / 1024);
+        println!(
+            "Peak memory usage during large operations: {} KB",
+            net_peak / 1024
+        );
 
         // Assert memory usage is within reasonable bounds (e.g. less than 20 MB)
         assert!(
@@ -598,16 +604,21 @@ active = true
             .expect("Failed to create remote 2");
         let remote_url2 = format!("file://{}", remote_repo2.display());
 
-        let output = harness.run_submod(&[
-            "add",
-            &remote_url2,
-            "--name",
-            "lock-sub2",
-            "--path",
-            "lib/lock-sub2",
-        ]).expect("Failed to run submod");
+        let output = harness
+            .run_submod(&[
+                "add",
+                &remote_url2,
+                "--name",
+                "lock-sub2",
+                "--path",
+                "lib/lock-sub2",
+            ])
+            .expect("Failed to run submod");
 
-        assert!(!output.status.success(), "Command should fail when index is locked");
+        assert!(
+            !output.status.success(),
+            "Command should fail when index is locked"
+        );
         let stderr = String::from_utf8_lossy(&output.stderr);
         assert!(
             stderr.contains("index.lock") || stderr.contains("lock") || stderr.contains("failed"),
@@ -618,17 +629,20 @@ active = true
         fs::remove_file(&super_lock_path).expect("Failed to remove lock file");
 
         // Now it should succeed
-        harness.run_submod_success(&[
-            "add",
-            &remote_url2,
-            "--name",
-            "lock-sub2",
-            "--path",
-            "lib/lock-sub2",
-        ]).expect("Failed to add submodule after lock release");
+        harness
+            .run_submod_success(&[
+                "add",
+                &remote_url2,
+                "--name",
+                "lock-sub2",
+                "--path",
+                "lib/lock-sub2",
+            ])
+            .expect("Failed to add submodule after lock release");
 
         // Lock the submodule's index
-        let sub_git_dir = harness.get_sparse_checkout_file_path("lib/lock-sub")
+        let sub_git_dir = harness
+            .get_sparse_checkout_file_path("lib/lock-sub")
             .parent() // info
             .unwrap()
             .parent() // gitdir root
@@ -638,8 +652,13 @@ active = true
         fs::write(&sub_lock_path, "locked").expect("Failed to create submodule lock file");
 
         // Run reset which modifies the submodule index, and verify failure
-        let output2 = harness.run_submod(&["reset", "lock-sub"]).expect("Failed to run reset");
-        assert!(!output2.status.success(), "Reset should fail when submodule index is locked");
+        let output2 = harness
+            .run_submod(&["reset", "lock-sub"])
+            .expect("Failed to run reset");
+        assert!(
+            !output2.status.success(),
+            "Reset should fail when submodule index is locked"
+        );
 
         // Clean up lock
         fs::remove_file(&sub_lock_path).expect("Failed to remove submodule lock");

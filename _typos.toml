@@ -7,7 +7,7 @@ locale = "en-us"
 check-file = true
 check-filename = true
 extend-ignore-re = [
-  "(?s)(#|//)\\s*spellchecker:off.*?\\n\\s*(#|//)\\s*spellchecker:on"
+  "(?s)(#|//|<!--)\\s*spellchecker:off.*?\\n\\s*(#|//|<!--)\\s*spellchecker:on"
 ]
 extend-ignore-identifiers-re = [
   "iif",
@@ -30,5 +30,6 @@ extend-exclude = [
   ".venv/",
   ".git/",
   "target/",
-  "docs/"
+  "docs/",
+  "CHANGELOG.md",
 ]

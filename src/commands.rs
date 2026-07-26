@@ -125,7 +125,7 @@ pub enum Commands {
             num_args = 0..=1,
             value_parser = clap::value_parser!(bool),
             default_missing_value = "true",
-            help = "Opt out of submod's deny-all-by-default sparse-checkout model and use git's built-in behaviour instead. When set, the `!/*` prefix is NOT prepended automatically."
+            help = "Opt out of submod's deny-all-by-default sparse-checkout model and use git's built-in behavior instead. When set, the `!/*` prefix is NOT prepended automatically."
         )]
         use_git_default_sparse_checkout: Option<bool>,
 
@@ -180,7 +180,7 @@ pub enum Commands {
             num_args = 0..=1,
             value_parser = clap::value_parser!(bool),
             default_missing_value = "true",
-            help = "Opt out of submod's deny-all-by-default sparse-checkout model and use git's built-in behaviour instead."
+            help = "Opt out of submod's deny-all-by-default sparse-checkout model and use git's built-in behavior instead."
         )]
         use_git_default_sparse_checkout: Option<bool>,
 
@@ -248,7 +248,7 @@ pub enum Commands {
             num_args = 0..=1,
             value_parser = clap::value_parser!(bool),
             default_missing_value = "true",
-            help = "Set the global default for sparse-checkout mode. When true, all submodules use git's built-in behaviour instead of submod's deny-all-by-default model (unless overridden per-submodule)."
+            help = "Set the global default for sparse-checkout mode. When true, all submodules use git's built-in behavior instead of submod's deny-all-by-default model (unless overridden per-submodule)."
         )]
         use_git_default_sparse_checkout: Option<bool>,
     },

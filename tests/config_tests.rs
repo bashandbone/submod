@@ -341,17 +341,18 @@ sparse_paths = ["src/**", "docs/*", "*.{md,txt,rst}"]
 
     #[test]
     fn test_public_surface_coverage() {
-        use submod::config::{SubmoduleUpdateOptions, SubmoduleEntry, OtherSubmoduleSettings, SubmoduleGitOptions, SubmoduleEntries};
-        use submod::options::{SerializableUpdate, SerializableFetchRecurse, SerializableIgnore, SerializableBranch};
-        use submod::git_ops::Git2Operations;
         use std::collections::HashMap;
+        use submod::config::{
+            OtherSubmoduleSettings, SubmoduleEntries, SubmoduleEntry, SubmoduleGitOptions,
+            SubmoduleUpdateOptions,
+        };
+        use submod::git_ops::Git2Operations;
+        use submod::options::{
+            SerializableBranch, SerializableFetchRecurse, SerializableIgnore, SerializableUpdate,
+        };
 
         // 1. Test SubmoduleUpdateOptions methods
-        let update_opts = SubmoduleUpdateOptions::new(
-            SerializableUpdate::Rebase,
-            true,
-            false,
-        );
+        let update_opts = SubmoduleUpdateOptions::new(SerializableUpdate::Rebase, true, false);
         assert_eq!(update_opts.strategy, SerializableUpdate::Rebase);
         assert!(update_opts.recursive);
         assert!(!update_opts.force);
@@ -395,18 +396,22 @@ sparse_paths = ["src/**", "docs/*", "*.{md,txt,rst}"]
             no_init: true,
         };
 
-        let entry_from_opts = SubmoduleEntry::from_options_and_settings(
-            git_opts.clone(),
-            other_settings.clone(),
+        let entry_from_opts =
+            SubmoduleEntry::from_options_and_settings(git_opts.clone(), other_settings.clone());
+        assert_eq!(
+            entry_from_opts.url.as_deref(),
+            Some("https://example.com/repo-new.git")
         );
-        assert_eq!(entry_from_opts.url.as_deref(), Some("https://example.com/repo-new.git"));
         assert_eq!(entry_from_opts.path.as_deref(), Some("lib/test-new"));
         assert_eq!(entry_from_opts.active, Some(false));
         assert_eq!(entry_from_opts.shallow, Some(true));
         assert_eq!(entry_from_opts.no_init, Some(true));
 
         let updated_entry = entry.update_with_settings(other_settings);
-        assert_eq!(updated_entry.url.as_deref(), Some("https://example.com/repo-new.git"));
+        assert_eq!(
+            updated_entry.url.as_deref(),
+            Some("https://example.com/repo-new.git")
+        );
         assert_eq!(updated_entry.path.as_deref(), Some("lib/test-new"));
         assert_eq!(updated_entry.active, Some(false));
         assert_eq!(updated_entry.shallow, Some(true));
@@ -417,18 +422,37 @@ sparse_paths = ["src/**", "docs/*", "*.{md,txt,rst}"]
         let entry_to_insert = SubmoduleEntry::new(
             Some("https://example.com/repo.git".to_string()),
             Some("lib/test".to_string()),
-            None, None, None, None, Some(true), Some(false), Some(false)
+            None,
+            None,
+            None,
+            None,
+            Some(true),
+            Some(false),
+            Some(false),
         );
         entries.update_entry("test-sub".to_string(), entry_to_insert);
-        
+
         // Test set_sparse_paths_for when paths is not empty
         entries.set_sparse_paths_for("test-sub", vec!["src/".to_string(), "docs/".to_string()]);
-        let stored_entry = entries.iter().find(|(name, _)| *name == "test-sub").unwrap().1.0;
-        assert_eq!(stored_entry.sparse_paths, Some(vec!["src/".to_string(), "docs/".to_string()]));
+        let stored_entry = entries
+            .iter()
+            .find(|(name, _)| *name == "test-sub")
+            .unwrap()
+            .1
+            .0;
+        assert_eq!(
+            stored_entry.sparse_paths,
+            Some(vec!["src/".to_string(), "docs/".to_string()])
+        );
 
         // Test set_sparse_paths_for when paths is empty
         entries.set_sparse_paths_for("test-sub", vec![]);
-        let stored_entry_empty = entries.iter().find(|(name, _)| *name == "test-sub").unwrap().1.0;
+        let stored_entry_empty = entries
+            .iter()
+            .find(|(name, _)| *name == "test-sub")
+            .unwrap()
+            .1
+            .0;
         assert_eq!(stored_entry_empty.sparse_paths, None);
 
         // 4. Test Config loading and sync methods using a real test harness
@@ -455,11 +479,14 @@ active = true
         assert_eq!(config.defaults.ignore, Some(SerializableIgnore::Dirty));
 
         // Test sync_with_git_config and load_with_git_sync
-        let mut git_ops = Git2Operations::new(Some(&harness.work_dir)).expect("Failed to open git_ops");
-        
+        let mut git_ops =
+            Git2Operations::new(Some(&harness.work_dir)).expect("Failed to open git_ops");
+
         // Initially, config has a submodule but gitmodules has nothing.
         // We sync config with git config, which should write the submodule to .gitmodules
-        config.sync_with_git_config(&mut git_ops).expect("Failed to sync_with_git_config");
+        config
+            .sync_with_git_config(&mut git_ops)
+            .expect("Failed to sync_with_git_config");
 
         // Verify .gitmodules was written
         let gitmodules_content = harness.gitmodules_entries();
@@ -469,6 +496,9 @@ active = true
         let loaded_sync_config = submod::Config::default()
             .load_with_git_sync(&config_path, &mut git_ops, submod::Config::default())
             .expect("Failed to load_with_git_sync");
-        assert_eq!(loaded_sync_config.defaults.ignore, Some(SerializableIgnore::Dirty));
+        assert_eq!(
+            loaded_sync_config.defaults.ignore,
+            Some(SerializableIgnore::Dirty)
+        );
     }
 }

@@ -319,7 +319,7 @@ submod completeme bash > ~/.bash_completion.d/submod
 
 ```zsh "zsh"
 # zsh has an fpath array with possible function directories. You can
-# put your competions in any of these; we use the first one here:
+# put your completions in any of these; we use the first one here:
 ZSH_DEFAULT="${XDG_DATA_HOME:-~/.local/share}/zsh/site-functions"
 ZFUNCDIR=""${fpath[1]:-$ZSH_DEFAULT}"
 mkdir -p "$ZFUNCDIR"
