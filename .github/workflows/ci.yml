@@ -17,7 +17,11 @@ jobs:
   test:
     name: Test Suite
     runs-on: ubuntu-latest
+    # beta/nightly are informational: a toolchain regression upstream should not
+    # gate merges, but we still want to see it.
+    continue-on-error: ${{ matrix.rust != 'stable' }}
     strategy:
+      fail-fast: false
       matrix:
         rust:
           - stable
@@ -52,6 +56,20 @@ jobs:
           path: target
           key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}-${{ matrix.rust }}
 
+      - name: Install cargo-nextest
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-nextest
+
+      # The integration harness shells out to git; give it a committer identity.
+      - name: Setup git
+        run: |
+          git config --global user.email "ci@example.com"
+          git config --global user.name "CI"
+
+      - name: Run tests
+        run: cargo nextest run --all-features --no-fail-fast
+
   lint:
     name: lint
     runs-on: ubuntu-latest
@@ -80,12 +98,14 @@ jobs:
             pkl = "latest"
             typos = { version = "latest", depends = ["rust"] }
     
-      - name: Run hk ci workflow
+      # --all: hk defaults to staged/changed files, which on a fresh CI checkout
+      # leaves most steps with nothing to do. --skip-step cargo_test: the test
+      # job above owns running the suite.
+      - name: Run hk check
         env:
           HK_MISE: 1
           MISE_YES: 1
-        run: |
-          hk check || cd ../ && hk check
+        run: hk check --all --skip-step cargo_test
 
   security_audit:
     name: Security Audit
@@ -98,7 +118,9 @@ jobs:
       - uses: rustsec/audit-check@v2
         with:
           token: ${{ secrets.GITHUB_TOKEN || github.token }}
-          ignore: RUSTSEC-2024-0364,RUSTSEC-2024-0436
+          # Keep in sync with the `ignore` list in deny.toml, which documents why
+          # each of these is accepted.
+          ignore: RUSTSEC-2024-0364,RUSTSEC-2024-0436,RUSTSEC-2026-0044,RUSTSEC-2026-0048
 
   coverage:
     name: Code Coverage
