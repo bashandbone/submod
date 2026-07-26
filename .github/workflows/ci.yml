@@ -98,14 +98,20 @@ jobs:
             pkl = "latest"
             typos = { version = "latest", depends = ["rust"] }
     
+      # mise installs the toolchain without optional components, so cargo_fmt and
+      # cargo_clippy have no binary to call.
+      - name: Add rustfmt and clippy components
+        run: rustup component add rustfmt clippy
+
       # --all: hk defaults to staged/changed files, which on a fresh CI checkout
       # leaves most steps with nothing to do. --skip-step cargo_test: the test
-      # job above owns running the suite.
+      # job above owns running the suite. --no-fail-fast: report every lint
+      # problem in one run instead of aborting the rest on the first failure.
       - name: Run hk check
         env:
           HK_MISE: 1
           MISE_YES: 1
-        run: hk check --all --skip-step cargo_test
+        run: hk check --all --skip-step cargo_test --no-fail-fast
 
   security_audit:
     name: Security Audit
