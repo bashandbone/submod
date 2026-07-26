@@ -2,6 +2,10 @@
 //
 // SPDX-License-Identifier: LicenseRef-PlainMIT OR MIT
 #![cfg_attr(coverage_nightly, feature(coverage_attribute))]
+// Cargo.toml sets `unsafe_code = "deny"` workspace-wide, which a single
+// `#![allow(unsafe_code)]` can opt back out of. The test crate needs that escape
+// hatch for its tracking allocator; the library does not, so forbid it here.
+#![forbid(unsafe_code)]
 //! A Rust CLI tool for managing Git submodules with enhanced features and user-friendly configuration.
 //! This module is exposed for integration testing; it is not intended for public use and may contain unstable APIs.
 

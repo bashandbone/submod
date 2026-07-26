@@ -89,10 +89,15 @@ After destructive operations (delete, nuke), `GitOpsManager::reopen()` must be c
 
 ### Testing Approach
 
-Integration tests in `tests/` use a `TestHarness` (in `tests/common/mod.rs`) that creates temporary git repos and invokes the compiled binary. Test files:
+Integration tests in `tests/` use a `TestHarness` (in `tests/common/mod.rs`) that creates temporary git repos and invokes the compiled binary. Beyond running the CLI, the harness inspects real git state — `index_gitlink_mode`, `gitmodules_entries`, `submodule_config_entries`, `git_modules_dir_exists` — and tests should assert on that rather than on printed output where both are available. Test files:
 - `integration_tests.rs` — end-to-end CLI behavior
 - `command_contract_tests.rs` — CLI command argument contracts
 - `config_tests.rs` — configuration parsing/serialization
 - `sparse_checkout_tests.rs` — sparse checkout behavior
 - `error_handling_tests.rs` — error conditions and messages
-- `performance_tests.rs` — benchmarks (uses criterion)
+- `fallback_tests.rs` — the gix→git2→CLI fallback chain, via the `GitOpsManager::without_gix` and `::forcing_cli_add` injection seams
+- `git_ops_tests.rs` — the `GitOperations` backends directly
+- `security_tests.rs` — path traversal, symlink escape, and command/flag injection containment
+- `performance_tests.rs` — timing and peak-allocation ceilings (plain `#[test]`s, not criterion)
+
+Criterion benchmarks live separately in `benches/benchmark.rs` (`cargo bench`).

@@ -2,6 +2,8 @@
 //
 // SPDX-License-Identifier: LicenseRef-PlainMIT OR MIT
 #![cfg_attr(coverage_nightly, feature(coverage_attribute))]
+// See the note in lib.rs: `deny` is opt-out-able per file, `forbid` is not.
+#![forbid(unsafe_code)]
 #![doc = r"
 Main entry point for the submod CLI tool.
 
