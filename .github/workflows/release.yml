@@ -94,7 +94,7 @@ jobs:
   publish:
     name: Publish to crates.io
     needs: [build]
-    # workflow_dispatch is the dry run: `build` already honours it via its
+    # workflow_dispatch is the dry run: `build` already honors it via its
     # dry-run input, but this job and `github_release` did not, so a manual
     # dispatch still ran `cargo publish` against crates.io and cut a real
     # GitHub release. Only a v* tag push publishes anything.
