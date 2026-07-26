@@ -86,7 +86,7 @@ bitflags = "2.11.0"
 
 # As of submod v0.2.0, git2 no longer optional
 # gix_submodule just isn't mature enough to realistically provide our functionality without falling back to git2
-git2 = { version = "0.20.4" }
+git2 = { version = "0.21.0" }
 
 [lib]
 name = "submod"
