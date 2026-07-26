@@ -12,6 +12,94 @@ spellchecker:off
 We document all important changes below.
 
 Submod follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+## [0.4.0] - 2026-07-26
+### Bug Fixes
+
+- Gix update causing incompatibility with gix modules([`f8164a0`](https://github.com/bashandbone/submod/commit/f8164a0f28ab0e4bcb9742b67fdd2e8967cf2364))
+
+- (**config**) Round-trip the fetchRecurse config key correctly (#63)([`441f41b`](https://github.com/bashandbone/submod/commit/441f41bacce25921b3acf9c6fef0e3e5c29ba782))
+
+- (**update**) Checkout submodule to recorded gitlink commit (#62 P1) (#67)([`dcf20fd`](https://github.com/bashandbone/submod/commit/dcf20fd01106bac6f5d79a2cd762660f7d94b2de))
+
+- (**check**) Report submodules with uncommitted changes as dirty (#62 P1) (#68)([`0440da4`](https://github.com/bashandbone/submod/commit/0440da45edf0d0b94b302a294e9785473cb21412))
+
+- (**config**) Round-trip submod.toml — preserve [defaults] on load, persist edits on save (#62 P1) (#70)([`af455ae`](https://github.com/bashandbone/submod/commit/af455ae2939d1bc07a51935b45f2c7c68406fa9c))
+
+- (**config**) Merge_from carries other.use_git_default_sparse_checkout (#62 P2) (#72)([`786b0c3`](https://github.com/bashandbone/submod/commit/786b0c3644bd39cea3a24876690c4abc646c8484))
+
+- (**git_ops**) Clean up path-keyed .gitmodules after a failed add + idempotency tests (#62 P2) (#75)([`598747b`](https://github.com/bashandbone/submod/commit/598747b6cda68a9ad9ee2f3919df6a565d39d7c5))
+
+- Failing tests and lints([`1c22370`](https://github.com/bashandbone/submod/commit/1c2237080ae87182410658336a8b24bbc6d796c7))
+
+- Lint tests and fix formatting in a few modules([`e1d8569`](https://github.com/bashandbone/submod/commit/e1d85692d6c2450236f05a9b88e83827a4b6f15f))
+
+- (**deps**) Update gix modules to address a transient vulnerability([`fb4d5ac`](https://github.com/bashandbone/submod/commit/fb4d5ace90ce504c82443485fa291e3c0c233d9f))
+
+- CI failing on missing checkout action([`7f5448c`](https://github.com/bashandbone/submod/commit/7f5448cb63f029018ea0e9673472a6e0c1366bcd))
+
+- (**ci**) Repair the lint job, make the test job actually run tests (#76)([`3f25280`](https://github.com/bashandbone/submod/commit/3f25280786d1c4fa539677d102b5f2a8a13d21fd))
+
+- (**update**) Keep gitoxide's fetch report off stdout, name each submodule (#78)([`9bac978`](https://github.com/bashandbone/submod/commit/9bac978c3fdd56702705007c2ac52719e69ed775))
+
+### CI/Build
+
+- (**ci.yml**) Fix tool install in ci action([`d54e521`](https://github.com/bashandbone/submod/commit/d54e521aaa021475c0a621f38e17bf33bf16e795))
+
+- (**release**) Measure static linkage on dry runs instead of inferring it (#80)([`f751eea`](https://github.com/bashandbone/submod/commit/f751eeafc8d4b5d2097510de49f8c64fc4b4d337))
+
+- Run all four cargo-deny checks, not just advisories (#82)([`debc885`](https://github.com/bashandbone/submod/commit/debc885cf798405b0fec962ccd5c453152ebd3e2))
+
+### Features
+
+- (**submodule**) Disable command updates .gitmodules active status (#50)([`5c2c8c5`](https://github.com/bashandbone/submod/commit/5c2c8c55949cef60786fe46696a137fd5b5bbfc3))
+
+### Miscellaneous
+
+- (**deps**) Bump rustls-webpki in the cargo group across 1 directory (#58)([`5c754c3`](https://github.com/bashandbone/submod/commit/5c754c392f0d55029ac764857f708c29b326bf69))
+
+- (**deps**) Bump gix from 0.81.0 to 0.83.0 in the cargo group across 1 directory (#59)([`4e0419b`](https://github.com/bashandbone/submod/commit/4e0419b119d61f43dc9240d60c7b742787926e70))
+
+- (**cleanup**) Remove old files, add license.toml for licet (#61)([`efb606e`](https://github.com/bashandbone/submod/commit/efb606e512ff6c39448896112fe8640a544547ab))
+
+- Remove unused import in tests/security_tests.rs([`a59068f`](https://github.com/bashandbone/submod/commit/a59068f491ec68b77187e0514b7e2c0782512859))
+
+- Consolidate on one TLS stack, ship static musl binaries (#79)([`1256c3e`](https://github.com/bashandbone/submod/commit/1256c3eae4b6e065af5d4a6e043d969ec6af1f26))
+
+- (**deps**) Update deps and deny.toml([`135353e`](https://github.com/bashandbone/submod/commit/135353efbf4b93585623356658a0ba6999c219a4))
+
+### Refactoring
+
+- (**tests**) Make sparse checkout unit tests hermetic and complete (#52)([`a50023b`](https://github.com/bashandbone/submod/commit/a50023b2527c0fc284711ffac958fdcd851791ae))
+
+- Complete p3/p4 of test improvement plan([`ffe76d8`](https://github.com/bashandbone/submod/commit/ffe76d8c98c59a9cdbbdff5f86252aac4b88a181))
+
+### Testing
+
+- (**integration**) Assert real git state for add/delete/nuke (#62 P0-2) (#64)([`c033a80`](https://github.com/bashandbone/submod/commit/c033a800b7321eb4d0b097fa8f9a8d20236e8f7d))
+
+- (**fallback**) Git2 failure-injection seam for fallback architecture (#62 P0-1) (#65)([`31b72ea`](https://github.com/bashandbone/submod/commit/31b72ea5337eac1ac3254f764f73cf8c9c58e613))
+
+- (**fallback**) Exercise CLI last-resort add + assert fallback warnings (#62 P0-1) (#66)([`d32c9eb`](https://github.com/bashandbone/submod/commit/d32c9eb343a90fe714e9284378f191721da9790f))
+
+- (**config/git_ops**) Cover git2 option bridges + get_submodule_status OIDs/flags (#62 P1) (#71)([`f17a043`](https://github.com/bashandbone/submod/commit/f17a043a5519009d2d8a90040eb41ae317f32ae0))
+
+- (**p2**) Make cannot-fail error tests meaningful + un-fake null-byte (#62 P2) (#73)([`fda1880`](https://github.com/bashandbone/submod/commit/fda1880188797e4c5d0399009d7f26b6ef3d26bc))
+
+- (**p2**) Command/flag-injection containment for name/url/.gitmodules (#62 P2) (#74)([`50bd136`](https://github.com/bashandbone/submod/commit/50bd136a6564f647c945c74f0338888f927299a9))
+
+- (**p2**) Pin loose error/output assertions to exact strings (#62 P2) (#77)([`ed6fd35`](https://github.com/bashandbone/submod/commit/ed6fd3526a10f5642841db1fa571958b815b0789))
+
+### Deps
+
+- Bump git2 to 0.21, clearing RUSTSEC-2026-0184 (#81)([`45de49a`](https://github.com/bashandbone/submod/commit/45de49a9877edf20d8fe504ee0a60eb0ba8dd238))
+
+### Style
+
+- Format code to spec([`e66b258`](https://github.com/bashandbone/submod/commit/e66b2587f7ed6deecae22405b928375a9aad2406))
+
+- Lint and format([`15cd804`](https://github.com/bashandbone/submod/commit/15cd8048525aab087432789100d519219d4dc9ed))
+
+
 ## [0.3.0] - 2026-04-08
 ### Bug Fixes
 
@@ -32,6 +120,8 @@ Submod follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and uses
 - (**schemas**) Update config schemas to reflect new sparse path handling and the `use_git_default_sparse_checkout` setting([`d0d6022`](https://github.com/bashandbone/submod/commit/d0d6022f51605fa3b605b56b85b3e6cbf9c28a05))
 
 - Update Cargo.toml to v0.3.0([`16bdfbe`](https://github.com/bashandbone/submod/commit/16bdfbea29d70ca1f9987421a770a0afca585b43))
+
+- Update CHANGELOG.md for v0.3.0([`14f37cc`](https://github.com/bashandbone/submod/commit/14f37ccf405d0673e15ff2b2992f24e0e559d06f))
 
 
 ## [0.2.7] - 2026-03-22
