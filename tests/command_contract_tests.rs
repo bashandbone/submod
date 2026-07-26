@@ -44,10 +44,16 @@ mod tests {
         );
 
         let stdout = String::from_utf8_lossy(&output.stdout);
-        // Bash completion scripts always contain the function/complete keyword
+        // A usable bash completion script needs both halves: the function that
+        // produces candidates, and the registration that binds it to the command.
+        // ("submod" alone would be satisfied by any output mentioning the binary.)
         assert!(
-            stdout.contains("complete") || stdout.contains("_submod") || stdout.contains("submod"),
-            "bash completion script should reference submod; got: {stdout}"
+            stdout.contains("_submod()"),
+            "bash completion script should define the completion function; got: {stdout}"
+        );
+        assert!(
+            stdout.contains("complete -F _submod"),
+            "bash completion script should register the function for submod; got: {stdout}"
         );
     }
 
@@ -230,9 +236,11 @@ mod tests {
         let init_verbose = harness
             .run_submod_success(&["init", "--verbose"])
             .expect("Failed to run init --verbose");
+        // The first init above already initialized it, so a second run must say so
+        // by name rather than claim to initialize it again.
         assert!(
-            init_verbose.contains("lazy-lib") || init_verbose.contains("already initialized"),
-            "Verbose init should mention the submodule; got: {init_verbose}"
+            init_verbose.contains("lazy-lib already initialized"),
+            "Verbose init should report the submodule as already initialized; got: {init_verbose}"
         );
     }
 
@@ -269,9 +277,14 @@ mod tests {
             .run_submod_success(&["nuke-it-from-orbit", "--all", "--kill"])
             .expect("Failed to nuke all");
 
+        // --all must nuke every submodule, not just the first one it finds.
         assert!(
-            stdout.contains("Nuking") || stdout.contains("💥"),
-            "Expected nuke progress output; got: {stdout}"
+            stdout.contains("Nuking submodule 'nuke-a'..."),
+            "Expected nuke progress for nuke-a; got: {stdout}"
+        );
+        assert!(
+            stdout.contains("Nuking submodule 'nuke-b'..."),
+            "Expected nuke progress for nuke-b; got: {stdout}"
         );
 
         let config_after = harness.read_config().expect("Failed to read config");
@@ -313,9 +326,15 @@ mod tests {
             .run_submod_success(&["nuke-it-from-orbit", "reinit-lib"])
             .expect("Failed to nuke-and-reinit");
 
+        // Without --kill both halves must happen; either one alone is the bug this
+        // test exists to catch, so assert them separately rather than as a disjunction.
         assert!(
-            stdout.contains("Nuking") || stdout.contains("Reinitializing"),
-            "Expected nuke/reinit progress; got: {stdout}"
+            stdout.contains("Nuking submodule 'reinit-lib'..."),
+            "Expected nuke progress; got: {stdout}"
+        );
+        assert!(
+            stdout.contains("Reinitializing submodule 'reinit-lib'..."),
+            "Expected reinit progress; got: {stdout}"
         );
 
         // After reinit, submodule should exist again
@@ -565,9 +584,9 @@ mod tests {
             .run_submod_success(&["change", "movable-lib", "--path", "lib/moved"])
             .expect("Failed to change submodule path");
 
-        // Should confirm the update
+        // Should confirm the update, naming the submodule it re-added at the new path.
         assert!(
-            stdout.contains("Added submodule") || stdout.contains("movable-lib"),
+            stdout.contains("Added submodule movable-lib"),
             "Expected confirmation of path change; got: {stdout}"
         );
 
@@ -1063,9 +1082,11 @@ mod tests {
         let stdout_verbose = harness
             .run_submod_success(&["init", "--verbose"])
             .expect("Failed to run init --verbose");
+        // "Initializing" || "initialized" could not distinguish the two states; the
+        // default init above ran first, so this run must report the already-done case.
         assert!(
-            stdout_verbose.contains("Initializing") || stdout_verbose.contains("initialized"),
-            "verbose init output should mention initialization; got: {stdout_verbose}"
+            stdout_verbose.contains("init-contract already initialized"),
+            "verbose init output should name the already-initialized submodule; got: {stdout_verbose}"
         );
     }
 

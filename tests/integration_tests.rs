@@ -192,7 +192,13 @@ sparse_paths = ["src"]
             .run_submod_success(&["update"])
             .expect("Failed to run update");
 
-        assert!(stdout.contains("Updated") || stdout.contains("Already up to date"));
+        // The one submodule in the config must be counted. `update` does not name
+        // the submodules it touched — it forwards the raw fetch output and then
+        // prints this summary — so the count is the assertable contract here.
+        assert!(
+            stdout.contains("Updated 1 submodule(s)"),
+            "update should report how many submodules it updated; got: {stdout}"
+        );
     }
 
     /// `update` must check the submodule worktree out to the commit recorded as
@@ -586,11 +592,17 @@ active = true
         let output = harness
             .run_submod(&["check", "--verbose"])
             .expect("Failed to run submod");
-        assert!(!output.status.success());
+        assert_eq!(output.status.code(), Some(1));
 
         let stderr = String::from_utf8_lossy(&output.stderr);
         assert!(
-            stderr.contains("Failed to create manager") || stderr.contains("Repository not found")
+            stderr.contains("Failed to create manager"),
+            "error should name the operation that failed; got: {stderr}"
+        );
+        // The underlying cause must survive the wrapping, not be flattened away.
+        assert!(
+            stderr.contains("Repository not found"),
+            "error should preserve the underlying cause; got: {stderr}"
         );
     }
 
@@ -611,9 +623,12 @@ active = true
             ])
             .expect("Failed to run submod");
 
-        assert!(!output.status.success());
+        assert_eq!(output.status.code(), Some(1));
         let stderr = String::from_utf8_lossy(&output.stderr);
-        assert!(stderr.contains("Failed to add submodule") || stderr.contains("clone failed"));
+        assert!(
+            stderr.contains("Failed to add submodule"),
+            "error should name the operation that failed; got: {stderr}"
+        );
     }
 
     #[test]
@@ -1042,9 +1057,13 @@ active = true
             ])
             .expect("Failed to run generate-config");
 
-        assert!(!output.status.success());
+        assert_eq!(output.status.code(), Some(1));
         let stderr = String::from_utf8_lossy(&output.stderr);
-        assert!(stderr.contains("already exists") || stderr.contains("Use --force"));
+        // Both the refusal and the way out of it must be in the message.
+        assert!(
+            stderr.contains("already exists. Use --force to overwrite."),
+            "error should refuse to clobber and name the override flag; got: {stderr}"
+        );
     }
 
     #[test]
@@ -1073,7 +1092,10 @@ active = true
             .run_submod_success(&["nuke-it-from-orbit", "nuke-lib", "--kill"])
             .expect("Failed to nuke submodule");
 
-        assert!(stdout.contains("Nuking") || stdout.contains("💥"));
+        assert!(
+            stdout.contains("💥 Nuking submodule 'nuke-lib'..."),
+            "nuke should report the submodule it is nuking; got: {stdout}"
+        );
 
         // Config should not contain the submodule anymore
         let config = harness.read_config().expect("Failed to read config");
