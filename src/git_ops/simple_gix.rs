@@ -13,7 +13,7 @@ use gitoxide_core::repository::fetch::{
 };
 use gix::{features::progress, progress::prodash};
 use prodash::render::line;
-use std::io::{stderr, stdout};
+use std::io::stderr;
 
 /// A standard range for line renderer.
 pub fn setup_line_renderer_range(
@@ -46,7 +46,14 @@ pub fn progress_tree(trace: bool) -> std::sync::Arc<prodash::tree::Root> {
     .into()
 }
 
-/// Run a function with progress tracking, capturing output to stdout and stderr.
+/// Run a function with progress tracking, returning its result alongside the
+/// bytes it wrote to the `out` and `err` handles it was given.
+///
+/// `gitoxide-core` writes CLI-shaped reports to those handles — for `fetch`,
+/// the refspec mapping and a per-ref status line. That is narration for someone
+/// running `gix` directly, not part of `submod`'s output contract, so it is
+/// captured and handed back rather than written to this process's own streams.
+/// The caller decides where, and whether, it is shown.
 pub fn get_progress<T>(
     func_name: &str,
     range: Option<std::ops::RangeInclusive<u8>>,
@@ -55,7 +62,7 @@ pub fn get_progress<T>(
         &mut dyn std::io::Write,
         &mut dyn std::io::Write,
     ) -> T,
-) -> Result<T> {
+) -> (T, Vec<u8>, Vec<u8>) {
     let standard_range = 2..=2;
     let range = range.unwrap_or_else(|| standard_range.clone());
     let progress = progress_tree(false);
@@ -75,9 +82,7 @@ pub fn get_progress<T>(
     });
 
     handle.shutdown_and_wait();
-    std::io::Write::write_all(&mut stdout(), &out)?;
-    std::io::Write::write_all(&mut stderr(), &err)?;
-    Ok(result)
+    (result, out, err)
 }
 
 /// Fetch options for the `fetch` command, with an option for shallow fetching.
@@ -100,9 +105,33 @@ const fn fetch_options(remote: Option<String>, shallow: bool) -> FetchOptions {
 }
 
 /// Fetch updates from a remote repository.
-pub fn fetch_repo(repo: gix::Repository, remote: Option<String>, shallow: bool) -> Result<()> {
-    let inner_result = get_progress("fetch", Some(FetchProgressRange), |progress, out, err| {
-        gitoxide_core::repository::fetch(repo, progress, out, err, fetch_options(remote, shallow))
-    })?;
+///
+/// The fetch report `gitoxide-core` produces never reaches stdout: stdout
+/// carries `submod`'s own output, and callers parse it. The report is written to
+/// stderr when the caller asked for verbose output, or when the fetch failed and
+/// it is the only detail available to explain why.
+pub fn fetch_repo(
+    repo: gix::Repository,
+    remote: Option<String>,
+    shallow: bool,
+    verbose: bool,
+) -> Result<()> {
+    let (inner_result, out, err) =
+        get_progress("fetch", Some(FetchProgressRange), |progress, out, err| {
+            gitoxide_core::repository::fetch(
+                repo,
+                progress,
+                out,
+                err,
+                fetch_options(remote, shallow),
+            )
+        });
+
+    if verbose || inner_result.is_err() {
+        let mut sink = stderr();
+        std::io::Write::write_all(&mut sink, &out)?;
+        std::io::Write::write_all(&mut sink, &err)?;
+    }
+
     inner_result.map_err(|e| anyhow::anyhow!("Fetch failed: {e}"))
 }

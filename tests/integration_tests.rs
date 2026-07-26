@@ -192,12 +192,22 @@ sparse_paths = ["src"]
             .run_submod_success(&["update"])
             .expect("Failed to run update");
 
-        // The one submodule in the config must be counted. `update` does not name
-        // the submodules it touched — it forwards the raw fetch output and then
-        // prints this summary — so the count is the assertable contract here.
+        // `update` must name each submodule it touched, then summarize the count.
+        assert!(
+            stdout.contains("✅ Updated update-lib"),
+            "update should name the submodule it updated; got: {stdout}"
+        );
         assert!(
             stdout.contains("Updated 1 submodule(s)"),
             "update should report how many submodules it updated; got: {stdout}"
+        );
+
+        // gitoxide's fetch report is plumbing narration for `gix fetch`, not part
+        // of submod's output. Leaking it to stdout is what made the per-submodule
+        // line unassertable in the first place.
+        assert!(
+            !stdout.contains("refs/remotes/origin/"),
+            "update must not leak the raw fetch refspec report to stdout; got: {stdout}"
         );
     }
 

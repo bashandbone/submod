@@ -178,7 +178,9 @@ pub struct GitOpsManager {
 impl GitOpsManager {
     /// Create a new `GitOpsManager` with automatic fallback
     pub fn new(repo_path: Option<&Path>, verbose: bool) -> Result<Self> {
-        let gix_ops = GixOperations::new(repo_path).ok();
+        let gix_ops = GixOperations::new(repo_path)
+            .ok()
+            .map(|ops| ops.with_verbose(verbose));
         let git2_ops = Git2Operations::new(repo_path)
             .with_context(|| "Failed to initialize git2 operations")?;
 
@@ -266,7 +268,7 @@ impl GitOpsManager {
         // gix is an optional optimistic backend — log failures but don't fail.
         match GixOperations::new(Some(&workdir)) {
             Ok(new_gix) => {
-                self.gix_ops = Some(new_gix);
+                self.gix_ops = Some(new_gix.with_verbose(self.verbose));
             }
             Err(e) => {
                 if self.verbose {
