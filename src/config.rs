@@ -174,7 +174,7 @@ pub struct SubmoduleDefaults {
     pub fetch_recurse: Option<SerializableFetchRecurse>,
     /// [`Update`][SerializableUpdate] setting for submodules
     pub update: Option<SerializableUpdate>,
-    /// When `true`, use git's built-in sparse-checkout behaviour (no `!/*` prefix is
+    /// When `true`, use git's built-in sparse-checkout behavior (no `!/*` prefix is
     /// prepended). Defaults to `false`, which uses submod's deny-all-by-default model.
     /// Individual submodules can override this per-entry.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -471,7 +471,7 @@ pub struct SubmoduleEntry {
     /// Sparse checkout paths for this submodule (optional)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub sparse_paths: Option<Vec<String>>,
-    /// When `true`, use git's built-in sparse-checkout behaviour instead of submod's
+    /// When `true`, use git's built-in sparse-checkout behavior instead of submod's
     /// deny-all-by-default model.  Overrides the global `[defaults]` setting.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub use_git_default_sparse_checkout: Option<bool>,

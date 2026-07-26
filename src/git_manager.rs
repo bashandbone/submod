@@ -320,8 +320,7 @@ impl GitManager {
         // Check if submodule has its own submodules
         let has_submodules = submodule_repo
             .submodules()
-            .map(|subs| subs.is_some_and(|mut iter| iter.next().is_some()))
-            .unwrap_or(false);
+            .is_ok_and(|subs| subs.is_some_and(|mut iter| iter.next().is_some()));
 
         Ok(SubmoduleStatus {
             path: submodule_path.to_string(),
@@ -406,8 +405,13 @@ impl GitManager {
         no_init: bool,
         use_git_default_sparse_checkout: Option<bool>,
     ) -> Result<(), SubmoduleError> {
-        let repo_root = self.git_ops.workdir().ok_or(SubmoduleError::RepositoryError)?;
-        if let Err(e) = crate::utilities::validate_submodule_path(repo_root, std::path::Path::new(&path)) {
+        let repo_root = self
+            .git_ops
+            .workdir()
+            .ok_or(SubmoduleError::RepositoryError)?;
+        if let Err(e) =
+            crate::utilities::validate_submodule_path(repo_root, std::path::Path::new(&path))
+        {
             return Err(SubmoduleError::InvalidPath(e.to_string()));
         }
 
@@ -531,7 +535,7 @@ impl GitManager {
     ///
     /// By default (`use_git_default = false`) the deny-all-by-default model is applied:
     /// `!/*` is prepended so only the explicitly listed `patterns` are checked out, and a
-    /// one-time informational message is printed to help users understand the behaviour and
+    /// one-time informational message is printed to help users understand the behavior and
     /// opt out if needed.
     ///
     /// When `use_git_default = true` the patterns are written as-is, matching git's own
@@ -552,7 +556,7 @@ impl GitManager {
                 eprintln!(
                     "ℹ️  submod uses a deny-all-by-default sparse-checkout model: `!/*` is \
                      automatically prepended so only the paths you list are checked out.\n\
-                     To use git's default behaviour instead, set \
+                     To use git's default behavior instead, set \
                      `use_git_default_sparse_checkout = true` in your submod.toml (globally \
                      under `[defaults]` or per submodule) or pass \
                      `--use-git-default-sparse-checkout`."
@@ -589,7 +593,7 @@ impl GitManager {
     ///
     /// This implements the "modified cone pattern" approach: all paths are denied by
     /// default and only the explicitly listed patterns are checked out. This makes the
-    /// intent clear and avoids surprises from git's default include-everything behaviour.
+    /// intent clear and avoids surprises from git's default include-everything behavior.
     ///
     /// Blank entries (empty or whitespace-only strings) are stripped before processing.
     /// If no non-blank include patterns remain after normalization, an empty list is
@@ -1477,7 +1481,7 @@ impl GitManager {
                 entries
                     .submodule_iter()
                     .find(|(_, e)| e.path.as_deref() == Some(path.as_str()))
-                    .map(|(n, _)| n.to_string())
+                    .map(|(n, _)| n.clone())
             };
 
             if let Some(gm_name) = gitmodules_name {
@@ -1876,7 +1880,7 @@ mod tests {
     use tempfile::tempdir;
 
     // Helper to create a `GitManager` for tests that need to call methods such as
-    // `check_sparse_checkout_status`. It initialises a real git repository in `repo_dir`
+    // `check_sparse_checkout_status`. It initializes a real git repository in `repo_dir`
     // via `git2` so that `GitOpsManager` can open it without depending on the caller's
     // working directory being inside a git repo.
     fn create_test_manager(repo_dir: &Path, config_path: PathBuf) -> GitManager {

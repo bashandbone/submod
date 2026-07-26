@@ -500,7 +500,7 @@ impl GitOperations for GixOperations {
         let submodule_name = entries
             .submodule_iter()
             .find(|(_, entry)| entry.path.as_ref() == Some(&path.to_string()))
-            .map(|(name, _)| name.to_string())
+            .map(|(name, _)| name.clone())
             .ok_or_else(|| anyhow::anyhow!("Submodule '{path}' not found in .gitmodules"))?;
 
         // 3. Remove from .gitmodules
@@ -583,7 +583,7 @@ impl GitOperations for GixOperations {
         let submodule_name = entries
             .submodule_iter()
             .find(|(_, entry)| entry.path.as_ref() == Some(&path.to_string()))
-            .map(|(name, _)| name.to_string())
+            .map(|(name, _)| name.clone())
             .ok_or_else(|| anyhow::anyhow!("Submodule '{path}' not found in .gitmodules"))?;
         self.clone().try_gix_operation_mut(|repo| {
             // 1. Get the submodule directory

@@ -208,7 +208,9 @@ impl GitOperations for Git2Operations {
         ))
     }
     fn write_gitmodules(&mut self, config: &SubmoduleEntries) -> Result<()> {
-        let workdir = self.repo.workdir()
+        let workdir = self
+            .repo
+            .workdir()
             .ok_or_else(|| anyhow::anyhow!("Repository has no working directory"))?;
         let gitmodules_path = workdir.join(".gitmodules");
 
@@ -239,10 +241,16 @@ impl GitOperations for Git2Operations {
                 gitmodules_config.set_str(&format!("{section}.ignore"), &ignore.to_gitmodules())?;
             }
             if let Some(fetch_recurse) = &entry.fetch_recurse {
-                gitmodules_config.set_str(&format!("{section}.fetchRecurseSubmodules"), &fetch_recurse.to_gitmodules())?;
+                gitmodules_config.set_str(
+                    &format!("{section}.fetchRecurseSubmodules"),
+                    &fetch_recurse.to_gitmodules(),
+                )?;
             }
             if let Some(active) = entry.active {
-                gitmodules_config.set_str(&format!("{section}.active"), if active { "true" } else { "false" })?;
+                gitmodules_config.set_str(
+                    &format!("{section}.active"),
+                    if active { "true" } else { "false" },
+                )?;
             }
 
             // 2. Sync to local repository config (.git/config) if the submodule exists in the repository

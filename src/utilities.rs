@@ -227,12 +227,17 @@ pub fn get_name(
 
 /// Validate a submodule path to ensure it is not absolute and does not escape
 /// the repository root via directory traversal (`..`) or symbolic links.
-pub fn validate_submodule_path(repo_root: &std::path::Path, path: &std::path::Path) -> Result<(), anyhow::Error> {
+pub fn validate_submodule_path(
+    repo_root: &std::path::Path,
+    path: &std::path::Path,
+) -> Result<(), anyhow::Error> {
     if path.is_absolute() {
         return Err(anyhow::anyhow!("Submodule path cannot be absolute"));
     }
 
-    let repo_root = repo_root.canonicalize().unwrap_or_else(|_| repo_root.to_path_buf());
+    let repo_root = repo_root
+        .canonicalize()
+        .unwrap_or_else(|_| repo_root.to_path_buf());
 
     let mut current = repo_root.clone();
     for component in path.components() {
@@ -247,9 +252,9 @@ pub fn validate_submodule_path(repo_root: &std::path::Path, path: &std::path::Pa
                     } else {
                         current.parent().unwrap().join(target)
                     };
-                    let canonical_resolved = resolved.canonicalize().unwrap_or_else(|_| {
-                        normalize_path_only(&resolved)
-                    });
+                    let canonical_resolved = resolved
+                        .canonicalize()
+                        .unwrap_or_else(|_| normalize_path_only(&resolved));
                     if !canonical_resolved.starts_with(&repo_root) {
                         return Err(anyhow::anyhow!(
                             "Submodule path escapes repository root via symlink: {}",
@@ -267,17 +272,21 @@ pub fn validate_submodule_path(repo_root: &std::path::Path, path: &std::path::Pa
             }
             std::path::Component::CurDir => {}
             std::path::Component::Prefix(_) | std::path::Component::RootDir => {
-                return Err(anyhow::anyhow!("Submodule path cannot contain root or prefix components"));
+                return Err(anyhow::anyhow!(
+                    "Submodule path cannot contain root or prefix components"
+                ));
             }
         }
     }
 
     // Also check the final resolved path
-    let final_canonical = current.canonicalize().unwrap_or_else(|_| {
-        normalize_path_only(&current)
-    });
+    let final_canonical = current
+        .canonicalize()
+        .unwrap_or_else(|_| normalize_path_only(&current));
     if !final_canonical.starts_with(&repo_root) {
-        return Err(anyhow::anyhow!("Submodule path resolves outside repository root"));
+        return Err(anyhow::anyhow!(
+            "Submodule path resolves outside repository root"
+        ));
     }
 
     Ok(())

@@ -462,7 +462,7 @@ impl GitmodulesConvert for SerializableBranch {
     fn to_gitmodules(&self) -> String {
         match self {
             Self::CurrentInSuperproject => ".".to_string(),
-            Self::Name(name) => name.to_string(),
+            Self::Name(name) => name.clone(),
         }
     }
 

@@ -139,7 +139,9 @@ mod tests {
             assert_eq!(output.status.code(), Some(1));
             let stderr = String::from_utf8_lossy(&output.stderr);
             assert!(
-                stderr.contains("Failed to add submodule") || stderr.contains("Not a directory") || stderr.contains("not a directory"),
+                stderr.contains("Failed to add submodule")
+                    || stderr.contains("Not a directory")
+                    || stderr.contains("not a directory"),
                 "Expected directory collision/IO failure message, got: {stderr}"
             );
         } else {
@@ -396,7 +398,9 @@ active = true
             assert_eq!(output.status.code(), Some(1));
             let stderr = String::from_utf8_lossy(&output.stderr);
             assert!(
-                stderr.contains("Failed to add submodule") || stderr.contains("space") || stderr.contains("disk"),
+                stderr.contains("Failed to add submodule")
+                    || stderr.contains("space")
+                    || stderr.contains("disk"),
                 "Expected failure message containing space/disk details, got: {stderr}"
             );
         }
@@ -540,7 +544,9 @@ active = true
             assert_eq!(output.status.code(), Some(1));
             let stderr = String::from_utf8_lossy(&output.stderr);
             assert!(
-                stderr.contains("Is a directory") || stderr.contains("Failed to save config") || stderr.contains("is a directory"),
+                stderr.contains("Is a directory")
+                    || stderr.contains("Failed to save config")
+                    || stderr.contains("is a directory"),
                 "Expected directory write/config save failure message, got: {stderr}"
             );
 
