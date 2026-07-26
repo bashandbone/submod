@@ -10,7 +10,7 @@ use std::path::Path;
 use crate::git_ops::simple_gix::fetch_repo;
 
 /// Parse a gix config file from raw bytes
-fn gix_file_from_bytes(bytes: Vec<u8>) -> Result<gix::config::File<'static>> {
+fn gix_file_from_bytes(bytes: Vec<u8>) -> Result<gix::config::File> {
     let mut owned_bytes: Vec<u8> = bytes;
     gix::config::File::from_bytes_owned(
         &mut owned_bytes,

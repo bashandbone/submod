@@ -15,4 +15,4 @@ htmlcov
 coverage.xml
 .claudedocs/
 claudedocs/
-
+*:ZoneIdentifier
