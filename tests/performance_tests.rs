@@ -472,8 +472,7 @@ ignore = "all"
         // Assert memory usage is within reasonable bounds (e.g. less than 20 MB)
         assert!(
             net_peak < 20 * 1024 * 1024,
-            "Peak memory usage too high: {} bytes",
-            net_peak
+            "Peak memory usage too high: {net_peak} bytes"
         );
 
         // If we reach here without OOM or crashes, the test passes

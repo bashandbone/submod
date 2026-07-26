@@ -108,8 +108,7 @@ mod tests {
         let is_root = std::process::Command::new("id")
             .arg("-u")
             .output()
-            .map(|output| String::from_utf8_lossy(&output.stdout).trim() == "0")
-            .unwrap_or(false);
+            .is_ok_and(|output| String::from_utf8_lossy(&output.stdout).trim() == "0");
 
         let harness = TestHarness::new().expect("Failed to create test harness");
         harness.init_git_repo().expect("Failed to init git repo");
@@ -504,8 +503,7 @@ active = true
         let is_root = std::process::Command::new("id")
             .arg("-u")
             .output()
-            .map(|output| String::from_utf8_lossy(&output.stdout).trim() == "0")
-            .unwrap_or(false);
+            .is_ok_and(|output| String::from_utf8_lossy(&output.stdout).trim() == "0");
 
         let harness = TestHarness::new().expect("Failed to create test harness");
         harness.init_git_repo().expect("Failed to init git repo");

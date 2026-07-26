@@ -397,7 +397,7 @@ sparse_paths = ["src/**", "docs/*", "*.{md,txt,rst}"]
         };
 
         let entry_from_opts =
-            SubmoduleEntry::from_options_and_settings(git_opts.clone(), other_settings.clone());
+            SubmoduleEntry::from_options_and_settings(git_opts, other_settings.clone());
         assert_eq!(
             entry_from_opts.url.as_deref(),
             Some("https://example.com/repo-new.git")
