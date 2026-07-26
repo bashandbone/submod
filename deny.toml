@@ -26,21 +26,19 @@
 # this list would mean the nix crate, as well as any of its exclusive
 # dependencies not shared by any other crates, would be ignored, as the target
 # list here is effectively saying which targets you are building for.
+# Keep this list identical to the `build` matrix in .github/workflows/release.yml.
+# A target listed here but never built makes cargo-deny gate on a configuration
+# nobody ships; a target built but missing here goes unchecked. Both drifted
+# before: musl, x86_64-apple-darwin and x86_64-pc-windows-gnu were checked but
+# never built, while aarch64-pc-windows-msvc was built but never checked.
 targets = [
-  "x86_64-unknown-linux-gnu",
-  "x86_64-unknown-linux-musl",
   "aarch64-apple-darwin",
+  "x86_64-unknown-linux-gnu",
   "aarch64-unknown-linux-gnu",
-  "x86_64-apple-darwin",
-  "x86_64-pc-windows-gnu",
+  "x86_64-unknown-linux-musl",
+  "aarch64-unknown-linux-musl",
   "x86_64-pc-windows-msvc",
-  # The triple can be any string, but only the target triples built in to
-  # rustc (as of 1.40) can be checked against actual config expressions
-  # "x86_64-unknown-linux-musl",
-  # You can also specify which target_features you promise are enabled for a
-  # particular target. target_features are currently not validated against
-  # the actual valid features supported by the target architecture.
-  # { triple = "wasm32-unknown-unknown", features = ["atomics"] },
+  "aarch64-pc-windows-msvc",
 ]
 # When creating the dependency graph used as the source of truth when checks are
 # executed, this field can be used to prune crates from the graph, removing them
@@ -82,15 +80,13 @@ feature-depth = 1
 # output a note when they are encountered.
 ignore = [
   "RUSTSEC-2024-0364", # gitoxide-core does not neutralize special characters for terminals. No patched version available.
-  "RUSTSEC-2024-0436", # paste is unmaintained; it is a transitive dependency via rustls-ffi -> macro_rules_attribute and has no patched version or security impact.
-  # aws-lc-sys 0.38.0 X.509 issues, both patched in >=0.39.0, but we cannot reach it:
-  # aws-lc-rs pins aws-lc-sys exactly, and it arrives transitively via
-  # gix[blocking-http-transport-curl-rustls] -> curl-sys -> rustls-ffi -> rustls -> aws-lc-rs.
-  # submod does not enable CRL checking and does not do its own certificate validation;
-  # it fetches from standard WebPKI hosts, whose certs carry dNSName SANs (the case both
-  # advisories call out as unaffected). Revisit when aws-lc-rs ships a bump.
-  "RUSTSEC-2026-0044", # AWS-LC X.509 name constraints bypass via wildcard/Unicode CN.
-  "RUSTSEC-2026-0048", # AWS-LC CRL distribution point scope check logic error.
+  # RUSTSEC-2024-0436 (paste, unmaintained) and RUSTSEC-2026-0044 / RUSTSEC-2026-0048
+  # (aws-lc-sys X.509) used to be ignored here. All three arrived through one root:
+  # gix[blocking-http-transport-curl-rustls] -> curl-sys -> rustls-ffi -> {rustls -> aws-lc-rs, paste}.
+  # submod now builds gix with blocking-http-transport-curl-openssl, so curl shares the
+  # single openssl-sys that git2/libgit2-sys/libssh2-sys already link. rustls, aws-lc-sys
+  # and paste are no longer in the graph at all, so the ignores are gone rather than merely
+  # unused — a re-entry of any of them means the TLS backend regressed and should fail.
   # "RUSTSEC-0000-0000",
   # { id = "RUSTSEC-0000-0000", reason = "you can specify a reason the advisory is ignored" },
   # "a-crate-that-is-yanked@0.1.1", # you can also ignore yanked crate versions if you wish

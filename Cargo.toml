@@ -44,7 +44,15 @@ rustdoc-args = ["--cfg", "docsrs"]
 # Gitoxide ops
 gix = { version = "0.85.0", default-features = false, features = [
   "blocking-network-client",
-  "blocking-http-transport-curl-rustls",
+  # OpenSSL, not rustls: git2/libgit2-sys/libssh2-sys already link openssl-sys, so
+  # this makes curl share it rather than adding a second TLS stack. The rustls
+  # variant pulled curl-sys -> rustls-ffi -> {rustls -> aws-lc-rs -> aws-lc-sys,
+  # paste}, which was the sole source of three ignored RUSTSEC advisories.
+  #
+  # Note this is the *-openssl* variant deliberately: bare
+  # `blocking-http-transport-curl` enables no TLS crate at all and leaves HTTPS to
+  # whatever system libcurl the host provides.
+  "blocking-http-transport-curl-openssl",
   "parallel",
   "max-performance",
   "status",
