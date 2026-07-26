@@ -91,6 +91,46 @@ jobs:
           features: git2/vendored-libgit2,git2/vendored-openssl
           dry-run: ${{ github.event_name == 'workflow_dispatch' }}
 
+      # A dry run builds the archive and then throws it away, which left the whole
+      # point of the musl targets — that the binary is actually static — argued
+      # from build-script logic rather than measured. These two steps only run on
+      # workflow_dispatch, so a real tag release is unaffected.
+      - name: Verify Linux binary linkage
+        if: github.event_name == 'workflow_dispatch' && contains(matrix.target, 'linux')
+        env:
+          TARGET: ${{ matrix.target }}
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/linkcheck
+          tar xzf "submod-${TARGET}.tar.gz" -C /tmp/linkcheck
+          desc=$(file /tmp/linkcheck/submod)
+          echo "$desc"
+          case "$TARGET" in
+            *musl*)
+              # Rust links musl targets as static-pie by default, which `file`
+              # reports as "static-pie linked" rather than "statically linked".
+              # Accept either; reject anything dynamically linked.
+              case "$desc" in
+                *"statically linked"*|*"static-pie linked"*)
+                  echo "OK: ${TARGET} is statically linked" ;;
+                *)
+                  echo "::error::${TARGET} is not statically linked: ${desc}"
+                  exit 1 ;;
+              esac
+              ;;
+            *)
+              echo "note: ${TARGET} is a glibc target; dynamic linking is expected" ;;
+          esac
+
+      - name: Upload dry-run archive for inspection
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v4
+        with:
+          name: dry-run-${{ matrix.target }}
+          path: submod-${{ matrix.target }}.*
+          retention-days: 7
+          if-no-files-found: error
+
   publish:
     name: Publish to crates.io
     needs: [build]
