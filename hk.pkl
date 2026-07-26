@@ -11,13 +11,23 @@ local linters = new Mapping<String, Step> {
 
     ["cargo_deny"] = new Step {
         workspace_indicator = "Cargo.toml"
-        glob = "Cargo.lock"
-        // Gate on vulnerabilities only, letting cargo-deny's own exit code decide.
+        // All three inputs matter now that every check runs: `licenses` and `bans`
+        // read Cargo.toml, and all four read deny.toml. With only Cargo.lock here,
+        // editing the policy itself would not re-run the step that enforces it.
+        glob = List("Cargo.lock", "Cargo.toml", "deny.toml")
+        // `check` with no subcommand runs all four — advisories, bans, licenses,
+        // sources — letting cargo-deny's own exit code decide. This was
+        // `check advisories` with `-A unsound -A unmaintained -A yanked -A notice`,
+        // which meant `deny.toml`'s licenses/bans/sources policy was configured but
+        // never enforced by any hook or CI job. The four allowances are gone too:
+        // they suppress nothing in the current graph, so keeping them would only
+        // hide a *future* unmaintained or yanked dependency. If one lands, add it to
+        // `ignore` in deny.toml with a reason rather than reinstating a blanket -A.
         // (The previous `-f json ... | jq -e '.[].vulnerabilities | length == 0'`
         // pipeline no longer parses: with `-f json` cargo-deny streams one object
         // per diagnostic, not an array, so jq failed with exit 5 on every run.)
         // --exclude-dev is a top-level flag; it moved off the `check` subcommand.
-        check = "cargo deny --all-features --manifest-path {{ workspace_indicator }} --exclude-dev -L warn check advisories --hide-inclusion-graph -A unsound -A unmaintained -A yanked -A notice"
+        check = "cargo deny --all-features --manifest-path {{ workspace_indicator }} --exclude-dev -L warn check --hide-inclusion-graph"
     }
     ["cargo_fmt"] = Builtins.cargo_fmt
     ["cargo_clippy"] = Builtins.cargo_clippy
