@@ -29,9 +29,12 @@ use crate::utilities;
 #[derive(Debug, Clone, PartialEq)]
 pub struct GixOperations {
     repo: gix::Repository,
+    /// Whether to surface the underlying gitoxide fetch report on stderr.
+    verbose: bool,
 }
 impl GixOperations {
-    /// Create a new `GixOperations` instance
+    /// Create a new `GixOperations` instance. Quiet by default; see
+    /// [`GixOperations::with_verbose`].
     pub fn new(repo_path: Option<&Path>) -> Result<Self> {
         let repo = match repo_path {
             Some(path) => gix::open(path)
@@ -39,7 +42,17 @@ impl GixOperations {
             None => gix::discover(".")
                 .with_context(|| "Failed to discover repository in current directory")?,
         };
-        Ok(Self { repo })
+        Ok(Self {
+            repo,
+            verbose: false,
+        })
+    }
+
+    /// Set whether gitoxide's own fetch report is echoed to stderr.
+    #[must_use]
+    pub const fn with_verbose(mut self, verbose: bool) -> Self {
+        self.verbose = verbose;
+        self
     }
 
     /// Try to perform operation with gix, return error if not supported
@@ -457,8 +470,13 @@ impl GitOperations for GixOperations {
             // Pass None to let gix resolve the default remote (which has refspecs configured).
             // Passing the URL string would create a bare remote without refspecs.
             let submodule_repo = gix::open(&submodule_path)?;
-            fetch_repo(submodule_repo, None, entry.shallow == Some(true))
-                .map_err(|e| anyhow::anyhow!("Failed to fetch submodule: {e}"))?;
+            fetch_repo(
+                submodule_repo,
+                None,
+                entry.shallow == Some(true),
+                self.verbose,
+            )
+            .map_err(|e| anyhow::anyhow!("Failed to fetch submodule: {e}"))?;
             match opts.strategy {
                 crate::options::SerializableUpdate::Checkout
                 | crate::options::SerializableUpdate::Unspecified => {
@@ -696,7 +714,7 @@ impl GitOperations for GixOperations {
     fn fetch_submodule(&self, path: &str) -> Result<()> {
         // Pass None to let gix resolve the default remote (which has refspecs configured).
         let submodule_repo = utilities::repo_from_path(&std::path::PathBuf::from(path))?;
-        fetch_repo(submodule_repo, None, false)
+        fetch_repo(submodule_repo, None, false, self.verbose)
             .map_err(|e| anyhow::anyhow!("Failed to fetch submodule: {e}"))
     }
 

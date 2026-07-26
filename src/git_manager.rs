@@ -707,9 +707,10 @@ impl GitManager {
                 SubmoduleError::GitoxideError(format!("GitOpsManager update failed: {e}"))
             })?;
 
-        if self.verbose {
-            println!("✅ Updated {name} successfully");
-        }
+        // Name every submodule that was updated, not just a trailing count: with
+        // only the count, a multi-submodule `update` gives no way to tell which
+        // ones it actually touched.
+        println!("✅ Updated {name}");
         Ok(())
     }
 
