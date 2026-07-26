@@ -40,7 +40,10 @@ impl Git2Operations {
     ) -> Result<(String, SubmoduleEntry)> {
         let name = submodule.name().unwrap_or("").to_string();
         let path = submodule.path().to_string_lossy().to_string();
-        let url = submodule.url().unwrap_or("").to_string();
+        // git2 0.21 splits what used to be one Option: the Result is UTF-8
+        // validity, the Option is whether a URL is configured at all. Both still
+        // collapse to "" here, matching the previous behaviour.
+        let url = submodule.url().ok().flatten().unwrap_or("").to_string();
         // Get branch from config
         let branch = self.get_submodule_branch(&name)?;
         // Get ignore setting
@@ -284,7 +287,7 @@ impl GitOperations for Git2Operations {
                     repo_config.set_str(&format!("submodule.{name}.active"), active_str)?;
                 }
                 if let Some(url) = &entry.url
-                    && submodule.url() != Some(url.as_str())
+                    && submodule.url().ok().flatten() != Some(url.as_str())
                 {
                     repo_config.set_str(&format!("submodule.{name}.url"), url)?;
                 }
@@ -298,7 +301,7 @@ impl GitOperations for Git2Operations {
         let mut entries = HashMap::new();
         // Iterate through config entries
         config.entries(None)?.for_each(|entry| {
-            if let (Some(name), Some(value)) = (entry.name(), entry.value()) {
+            if let (Ok(name), Ok(value)) = (entry.name(), entry.value()) {
                 entries.insert(name.to_string(), value.to_string());
             }
         })?;
@@ -500,7 +503,11 @@ impl GitOperations for Git2Operations {
             .find_submodule(path)
             .with_context(|| format!("Submodule not found: {path}"))?;
         let name = submodule.name().unwrap_or(path).to_string();
-        let url = submodule.url().map(std::string::ToString::to_string);
+        let url = submodule
+            .url()
+            .ok()
+            .flatten()
+            .map(std::string::ToString::to_string);
 
         // Get status
         let status = self
@@ -612,7 +619,7 @@ impl GitOperations for Git2Operations {
         // Remove untracked files
         for entry in statuses.iter() {
             if entry.status().is_wt_new()
-                && let Some(file_path) = entry.path()
+                && let Ok(file_path) = entry.path()
             {
                 let full_path = sub_repo
                     .workdir()
