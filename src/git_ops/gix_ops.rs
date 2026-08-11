@@ -83,9 +83,8 @@ impl GixOperations {
                 || section.header().name().to_string(),
                 |subsection| subsection.to_string(),
             );
-            let body_entries = section.body().into_iter().collect::<HashMap<_, _>>();
-            for (key, value) in body_entries {
-                section_entries.insert(key.clone().clone(), value.to_string().clone());
+            for (key, value) in section.body() {
+                section_entries.insert(key.clone(), value.to_string());
             }
             sections_map.insert(name, section_entries);
         }
@@ -239,8 +238,7 @@ impl GitOperations for GixOperations {
             for section in config_snapshot.sections() {
                 if section.meta().source == source_filter {
                     let section_name = section.header().name();
-                    let body_iter = section.body().into_iter();
-                    for (key, value) in body_iter {
+                    for (key, value) in section.body() {
                         entries.insert(format!("{section_name}.{key}"), value.to_string());
                     }
                 }
