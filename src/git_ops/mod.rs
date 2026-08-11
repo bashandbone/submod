@@ -389,7 +389,8 @@ impl GitOperations for GitOpsManager {
             // Clean up potentially partially initialized submodule path before fallback
             let sub_path = workdir.join(&opts.path);
             if sub_path.exists() {
-                let _ = std::fs::remove_dir_all(&sub_path);
+                std::fs::remove_dir_all(&sub_path)
+                    .context("Failed to clean up partially initialized submodule path before CLI fallback")?;
             }
 
             // git2 also adds the submodule to .gitmodules, which will cause CLI to fail
@@ -415,7 +416,8 @@ impl GitOperations for GitOpsManager {
                             new_content.push('\n');
                         }
                     }
-                    let _ = std::fs::write(&gitmodules_path, new_content);
+                    std::fs::write(&gitmodules_path, new_content)
+                        .context("Failed to rewrite .gitmodules during fallback cleanup")?;
                 }
             }
 
@@ -448,7 +450,8 @@ impl GitOperations for GitOpsManager {
             // Also git2 might have created the internal git directory
             let internal_git_dir = workdir.join(".git").join("modules").join(&opts.name);
             if internal_git_dir.exists() {
-                let _ = std::fs::remove_dir_all(&internal_git_dir);
+                std::fs::remove_dir_all(&internal_git_dir)
+                    .context("Failed to clean up partially initialized internal git directory before CLI fallback")?;
             }
 
             // git2's repo.submodule() uses the *path* (not the name) as the key for the
@@ -456,7 +459,8 @@ impl GitOperations for GitOpsManager {
             // ".git/modules/<name>" has already been cleaned up.  Remove both.
             let path_internal_git_dir = workdir.join(".git").join("modules").join(&opts.path);
             if path_internal_git_dir.exists() {
-                let _ = std::fs::remove_dir_all(&path_internal_git_dir);
+                std::fs::remove_dir_all(&path_internal_git_dir)
+                    .context("Failed to clean up partially initialized internal git directory (by path) before CLI fallback")?;
             }
 
             // And removed from index
