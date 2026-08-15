@@ -1,3 +1,5 @@
+
+
 <!--
 SPDX-FileCopyrightText: 2025 Adam Poulemanos <89049923+bashandbone@users.noreply.github.com>
 
@@ -61,7 +63,7 @@ mise use cargo:submod@latest
 ### From Source
 
 ```bash
-git clone https://github.com/yourusername/submod.git
+git clone https://github.com/bashandbone/submod.git
 cd submod
 cargo install --path .
 ```
