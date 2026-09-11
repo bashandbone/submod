@@ -1793,13 +1793,56 @@ impl GitOpsManager {
                 .to_str()
                 .context("Submodule storage name is not valid UTF-8")?,
         )?;
-        if reported != expected {
+        // `git --git-path` resolves storage through the filesystem, so its
+        // spelling can differ from the joined path (8.3 short names and
+        // separator style on Windows) while naming the same directory.
+        // Compare canonical forms so the containment check is not defeated by
+        // spelling; both spellings are reported when they still disagree.
+        let canonical_reported = Self::canonical_storage_form(&reported)?;
+        let canonical_expected = Self::canonical_storage_form(&expected)?;
+        if canonical_reported != canonical_expected {
             anyhow::bail!(
-                "Git resolved submodule storage outside the expected Git directory: {}",
-                reported.display()
+                "Git resolved submodule storage outside the expected Git directory: reported {}, expected {}",
+                reported.display(),
+                expected.display()
             );
         }
         Ok(reported)
+    }
+
+    /// Canonicalize a submodule storage path for containment comparison,
+    /// resolving through the nearest existing ancestor when the path itself
+    /// does not exist yet (preflight runs before Git creates storage).
+    fn canonical_storage_form(path: &Path) -> Result<PathBuf> {
+        match std::fs::canonicalize(path) {
+            Ok(canonical) => Ok(canonical),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                let mut missing: Vec<OsString> = Vec::new();
+                let mut current = path;
+                loop {
+                    match std::fs::canonicalize(current) {
+                        Ok(base) => {
+                            let mut canonical = base;
+                            for component in missing.iter().rev() {
+                                canonical.push(component);
+                            }
+                            return Ok(canonical);
+                        }
+                        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                            match (current.file_name(), current.parent()) {
+                                (Some(name), Some(parent)) => {
+                                    missing.push(name.to_os_string());
+                                    current = parent;
+                                }
+                                _ => return Err(error.into()),
+                            }
+                        }
+                        Err(error) => return Err(error.into()),
+                    }
+                }
+            }
+            Err(error) => Err(error.into()),
+        }
     }
 
     fn retained_repo_matches_url(&self, git_dir: &Path, url: &str) -> Result<bool> {
@@ -3026,5 +3069,47 @@ impl GitOperations for GitOpsManager {
         self.preflight_native_locks()?;
         self.child_git(path, ["sparse-checkout", "reapply"])?;
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod storage_path_tests {
+    use super::*;
+
+    #[test]
+    fn canonical_storage_form_resolves_existing_directory() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let target = dir.path().join("modules").join("child");
+        std::fs::create_dir_all(&target).unwrap();
+        assert_eq!(
+            GitOpsManager::canonical_storage_form(&target).unwrap(),
+            std::fs::canonicalize(&target).unwrap()
+        );
+    }
+
+    #[test]
+    fn canonical_storage_form_keeps_missing_leaf_below_canonical_parent() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let parent = dir.path().join("modules");
+        std::fs::create_dir_all(&parent).unwrap();
+        let missing = parent.join("child");
+        assert_eq!(
+            GitOpsManager::canonical_storage_form(&missing).unwrap(),
+            std::fs::canonicalize(&parent).unwrap().join("child")
+        );
+    }
+
+    #[test]
+    fn canonical_storage_form_walks_multiple_missing_levels() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let missing = dir.path().join("a").join("b").join("c");
+        assert_eq!(
+            GitOpsManager::canonical_storage_form(&missing).unwrap(),
+            std::fs::canonicalize(dir.path())
+                .unwrap()
+                .join("a")
+                .join("b")
+                .join("c")
+        );
     }
 }
