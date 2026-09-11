@@ -5,23 +5,22 @@
 [settings]
 experimental = true
 
-
 [tools]
 act = "latest"
 cargo-binstall = "latest"
-"cargo:cargo-audit" = "latest" # For auditing dependencies for security vulnerabilities.
-"cargo:cargo-deny" = "latest" # For checking licenses and other policies.
+"cargo:cargo-audit" = "latest"  # For auditing dependencies for security vulnerabilities.
+"cargo:cargo-deny" = "latest"  # For checking licenses and other policies.
 "cargo:git-cliff" = "latest"
 "cargo:cargo-edit" = "latest"
-"cargo:cargo-nextest" = "0.9.128" # Test-group isolation; keep in sync with .config/nextest.toml.
-"cargo:cargo-smart-release" = "latest" # For automating releases.
-"cargo:cargo-watch" = "latest" # For watching files and rerunning commands.
+"cargo:cargo-nextest" = "0.9.128"  # Test-group isolation; keep in sync with .config/nextest.toml.
+"cargo:cargo-smart-release" = "latest"  # For automating releases.
+"cargo:cargo-watch" = "latest"  # For watching files and rerunning commands.
 hk = "1.48"  # Handles git hooks, like pre-commit. Pinned to match CI; hk.pkl targets the 1.48 schema.
 jq = "latest"
 pkl = "latest"  # pkl for `hk`, which handles git hooks
 rust = "1.98"
 typos = "latest"
-"pipx:reuse" = { version = "latest", uvx_args = '-p 3.13' }
+"pipx:reuse" = { version = "latest", uvx_args = "-p 3.13" }
 "cargo:licet" = "0.2.2"
 
 [env]

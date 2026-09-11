@@ -9,52 +9,70 @@ version = "0.4.0"
 edition = "2024"
 rust-version = "1.89"
 description = "A headache-free git submodule management tool. Manage sparse checkouts, submodule updates, and adding/removing submodules with ease."
-license = "LicenseRef-PlainMIT OR MIT"
-repository = "https://github.com/bashandbone/submod"
-homepage = "https://github.com/bashandbone/submod"
 documentation = "https://docs.rs/submod"
 readme = "README.md"
-keywords = ["git", "submodule", "gitoxide", "cli", "sparse-checkout"]
+homepage = "https://github.com/bashandbone/submod"
+repository = "https://github.com/bashandbone/submod"
+license = "LicenseRef-PlainMIT OR MIT"
+keywords = ["cli", "git", "gitoxide", "sparse-checkout", "submodule"]
 categories = ["command-line-utilities", "development-tools"]
 
-resolver = "3"
 include = [
-  "src/**/*",
-  "README.md",
   "Cargo.toml",
-  "sample_config/submod.toml",
-  "REUSE.toml",
-  "LICENSES/*",
   "LICENSE-*.md",
+  "LICENSES/*",
+  "README.md",
+  "REUSE.toml",
+  "sample_config/submod.toml",
+  "src/**/*",
 ]
+resolver = "3"
 
 [package.metadata.docs.rs]
 all-features = true
 rustdoc-args = ["--cfg", "docsrs"]
 
+[lib]
+name = "submod"
+path = "src/lib.rs"
+
+[[bin]]
+name = "submod"
+path = "src/main.rs"
+
+[[bench]]
+harness = false
+name = "benchmark"
 
 [dependencies]
 # Gitoxide ops
-gix = { version = "^0.87.1", default-features = false, features = [
-  "max-performance-safe",
-  "status",
-  "sha1",
-] }
+gix = {
+  version = "^0.87.1",
+  default-features = false,
+  features = [
+    "max-performance-safe",
+    "sha1",
+    "status",
+  ]
+}
 gix-submodule = { version = "^0.34.0", features = ["sha1"] }
 
 # CLI
-clap = { version = ">=4.0.0", features = [
-  "derive",
-  "cargo",
-  "unicode",
-  "wrap_help",
-] }
+clap = {
+  version = ">=4.0.0",
+  features = [
+    "cargo",
+    "derive",
+    "unicode",
+    "wrap_help",
+  ]
+}
 clap_complete = ">=4.0.0"
 clap_complete_nushell = ">=4.0.0"
 
-serde = { version = "1.0.220", features = ["derive"] }
 # TOML config
 figment = { version = "^0.10.0", default-features = false, features = ["toml"] }
+serde = { version = "1.0.220", features = ["derive"] }
 
 # errors
 anyhow = "1.0.104"
@@ -66,40 +84,20 @@ bitflags = "2.13.2"
 # As of submod v0.2.0, git2 no longer optional
 # gix_submodule just isn't mature enough to realistically provide our functionality without falling back to git2
 git2 = { version = "0.21.0" }
+tempfile = "3.27.0"
 toml = ">=0.8.0"
 toml_edit = ">=0.16.0"
-tempfile = "3.27.0"
-
-[lib]
-name = "submod"
-path = "src/lib.rs"
-
-[[bin]]
-name = "submod"
-path = "src/main.rs"
 
 [dev-dependencies]
-figment = { version = "0.10.0", default-features = false, features = [
-  "test",
-  "toml",
-] }
 criterion = "0.8.2"
-
-[lints.rust]
-# Deny unsafe code unless explicitly allowed
-unsafe_code = "deny"
-# Warn about unused items
-unused = { level = "warn", priority = -1 }
-# Warn about missing documentation
-missing_docs = "warn"
-# Warn about unreachable code
-unreachable_code = "warn"
-# Allow cfg(coverage) and cfg(coverage_nightly) set by cargo-llvm-cov
-unexpected_cfgs = { level = "warn", check-cfg = [
-  'cfg(coverage)',
-  'cfg(coverage_nightly)',
-  'cfg(coverage_attribute)',
-] }
+figment = {
+  version = "0.10.0",
+  default-features = false,
+  features = [
+    "test",
+    "toml",
+  ]
+}
 
 [lints.clippy]
 # Cargo-specific lints
@@ -108,6 +106,10 @@ cargo = { level = "warn", priority = -1 }
 complexity = { level = "warn", priority = -1 }
 # Correctness lints (deny these as they indicate bugs)
 correctness = { level = "deny", priority = -1 }
+missing_errors_doc = "allow"
+missing_panics_doc = "allow"
+module_name_repetitions = "allow"
+multiple_crate_versions = "allow"
 # Nursery lints for cutting-edge suggestions
 nursery = { level = "warn", priority = -1 }
 # Pedantic lints for high code quality
@@ -118,30 +120,41 @@ perf = { level = "warn", priority = -1 }
 style = { level = "warn", priority = -1 }
 # Suspicious constructs
 suspicious = { level = "warn", priority = -1 }
-multiple_crate_versions = "allow"
-missing_errors_doc = "allow"
-missing_panics_doc = "allow"
-module_name_repetitions = "allow"
 # Allow some pedantic lints that can be overly strict for CLI tools
 too_many_lines = "allow"
 
-[[bench]]
-name = "benchmark"
-harness = false
-
-[profile.release]
-codegen-units = 1
-lto = true
-opt-level = 3
-incremental = false
-
-[profile.dev]
-incremental = true
-lto = false
-opt-level = 1
+[lints.rust]
+# Warn about missing documentation
+missing_docs = "warn"
+# Allow cfg(coverage) and cfg(coverage_nightly) set by cargo-llvm-cov
+unexpected_cfgs = {
+  level = "warn",
+  check-cfg = [
+    "cfg(coverage)",
+    "cfg(coverage_nightly)",
+    "cfg(coverage_attribute)",
+  ]
+}
+# Warn about unreachable code
+unreachable_code = "warn"
+# Deny unsafe code unless explicitly allowed
+unsafe_code = "deny"
+# Warn about unused items
+unused = { level = "warn", priority = -1 }
 
 [profile.bench]
 inherits = "release"
+
+[profile.dev]
+opt-level = 1
+lto = false
+incremental = true
+
+[profile.release]
+opt-level = 3
+lto = true
+incremental = false
+codegen-units = 1
 
 [profile.test]
 inherits = "dev"
