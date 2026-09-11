@@ -86,8 +86,8 @@ features = ["cargo", "derive", "unicode", "wrap_help"]
 criterion = "0.8.2"
 
 [dev-dependencies.figment]
-version = "0.10.0",
-default-features = false,
+version = "0.10.0"
+default-features = false
 features = ["toml", "test"]
 
 [lints.clippy]
@@ -115,13 +115,14 @@ suspicious = { level = "warn", priority = -1 }
 too_many_lines = "allow"
 
 [lints.rust]
-# Warn about missing documentation
 unexpected_cfgs = {
   level = "warn",
-missing_docs = "warn"
+# Warn about missing documentation
+
 
 
 }
+missing_docs = "warn"
 # Allow cfg(coverage) and cfg(coverage_nightly) set by cargo-llvm-cov
 check-cfg = [
   "cfg(coverage)",
