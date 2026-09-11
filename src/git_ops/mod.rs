@@ -535,6 +535,27 @@ impl GitOpsManager {
         Ok(None)
     }
 
+    /// Compare a `.gitmodules` path value against a requested path. The value
+    /// arrives as raw bytes while the request is a normalized OS string, and
+    /// on Windows the two spell separators differently (forward slashes in
+    /// storage, backslashes in normalized paths) for the same file, so fold
+    /// separators there; elsewhere a byte comparison is exact.
+    fn gitmodules_path_matches(value: &[u8], requested: &OsStr) -> bool {
+        #[cfg(windows)]
+        let matches = {
+            let fold = |byte: u8| {
+                if byte == b'\\' { b'/' } else { byte }
+            };
+            value
+                .iter()
+                .map(|byte| fold(*byte))
+                .eq(requested.as_encoded_bytes().iter().map(|byte| fold(*byte)))
+        };
+        #[cfg(not(windows))]
+        let matches = value == requested.as_encoded_bytes();
+        matches
+    }
+
     fn starts_dot_component(value: &str, parent: bool) -> bool {
         let prefix = if parent { ".." } else { "." };
         value
@@ -1945,14 +1966,7 @@ impl GitOpsManager {
             };
             let key = std::str::from_utf8(&record[..newline])?;
             let value = &record[newline + 1..];
-            #[cfg(unix)]
-            let value: OsString = {
-                use std::os::unix::ffi::OsStringExt;
-                OsString::from_vec(value.to_vec())
-            };
-            #[cfg(not(unix))]
-            let value = OsString::from(String::from_utf8(value.to_vec())?);
-            if value == requested {
+            if Self::gitmodules_path_matches(value, requested) {
                 let name = key
                     .strip_prefix("submodule.")
                     .and_then(|key| key.strip_suffix(".path"))
@@ -3096,6 +3110,32 @@ mod storage_path_tests {
         assert_eq!(
             GitOpsManager::canonical_storage_form(&missing).unwrap(),
             std::fs::canonicalize(&parent).unwrap().join("child")
+        );
+    }
+
+    #[test]
+    fn gitmodules_path_matches_exact_spelling() {
+        assert!(GitOpsManager::gitmodules_path_matches(
+            b"vendor/checkout",
+            OsStr::new("vendor/checkout")
+        ));
+        assert!(!GitOpsManager::gitmodules_path_matches(
+            b"vendor/other",
+            OsStr::new("vendor/checkout")
+        ));
+    }
+
+    #[test]
+    fn gitmodules_path_separator_matching_follows_platform_rules() {
+        // On Windows both separators name the same file, so storage using
+        // forward slashes matches a normalized backslash request; elsewhere
+        // a backslash is a distinct filename character and must not match.
+        assert_eq!(
+            GitOpsManager::gitmodules_path_matches(
+                b"vendor/checkout",
+                OsStr::new("vendor\\checkout")
+            ),
+            cfg!(windows)
         );
     }
 
