@@ -435,7 +435,7 @@ sparse_paths = ["src/**", "docs/*", "*.{md,txt,rst}"]
             .find(|(name, _)| *name == "test-sub")
             .unwrap()
             .1
-             .0;
+            .0;
         assert_eq!(
             stored_entry.sparse_paths,
             Some(vec!["src/".to_string(), "docs/".to_string()])
@@ -448,7 +448,7 @@ sparse_paths = ["src/**", "docs/*", "*.{md,txt,rst}"]
             .find(|(name, _)| *name == "test-sub")
             .unwrap()
             .1
-             .0;
+            .0;
         assert_eq!(stored_entry_empty.sparse_paths, None);
 
         // 4. Test raw Config loading using a real test harness
@@ -707,10 +707,12 @@ mod phase3_acceptance_config {
             before,
             "symlink target modified"
         );
-        assert!(std::fs::symlink_metadata(h.config_path())
-            .unwrap()
-            .file_type()
-            .is_symlink());
+        assert!(
+            std::fs::symlink_metadata(h.config_path())
+                .unwrap()
+                .file_type()
+                .is_symlink()
+        );
         assert!(!out.status.success(), "symlink output accepted");
     }
 
