@@ -801,6 +801,26 @@ locally; docs describe the implemented contracts. Hosted platform/release
 execution is defined but unrun (R29 PARTIAL); everything runnable locally is
 green.
 
+## CI follow-up (Git 2.51+ submodule sync remote selection)
+
+Hosted ubuntu CI (Git 2.55.0) failed
+`r22_nuke_changed_relative_url_fetches_missing_pin_from_selected_remote`
+with "Git did not synchronize the selected child URL", while the same suite
+was green locally (Git 2.50.1). Root cause: Git 2.51 changed native
+`git submodule sync` to look the child remote up by URL first
+(`repo_remote_from_url`) instead of using the branch-default/`origin`
+remote, so sync maintains `remote.selected.url` and never creates
+`remote.origin.url`; `expected_synced_urls` still expected the old remote.
+Reproduced authentically in an ubuntu container with Git 2.55.0 (byte-identical
+failure), then fixed `expected_synced_urls` to mirror native selection —
+URL-matching remote first, branch-default/`origin` fallback — in both the
+relative and absolute URL branches. The existing r22 test is the relative-URL
+regression test (proven red pre-fix, green post-fix on Git 2.55.0); new test
+`r22_nuke_absolute_url_fetches_missing_pin_from_selected_remote` covers the
+absolute-URL branch the same way. Verified green on Git 2.43.0, 2.50.1, and
+2.55.0, full suite 633/633 locally, fmt clean, no new clippy warnings. The
+sync-mismatch error message now reports expected vs actual values.
+
 ## Known environment limits
 
 - Hosted Linux, Windows, and release authorization jobs cannot be asserted from

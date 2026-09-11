@@ -954,6 +954,168 @@ fn r22_nuke_changed_relative_url_fetches_missing_pin_from_selected_remote() {
 }
 
 #[test]
+fn r22_nuke_absolute_url_fetches_missing_pin_from_selected_remote() {
+    let h = fixture();
+    let storage = add_child(&h);
+    let (old_head, stash) = local_history(&h);
+    let new_remote = h.create_test_remote("reachable").unwrap();
+    let new_work = h.temp_dir.path().join("reachable_work");
+    fs::write(
+        new_work.join("required-only-new.txt"),
+        "required parent pin from new remote\n",
+    )
+    .unwrap();
+    h.git_at(&new_work, &["add", "required-only-new.txt"]);
+    h.git_at(&new_work, &["commit", "-m", "pin only in new remote"]);
+    h.git_at(&new_work, &["push", "origin", "main"]);
+    let pin = h.git_at(&new_work, &["rev-parse", "HEAD"]);
+    let missing = h
+        .git_cmd()
+        .args(["-C", "lib/child", "cat-file", "-e", &pin])
+        .current_dir(&h.work_dir)
+        .output()
+        .unwrap();
+    assert_eq!(
+        missing.status.code(),
+        Some(1),
+        "pin unexpectedly present or Git inspection failed: {missing:?}"
+    );
+    let expected_url = format!("file://{}", new_remote.display());
+    let parent_url = format!("file://{}", h.temp_dir.path().join("super.git").display());
+    h.git_stdout(&["remote", "add", "upstream", &parent_url]);
+    h.git_stdout(&["config", "branch.main.remote", "upstream"]);
+    h.git_stdout(&["config", "branch.main.merge", "refs/heads/main"]);
+    h.git_stdout(&["-C", "lib/child", "remote", "rename", "origin", "selected"]);
+    h.git_stdout(&[
+        "-C",
+        "lib/child",
+        "config",
+        "branch.main.remote",
+        "selected",
+    ]);
+    assert_eq!(
+        h.git_stdout(&["-C", "lib/child", "symbolic-ref", "--short", "HEAD"]),
+        "main"
+    );
+    h.create_config(&format!(
+        "[nickname]\npath = 'lib/child'\nurl = '{expected_url}'\nactive = true\nupdate = 'checkout'\n"
+    ))
+    .unwrap();
+    let stale_url = h.git_stdout(&[
+        "config",
+        "--file",
+        ".gitmodules",
+        "--get",
+        "submodule.child.url",
+    ]);
+    assert_ne!(stale_url, expected_url);
+    assert_eq!(
+        h.git_stdout(&["config", "--local", "--get", "submodule.child.url"]),
+        stale_url
+    );
+    assert_eq!(
+        h.git_stdout(&["-C", "lib/child", "config", "--get", "remote.selected.url"]),
+        stale_url
+    );
+    h.git_stdout(&[
+        "config",
+        "--file",
+        ".gitmodules",
+        "submodule.child.update",
+        "checkout",
+    ]);
+    h.git_stdout(&[
+        "update-index",
+        "--cacheinfo",
+        &format!("160000,{pin},lib/child"),
+    ]);
+    h.git_stdout(&["add", ".gitmodules", "submod.toml"]);
+    h.git_stdout(&["commit", "-m", "record pin and TOML-only URL change"]);
+    let selected_fetch = h.git_stdout(&[
+        "-C",
+        "lib/child",
+        "config",
+        "--get-all",
+        "remote.selected.fetch",
+    ]);
+    let before = h.preservation_snapshot();
+    let index = fs::read(h.work_dir.join(".git/index")).unwrap();
+    let staged_gitmodules = h.git_stdout(&["show", ":.gitmodules"]);
+    let expected_gitmodules_path = h.temp_dir.path().join("expected.gitmodules");
+    fs::write(&expected_gitmodules_path, before.2[1].as_ref().unwrap()).unwrap();
+    h.git_stdout(&[
+        "config",
+        "--file",
+        expected_gitmodules_path.to_str().unwrap(),
+        "submodule.child.url",
+        &expected_url,
+    ]);
+    h.git_stdout(&[
+        "config",
+        "--file",
+        expected_gitmodules_path.to_str().unwrap(),
+        "--unset-all",
+        "submodule.child.shallow",
+    ]);
+    let expected_gitmodules = fs::read(expected_gitmodules_path).unwrap();
+    h.run_submod_success(&["nuke-it-from-orbit", "nickname", "--force"])
+        .unwrap();
+    assert_eq!(h.git_stdout(&["-C", "lib/child", "rev-parse", "HEAD"]), pin);
+    assert_eq!(
+        fs::read_to_string(h.work_dir.join("lib/child/required-only-new.txt")).unwrap(),
+        "required parent pin from new remote\n"
+    );
+    assert!(
+        h.git_stdout(&["-C", "lib/child", "status", "--porcelain=v1"])
+            .is_empty()
+    );
+    assert_eq!(
+        h.git_stdout(&["config", "--local", "--get", "submodule.child.url"]),
+        expected_url
+    );
+    assert_eq!(
+        h.git_stdout(&["-C", "lib/child", "config", "--get", "remote.selected.url"]),
+        expected_url
+    );
+    assert_eq!(
+        h.git_stdout(&["-C", "lib/child", "config", "--get", "branch.main.remote"]),
+        "selected"
+    );
+    assert_eq!(
+        h.git_stdout(&[
+            "-C",
+            "lib/child",
+            "config",
+            "--get-all",
+            "remote.selected.fetch"
+        ]),
+        selected_fetch
+    );
+    assert_eq!(
+        PathBuf::from(h.git_stdout(&["-C", "lib/child", "rev-parse", "--absolute-git-dir"])),
+        storage
+    );
+    assert_eq!(fs::read(h.work_dir.join(".git/index")).unwrap(), index);
+    let after = h.preservation_snapshot();
+    assert_eq!(before.0, after.0);
+    assert_eq!(before.1, after.1);
+    assert_eq!(before.2[0], after.2[0]);
+    assert_eq!(after.2[1].as_ref().unwrap(), &expected_gitmodules);
+    assert_eq!(h.git_stdout(&["show", ":.gitmodules"]), staged_gitmodules);
+    assert_eq!(
+        h.git_stdout(&[
+            "config",
+            "--file",
+            ".gitmodules",
+            "--get",
+            "submodule.child.url"
+        ]),
+        expected_url
+    );
+    assert_history(&h, &storage, &old_head, &stash);
+}
+
+#[test]
 fn r22_nuke_refuses_nested_ignored_content_without_mutation() {
     fn snapshot(
         path: &std::path::Path,
