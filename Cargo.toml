@@ -10,7 +10,6 @@ edition = "2024"
 rust-version = "1.89"
 description = "A headache-free git submodule management tool. Manage sparse checkouts, submodule updates, and adding/removing submodules with ease."
 documentation = "https://docs.rs/submod"
-readme = "README.md"
 repository = "https://github.com/bashandbone/submod"
 license = "LicenseRef-PlainMIT OR MIT"
 keywords = ["cli", "git", "gitoxide", "sparse-checkout", "submodule"]
