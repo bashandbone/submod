@@ -1116,6 +1116,43 @@ fn r22_nuke_absolute_url_fetches_missing_pin_from_selected_remote() {
 }
 
 #[test]
+fn r22_sync_relative_parent_url_resolves_child_url_from_submodule() {
+    let h = fixture();
+    add_child(&h);
+    // Relative superproject remote: native `submodule sync` resolves the
+    // child URL against this string, then re-bases it below the submodule
+    // with one `../` per submodule path component (Git's `get_up_path`).
+    // `super.git` never needs to exist; sync only resolves strings.
+    h.git_stdout(&["remote", "add", "upstream", "../super.git"]);
+    h.git_stdout(&["config", "branch.main.remote", "upstream"]);
+    h.git_stdout(&["config", "branch.main.merge", "refs/heads/main"]);
+    h.create_config("[nickname]\npath = 'lib/child'\nurl = '../reachable.git'\nactive = true\nupdate = 'checkout'\n").unwrap();
+    h.run_submod_success(&["sync"]).unwrap();
+    assert_eq!(
+        h.git_stdout(&["config", "--local", "--get", "submodule.child.url"]),
+        "../reachable.git"
+    );
+    assert_eq!(
+        h.git_stdout(&[
+            "config",
+            "--file",
+            ".gitmodules",
+            "--get",
+            "submodule.child.url"
+        ]),
+        "../reachable.git"
+    );
+    // One `../` per path component (Git's `get_up_path`: separators plus
+    // one): from lib/child, `../../../reachable.git` re-bases the
+    // superproject-relative `../reachable.git` below the submodule. Verified
+    // against native `git submodule sync`, which writes the same value.
+    assert_eq!(
+        h.git_stdout(&["-C", "lib/child", "config", "--get", "remote.origin.url"]),
+        "../../../reachable.git"
+    );
+}
+
+#[test]
 fn r22_nuke_refuses_nested_ignored_content_without_mutation() {
     fn snapshot(
         path: &std::path::Path,
