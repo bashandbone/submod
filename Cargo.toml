@@ -8,7 +8,7 @@ name = "submod"
 version = "0.4.0"
 edition = "2024"
 rust-version = "1.89"
-description = "A headache-free submodule management tool, built on top of gitoxide. Manage sparse checkouts, submodule updates, and adding/removing submodules with ease."
+description = "A headache-free git submodule management tool. Manage sparse checkouts, submodule updates, and adding/removing submodules with ease."
 license = "LicenseRef-PlainMIT OR MIT"
 repository = "https://github.com/bashandbone/submod"
 homepage = "https://github.com/bashandbone/submod"
@@ -31,8 +31,7 @@ include = [
   "sample_config/submod.toml",
   "REUSE.toml",
   "LICENSES/*",
-  "LICENSE.md",
-  "submod-sbom.spdx"
+  "LICENSE-*.md",
 ]
 
 [package.metadata.docs.rs]
@@ -43,21 +42,10 @@ rustdoc-args = ["--cfg", "docsrs"]
 [dependencies]
 # Gitoxide ops
 gix = { version = "^0.86.0", default-features = false, features = [
-  # OpenSSL, not rustls: git2/libgit2-sys/libssh2-sys already link openssl-sys, so
-  # this makes curl share it rather than adding a second TLS stack. The rustls
-  # variant pulled curl-sys -> rustls-ffi -> {rustls -> aws-lc-rs -> aws-lc-sys,
-  # paste}, which was the sole source of three ignored RUSTSEC advisories.
-  #
-  # Note this is the *-openssl* variant deliberately: bare
-  # `blocking-http-transport-curl` enables no TLS crate at all and leaves HTTPS to
-  # whatever system libcurl the host provides.
-  "blocking-http-transport-curl-openssl",
   "max-performance-safe",
   "status",
-  "worktree-mutation",
   "sha1"
 ] }
-gitoxide-core = { version = "^0.60.0", default-features = false, features = ["blocking-client"] }
 gix-submodule = { version = "^0.33.0", features = ["sha1"]}
 
 # CLI
@@ -69,7 +57,6 @@ clap = { version = "4.6.4", features = [
 ] }
 clap_complete = "4.6.7"
 clap_complete_nushell = "4.6.1"
-prodash = { version = "31.0.0", features = ["render-line-crossterm", "render-line-autoconfigure", "render-line"] }
 
 serde = { version = "1.0.229", features = ["derive"] }
 # TOML config
@@ -86,6 +73,8 @@ bitflags = "2.13.1"
 # gix_submodule just isn't mature enough to realistically provide our functionality without falling back to git2
 git2 = { version = "0.21.0" }
 toml = "1.1.3"
+toml_edit = "0.22.27"
+tempfile = "3.27.0"
 
 [lib]
 name = "submod"
@@ -100,7 +89,6 @@ figment = { version = "0.10.19", default-features = false, features = [
   "test",
   "toml",
 ] }
-tempfile = "3.27.0"
 criterion = "0.8.2"
 toml = "1.1.3"
 

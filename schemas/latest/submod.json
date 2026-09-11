@@ -1,1 +1,248 @@
-submod_config_v1.0.0.json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://raw.githubusercontent.com/bashandbone/submod/main/schemas/v1.1.0/submod_config_v1.1.0.json",
+  "title": "submod configuration",
+  "description": "Current configuration contract. Omitted per-module settings inherit defaults, then built-in defaults. Git validates repository paths and branch names at runtime.",
+  "type": "object",
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "enum": [
+        "1.0.0",
+        "1.1.0"
+      ],
+      "description": "Optional metadata. These exact legacy/current versions are accepted; omission is supported."
+    },
+    "defaults": {
+      "type": "object",
+      "description": "Inherited settings. Per-module declarations, including explicit false, take precedence.",
+      "properties": {
+        "branch": {
+          "$ref": "#/definitions/branch"
+        },
+        "ignore": {
+          "$ref": "#/definitions/ignore"
+        },
+        "update": {
+          "$ref": "#/definitions/update"
+        },
+        "fetchRecurse": {
+          "$ref": "#/definitions/fetchRecurse"
+        },
+        "use_git_default_sparse_checkout": {
+          "$ref": "#/definitions/sparseMode"
+        },
+        "fetch": {
+          "allOf": [
+            {
+              "$ref": "#/definitions/fetchRecurse"
+            }
+          ],
+          "description": "Legacy alias for fetchRecurse; accepted with a migration warning. Use only one spelling per table."
+        },
+        "fetch_recurse": {
+          "allOf": [
+            {
+              "$ref": "#/definitions/fetchRecurse"
+            }
+          ],
+          "description": "Legacy alias for fetchRecurse; accepted with a migration warning. Use only one spelling per table."
+        }
+      },
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "not": {
+            "required": [
+              "fetchRecurse",
+              "fetch"
+            ]
+          }
+        },
+        {
+          "not": {
+            "required": [
+              "fetchRecurse",
+              "fetch_recurse"
+            ]
+          }
+        },
+        {
+          "not": {
+            "required": [
+              "fetch",
+              "fetch_recurse"
+            ]
+          }
+        }
+      ]
+    }
+  },
+  "additionalProperties": {
+    "$ref": "#/definitions/submodule"
+  },
+  "definitions": {
+    "ignore": {
+      "type": "string",
+      "enum": [
+        "all",
+        "dirty",
+        "untracked",
+        "none"
+      ],
+      "default": "none",
+      "description": "Git status ignore policy. It does not disable safety checks for local work."
+    },
+    "update": {
+      "type": "string",
+      "enum": [
+        "checkout",
+        "merge",
+        "rebase",
+        "none"
+      ],
+      "default": "checkout",
+      "description": "Strategy against the parent-recorded gitlink. none skips updating and fetching. Custom !command values are rejected. Only update --remote requests tracking-tip advancement."
+    },
+    "fetchRecurse": {
+      "type": "string",
+      "enum": [
+        "on-demand",
+        "always",
+        "never",
+        "true",
+        "false"
+      ],
+      "default": "on-demand",
+      "description": "Git fetchRecurseSubmodules policy: on-demand/true/false respectively for on-demand/always/never. Legacy strings \"true\" and \"false\" are accepted with a warning; TOML booleans are invalid. This does not promise a fetch on every operation or initialize nested checkouts."
+    },
+    "branch": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "\\S",
+      "description": "Named tracking branch, or . for the parent branch. Omission inherits defaults; with no default Git selects its remote default. Aliases current, current-in-super-project, current-in-superproject, superproject, super are accepted. Use refs/heads/current for a literal alias name. Legacy HEAD explicitly selects remote-default tracking, overriding a global branch. Git branch validation also applies. Default update remains pinned."
+    },
+    "sparseMode": {
+      "type": "boolean",
+      "default": false,
+      "description": "true passes sparse patterns to Git without adding !/*. false prepends !/* to nonempty patterns. This does not imply all files are included."
+    },
+    "submodule": {
+      "type": "object",
+      "description": "Section name is the logical identity, distinct from checkout path. Existing Git names are preserved when unambiguously resolved.",
+      "required": [
+        "url"
+      ],
+      "properties": {
+        "branch": {
+          "$ref": "#/definitions/branch"
+        },
+        "ignore": {
+          "$ref": "#/definitions/ignore"
+        },
+        "update": {
+          "$ref": "#/definitions/update"
+        },
+        "fetchRecurse": {
+          "$ref": "#/definitions/fetchRecurse"
+        },
+        "use_git_default_sparse_checkout": {
+          "$ref": "#/definitions/sparseMode"
+        },
+        "fetch": {
+          "allOf": [
+            {
+              "$ref": "#/definitions/fetchRecurse"
+            }
+          ],
+          "description": "Legacy alias for fetchRecurse; accepted with a migration warning. Use only one spelling per table."
+        },
+        "fetch_recurse": {
+          "allOf": [
+            {
+              "$ref": "#/definitions/fetchRecurse"
+            }
+          ],
+          "description": "Legacy alias for fetchRecurse; accepted with a migration warning. Use only one spelling per table."
+        },
+        "url": {
+          "type": "string",
+          "minLength": 1,
+          "allOf": [
+            {
+              "pattern": "\\S"
+            },
+            {
+              "not": {
+                "pattern": "[\\u0000\\r\\n]"
+              }
+            }
+          ],
+          "description": "Required nonempty remote URL or local repository path. Relative URLs follow Git semantics."
+        },
+        "path": {
+          "type": "string",
+          "minLength": 1,
+          "allOf": [
+            {
+              "pattern": "\\S"
+            },
+            {
+              "not": {
+                "pattern": "[\\u0000\\r\\n]"
+              }
+            }
+          ],
+          "description": "Checkout path relative to the superproject root; defaults to the section name. Absolute paths, parent traversal and .git components are rejected; runtime containment checks apply."
+        },
+        "active": {
+          "type": "boolean",
+          "default": true,
+          "description": "App selection and local Git activation only; not portable .gitmodules metadata. Disabling preserves checkout and history."
+        },
+        "shallow": {
+          "type": "boolean",
+          "default": false,
+          "description": "Request depth-one cloning for new repositories. Does not truncate or unshallow existing history."
+        },
+        "sparse_paths": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "not": {
+              "pattern": "[\\u0000\\r\\n]"
+            }
+          },
+          "description": "Ordered Git sparse-checkout patterns. Absent or empty means full checkout. By default !/* is prepended once; sparse mode can opt out. Sparse checkout limits working-tree files, not downloaded objects (partial clone)."
+        }
+      },
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "not": {
+            "required": [
+              "fetchRecurse",
+              "fetch"
+            ]
+          }
+        },
+        {
+          "not": {
+            "required": [
+              "fetchRecurse",
+              "fetch_recurse"
+            ]
+          }
+        },
+        {
+          "not": {
+            "required": [
+              "fetch",
+              "fetch_recurse"
+            ]
+          }
+        }
+      ]
+    }
+  }
+}

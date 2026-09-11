@@ -232,6 +232,16 @@ mod tests {
             "After init the submodule should exist"
         );
 
+        let pin = harness.git_at(&remote_repo, &["rev-parse", "HEAD"]);
+        assert_eq!(
+            harness.git_at(&harness.work_dir.join("lib/lazy"), &["rev-parse", "HEAD"]),
+            pin
+        );
+        assert_eq!(
+            harness.index_gitlink_mode("lib/lazy").as_deref(),
+            Some("160000")
+        );
+
         // Verbose init should mention the submodule
         let init_verbose = harness
             .run_submod_success(&["init", "--verbose"])
@@ -239,9 +249,13 @@ mod tests {
         // The first init above already initialized it, so a second run must say so
         // by name rather than claim to initialize it again.
         assert!(
-            init_verbose.contains("lazy-lib already initialized"),
-            "Verbose init should report the submodule as already initialized; got: {init_verbose}"
+            init_verbose.contains("lazy-lib at lib/lazy: unchanged:"),
+            "Verbose init should report the unchanged submodule; got: {init_verbose}"
         );
+        assert!(init_verbose.contains(&format!("(target {pin})")));
+        assert!(init_verbose.contains(
+            "Initialization summary: 0 changed, 1 unchanged, 0 skipped, 0 failed, 0 pending."
+        ));
     }
 
     // =========================================================================
@@ -269,6 +283,16 @@ mod tests {
             .run_submod_success(&["add", &url2, "--name", "nuke-b", "--path", "lib/nuke-b"])
             .expect("Failed to add submodule B");
 
+        let retained: Vec<_> = ["lib/nuke-a", "lib/nuke-b"]
+            .into_iter()
+            .map(|path| {
+                (
+                    path,
+                    harness.git_stdout(&["-C", path, "rev-parse", "--absolute-git-dir"]),
+                    harness.git_stdout(&["-C", path, "rev-parse", "HEAD"]),
+                )
+            })
+            .collect();
         let config_before = harness.read_config().expect("Failed to read config");
         assert!(config_before.contains("[nuke-a]"));
         assert!(config_before.contains("[nuke-b]"));
@@ -279,14 +303,31 @@ mod tests {
 
         // --all must nuke every submodule, not just the first one it finds.
         assert!(
-            stdout.contains("Nuking submodule 'nuke-a'..."),
+            stdout.contains(
+                "nuke-a: changed: removed its checkout, Git registration, and TOML declaration;"
+            ),
             "Expected nuke progress for nuke-a; got: {stdout}"
         );
         assert!(
-            stdout.contains("Nuking submodule 'nuke-b'..."),
+            stdout.contains(
+                "nuke-b: changed: removed its checkout, Git registration, and TOML declaration;"
+            ),
             "Expected nuke progress for nuke-b; got: {stdout}"
         );
 
+        assert!(stdout.contains("Nuke summary: 2 changed, 0 unchanged, 0 skipped, 0 failed."));
+        for (path, gitdir, pin) in retained {
+            assert!(!harness.file_exists(&format!("{path}/.git")));
+            assert!(
+                harness
+                    .git_stdout(&["ls-files", "--stage", "--", path])
+                    .is_empty()
+            );
+            assert_eq!(
+                harness.git_stdout(&["--git-dir", gitdir.trim(), "rev-parse", "HEAD"]),
+                pin
+            );
+        }
         let config_after = harness.read_config().expect("Failed to read config");
         assert!(
             !config_after.contains("[nuke-a]"),
@@ -316,6 +357,11 @@ mod tests {
             .run_submod_success(&["add", &url, "--name", "reinit-lib", "--path", "lib/reinit"])
             .expect("Failed to add submodule");
 
+        let pin = harness.git_at(&harness.work_dir.join("lib/reinit"), &["rev-parse", "HEAD"]);
+        let gitlink = harness.git_stdout(&["ls-files", "--stage", "--", "lib/reinit"]);
+        let tracked = fs::read(harness.work_dir.join("lib/reinit/src/main.c"))
+            .expect("Failed to read initial tracked content");
+
         assert!(
             harness.file_exists("lib/reinit/.git"),
             "Submodule should exist after add"
@@ -326,15 +372,10 @@ mod tests {
             .run_submod_success(&["nuke-it-from-orbit", "reinit-lib"])
             .expect("Failed to nuke-and-reinit");
 
-        // Without --kill both halves must happen; either one alone is the bug this
-        // test exists to catch, so assert them separately rather than as a disjunction.
+        assert!(stdout.contains("Nuke summary: 1 changed, 0 unchanged, 0 skipped, 0 failed."));
         assert!(
-            stdout.contains("Nuking submodule 'reinit-lib'..."),
-            "Expected nuke progress; got: {stdout}"
-        );
-        assert!(
-            stdout.contains("Reinitializing submodule 'reinit-lib'..."),
-            "Expected reinit progress; got: {stdout}"
+            stdout.contains("Reinitialized submodule 'reinit-lib'."),
+            "Expected verified reinit completion; got: {stdout}"
         );
 
         // After reinit, submodule should exist again
@@ -348,6 +389,26 @@ mod tests {
         assert!(
             config.contains("[reinit-lib]"),
             "Config should retain the submodule entry after reinit"
+        );
+        assert_eq!(
+            harness.git_at(&harness.work_dir.join("lib/reinit"), &["rev-parse", "HEAD"]),
+            pin
+        );
+        assert_eq!(
+            fs::read(harness.work_dir.join("lib/reinit/src/main.c")).unwrap(),
+            tracked
+        );
+        assert_eq!(
+            harness.git_stdout(&["ls-files", "--stage", "--", "lib/reinit"]),
+            gitlink
+        );
+        assert!(
+            harness
+                .git_at(
+                    &harness.work_dir.join("lib/reinit"),
+                    &["status", "--porcelain=v1"]
+                )
+                .is_empty()
         );
     }
 
@@ -558,7 +619,7 @@ mod tests {
     // =========================================================================
 
     #[test]
-    fn test_change_path_reclones_at_new_location() {
+    fn test_change_path_moves_and_preserves_repository() {
         let harness = TestHarness::new().expect("Failed to create test harness");
         harness.init_git_repo().expect("Failed to init git repo");
 
@@ -579,22 +640,51 @@ mod tests {
             .expect("Failed to add submodule");
 
         assert!(harness.file_exists("lib/original/.git"));
+        let gitdir = harness.git_stdout(&["-C", "lib/original", "rev-parse", "--absolute-git-dir"]);
+        let head = harness.git_stdout(&["-C", "lib/original", "rev-parse", "HEAD"]);
+        harness.git_stdout(&["-C", "lib/original", "branch", "retained-history"]);
+        let refs = harness.git_stdout(&["-C", "lib/original", "show-ref"]);
 
         let stdout = harness
             .run_submod_success(&["change", "movable-lib", "--path", "lib/moved"])
             .expect("Failed to change submodule path");
 
-        // Should confirm the update, naming the submodule it re-added at the new path.
         assert!(
-            stdout.contains("Added submodule movable-lib"),
+            stdout.contains("Updated submodule 'movable-lib'"),
             "Expected confirmation of path change; got: {stdout}"
         );
 
-        // New path should be cloned
+        // Git-aware relocation keeps the repository and all local refs.
         assert!(
             harness.file_exists("lib/moved/.git"),
             "Submodule should exist at new path"
         );
+
+        assert!(!harness.dir_exists("lib/original"));
+        assert_eq!(
+            harness.git_stdout(&["-C", "lib/moved", "rev-parse", "--absolute-git-dir"]),
+            gitdir
+        );
+        assert_eq!(
+            harness.git_stdout(&["-C", "lib/moved", "rev-parse", "HEAD"]),
+            head
+        );
+        assert_eq!(harness.git_stdout(&["-C", "lib/moved", "show-ref"]), refs);
+        assert_eq!(
+            harness.git_stdout(&[
+                "config",
+                "-f",
+                ".gitmodules",
+                "--get",
+                "submodule.movable-lib.path"
+            ]),
+            "lib/moved"
+        );
+        assert_eq!(
+            harness.index_gitlink_mode("lib/moved").as_deref(),
+            Some("160000")
+        );
+        assert_eq!(harness.index_gitlink_mode("lib/original"), None);
 
         // Config should reflect the new path
         let config = harness.read_config().expect("Failed to read config");
@@ -1038,23 +1128,17 @@ mod tests {
             .create_config("# empty\n")
             .expect("Failed to create config");
 
-        // Default (non-verbose) check with no submodules produces minimal output
-        let stdout = harness
-            .run_submod_success(&["check"])
-            .expect("Failed to run check");
-        assert!(
-            !stdout.contains("FAIL"),
-            "check output should not contain errors; got: {stdout}"
-        );
-
-        // Verbose check should show the detailed header
-        let stdout_verbose = harness
-            .run_submod_success(&["check", "--verbose"])
-            .expect("Failed to run check --verbose");
-        assert!(
-            stdout_verbose.contains("Checking submodule configurations"),
-            "verbose check should say 'Checking submodule configurations'; got: {stdout_verbose}"
-        );
+        let before = harness.preservation_snapshot();
+        for args in [vec!["check"], vec!["check", "--verbose"]] {
+            let output = harness.run_submod(&args).unwrap();
+            assert_eq!(output.status.code(), Some(0));
+            assert!(output.stderr.is_empty(), "{output:?}");
+            assert_eq!(
+                String::from_utf8(output.stdout).unwrap(),
+                "Check complete: all configured submodules match.\n"
+            );
+            assert_eq!(harness.preservation_snapshot(), before);
+        }
     }
 
     #[test]
@@ -1073,21 +1157,39 @@ mod tests {
             .create_config(&config_content)
             .expect("Failed to create config");
 
-        // Default init succeeds silently
-        let _stdout = harness
+        let pin = harness.git_at(&remote, &["rev-parse", "HEAD"]);
+        let stdout = harness
             .run_submod_success(&["init"])
             .expect("Failed to run init");
 
-        // Verbose init should mention initialization
+        assert!(stdout.contains("init-contract at lib/ic: changed:"));
+        assert!(stdout.contains(&format!("(target {pin})")));
+        assert!(stdout.contains(
+            "Initialization summary: 1 changed, 0 unchanged, 0 skipped, 0 failed, 0 pending."
+        ));
+        assert_eq!(
+            harness.git_at(&harness.work_dir.join("lib/ic"), &["rev-parse", "HEAD"]),
+            pin
+        );
+        assert_eq!(
+            harness.index_gitlink_mode("lib/ic").as_deref(),
+            Some("160000")
+        );
+
+        // A repeated initialization reports its observed unchanged state.
         let stdout_verbose = harness
             .run_submod_success(&["init", "--verbose"])
             .expect("Failed to run init --verbose");
         // "Initializing" || "initialized" could not distinguish the two states; the
         // default init above ran first, so this run must report the already-done case.
         assert!(
-            stdout_verbose.contains("init-contract already initialized"),
-            "verbose init output should name the already-initialized submodule; got: {stdout_verbose}"
+            stdout_verbose.contains("init-contract at lib/ic: unchanged:"),
+            "verbose init output should name the unchanged submodule; got: {stdout_verbose}"
         );
+        assert!(stdout_verbose.contains(&format!("(target {pin})")));
+        assert!(stdout_verbose.contains(
+            "Initialization summary: 0 changed, 1 unchanged, 0 skipped, 0 failed, 0 pending."
+        ));
     }
 
     #[test]
@@ -1104,21 +1206,43 @@ mod tests {
             .run_submod_success(&["add", &url, "--name", "reset-contract", "--path", "lib/rc"])
             .expect("Failed to add submodule");
 
+        let pin = harness.git_at(&harness.work_dir.join("lib/rc"), &["rev-parse", "HEAD"]);
+        let gitlink = harness.git_stdout(&["ls-files", "--stage", "--", "lib/rc"]);
+        let tracked = fs::read(harness.work_dir.join("lib/rc/src/main.c"))
+            .expect("Failed to read initial tracked content");
+
         let stdout = harness
             .run_submod_success(&["reset", "reset-contract"])
             .expect("Failed to run reset");
 
+        assert!(stdout.contains("Reset summary: 1 changed, 0 unchanged, 0 skipped, 0 failed."));
         assert!(
-            stdout.contains("Hard resetting"),
-            "reset output should say 'Hard resetting'; got: {stdout}"
-        );
-        assert!(
-            stdout.contains("reset complete"),
-            "reset output should say 'reset complete'; got: {stdout}"
+            stdout.contains(&format!("reset-contract reset to {pin}")),
+            "reset output should report the verified parent pin; got: {stdout}"
         );
         assert!(
             stdout.contains("reset-contract"),
             "reset output should name the submodule; got: {stdout}"
+        );
+        assert_eq!(
+            harness.git_at(&harness.work_dir.join("lib/rc"), &["rev-parse", "HEAD"]),
+            pin
+        );
+        assert_eq!(
+            fs::read(harness.work_dir.join("lib/rc/src/main.c")).unwrap(),
+            tracked
+        );
+        assert_eq!(
+            harness.git_stdout(&["ls-files", "--stage", "--", "lib/rc"]),
+            gitlink
+        );
+        assert!(
+            harness
+                .git_at(
+                    &harness.work_dir.join("lib/rc"),
+                    &["status", "--porcelain=v1"]
+                )
+                .is_empty()
         );
     }
 
@@ -1142,22 +1266,41 @@ mod tests {
         let stdout = harness
             .run_submod_success(&["sync"])
             .expect("Failed to run sync");
+        let pin = harness.git_at(&remote, &["rev-parse", "HEAD"]);
+        assert!(stdout.contains("sync-contract at lib/sc: changed:"));
+        assert!(stdout.contains(&format!("(target {pin})")));
         assert!(
-            stdout.contains("Syncing submodules:"),
-            "sync output should say 'Syncing submodules:'; got: {stdout}"
-        );
-        assert!(
-            stdout.contains("Sync complete"),
-            "sync output should say 'Sync complete'; got: {stdout}"
+            stdout
+                .contains("Sync summary: 1 changed, 0 unchanged, 0 skipped, 0 failed, 0 pending.")
         );
 
         // Verbose sync shows detailed output
         let stdout_verbose = harness
             .run_submod_success(&["sync", "--verbose"])
             .expect("Failed to run sync --verbose");
+        assert!(stdout_verbose.contains("sync-contract at lib/sc: unchanged:"));
+        assert!(stdout_verbose.contains(&format!("(target {pin})")));
         assert!(
-            stdout_verbose.contains("Running full sync"),
-            "verbose sync should say 'Running full sync'; got: {stdout_verbose}"
+            stdout_verbose
+                .contains("Sync summary: 0 changed, 1 unchanged, 0 skipped, 0 failed, 0 pending.")
+        );
+        assert!(harness.dir_exists("lib/sc"));
+        assert!(harness.file_exists("lib/sc/.git"));
+        assert_eq!(
+            harness.index_gitlink_mode("lib/sc").as_deref(),
+            Some("160000")
+        );
+        assert_eq!(
+            harness
+                .git_stdout(&["-C", "lib/sc", "rev-parse", "HEAD"])
+                .trim(),
+            harness.git_at(&remote, &["rev-parse", "HEAD"])
+        );
+        assert_eq!(
+            std::fs::read_to_string(harness.work_dir.join("lib/sc/LICENSE"))
+                .unwrap()
+                .trim(),
+            harness.git_at(&remote, &["show", "HEAD:LICENSE"])
         );
     }
 
@@ -1307,7 +1450,12 @@ mod tests {
         assert!(config.contains("[full-opts]"), "section header missing");
         assert!(config.contains("path = \"lib/full\""), "path missing");
         assert!(config.contains(&format!("url = \"{url}\"")), "url missing");
-        assert!(config.contains("active = true"), "active missing");
+        let parsed = submod::Config::parse(&config).expect("Failed to parse config");
+        assert_eq!(parsed.get_submodule("full-opts").unwrap().active, None);
+        assert_eq!(
+            parsed.effective_entry("full-opts").unwrap().active,
+            Some(true)
+        );
         assert!(
             config.contains("\"src\"") && config.contains("\"docs\""),
             "sparse_paths missing"
@@ -1390,5 +1538,315 @@ mod tests {
         assert!(config.contains("[keep-a]"), "keep-a should remain");
         assert!(config.contains("[keep-c]"), "keep-c should remain");
         assert!(!config.contains("[remove-b]"), "remove-b should be gone");
+    }
+}
+
+#[cfg(test)]
+mod phase3_acceptance_commands {
+    use super::*;
+
+    fn fixture() -> TestHarness {
+        let h = TestHarness::new().unwrap();
+        h.init_git_repo().unwrap();
+        h.create_config("[defaults]\nignore = \"dirty\"\nuse_git_default_sparse_checkout = true\n[lib]\nurl = \"./remote.git\"\nactive = false\nshallow = true\nignore = \"none\"\nuse_git_default_sparse_checkout = true\nsparse_paths = [\"src/\"]\n").unwrap();
+        h
+    }
+
+    fn document(h: &TestHarness) -> toml::Value {
+        toml::from_str(&h.read_config().unwrap()).unwrap()
+    }
+
+    #[test]
+    fn r07_omitted_shallow_preserves_true() {
+        let h = fixture();
+        h.run_submod_success(&["change", "lib", "--ignore", "all"])
+            .unwrap();
+        assert_eq!(document(&h)["lib"]["shallow"].as_bool(), Some(true));
+        assert_eq!(document(&h)["lib"]["active"].as_bool(), Some(false));
+        h.run_submod_success(&["list"]).unwrap();
+    }
+
+    #[test]
+    fn r07_explicit_shallow_false_round_trips() {
+        let h = fixture();
+        h.run_submod_success(&["change", "lib", "--shallow", "false"])
+            .unwrap();
+        assert_eq!(document(&h)["lib"]["shallow"].as_bool(), Some(false));
+        h.run_submod_success(&["change", "lib", "--ignore", "all"])
+            .unwrap();
+        assert_eq!(document(&h)["lib"]["shallow"].as_bool(), Some(false));
+    }
+
+    #[test]
+    fn r07_sparse_mode_booleans_at_both_scopes_round_trip() {
+        let h = fixture();
+        for value in ["false", "true"] {
+            h.run_submod_success(&["change-global", "--use-git-default-sparse-checkout", value])
+                .unwrap();
+            h.run_submod_success(&["change", "lib", "--use-git-default-sparse-checkout", value])
+                .unwrap();
+            let config = document(&h);
+            for scope in ["defaults", "lib"] {
+                assert_eq!(
+                    config[scope]["use_git_default_sparse_checkout"].as_bool(),
+                    Some(value == "true"),
+                    "scope {scope}"
+                );
+            }
+            h.run_submod_success(&["list"]).unwrap();
+        }
+    }
+
+    #[test]
+    fn r18_unset_override_restores_inheritance() {
+        let h = fixture();
+        h.run_submod_success(&["change", "lib", "--unset", "ignore"])
+            .unwrap();
+        let config = document(&h);
+        assert!(config["lib"].get("ignore").is_none());
+        assert_eq!(config["defaults"]["ignore"].as_str(), Some("dirty"));
+        assert_eq!(config["lib"]["shallow"].as_bool(), Some(true));
+        h.run_submod_success(&["list"]).unwrap();
+    }
+
+    #[test]
+    fn r18_clear_sparse_paths_removes_patterns() {
+        let h = fixture();
+        h.run_submod_success(&["change", "lib", "--clear-sparse-paths"])
+            .unwrap();
+        let config = document(&h);
+        assert!(
+            config["lib"]
+                .get("sparse_paths")
+                .is_none_or(|v| v.as_array().is_some_and(Vec::is_empty))
+        );
+        assert_eq!(config["lib"]["shallow"].as_bool(), Some(true));
+        h.run_submod_success(&["list"]).unwrap();
+    }
+
+    macro_rules! rejected_args {
+        ($name:ident, $args:expr) => {
+            #[test]
+            fn $name() {
+                let h = fixture();
+                let before = h.preservation_snapshot();
+                let out = h.run_submod($args).unwrap();
+                assert_eq!(
+                    h.preservation_snapshot(),
+                    before,
+                    "argument rejection mutated state"
+                );
+                assert_eq!(
+                    out.status.code(),
+                    Some(2),
+                    "expected argument-validation exit 2: {out:?}"
+                );
+                let error = String::from_utf8_lossy(&out.stderr);
+                assert!(
+                    !error.contains("unexpected argument '--clear-sparse-paths'")
+                        && !error.contains("unexpected argument '--unset'"),
+                    "missing option is not conflict validation: {error}"
+                );
+            }
+        };
+    }
+    rejected_args!(r18_change_without_settings_rejected, &["change", "lib"]);
+    rejected_args!(r18_global_without_settings_rejected, &["change-global"]);
+    rejected_args!(
+        r18_clear_and_replace_conflict,
+        &[
+            "change",
+            "lib",
+            "--clear-sparse-paths",
+            "--sparse-paths",
+            "docs/"
+        ]
+    );
+    rejected_args!(
+        r18_clear_and_append_conflict,
+        &[
+            "change",
+            "lib",
+            "--clear-sparse-paths",
+            "--sparse-paths",
+            "docs/",
+            "--append",
+            "true"
+        ]
+    );
+    rejected_args!(
+        r18_unset_and_set_conflict,
+        &["change", "lib", "--unset", "ignore", "--ignore", "all"]
+    );
+    rejected_args!(
+        r18_append_without_patterns_rejected,
+        &["change", "lib", "--append", "true"]
+    );
+    rejected_args!(
+        r18_all_and_names_rejected,
+        &["nuke-it-from-orbit", "--all", "lib", "--kill"]
+    );
+}
+
+#[test]
+fn phase3_acceptance_r07_boolean_tristate_survives_fresh_edit() {
+    let h = TestHarness::new().unwrap();
+    h.init_git_repo().unwrap();
+    h.create_config("[defaults]\nignore='dirty'\n[lib]\nurl='./remote.git'\nactive=false\n")
+        .unwrap();
+    h.run_submod_success(&["change", "lib", "--ignore", "all"])
+        .unwrap();
+    let raw: toml::Value = toml::from_str(&h.read_config().unwrap()).unwrap();
+    assert!(raw["lib"].get("shallow").is_none());
+    for scope in ["defaults", "lib"] {
+        assert!(raw[scope].get("use_git_default_sparse_checkout").is_none());
+    }
+    for value in ["true", "false"] {
+        h.run_submod_success(&[
+            "change",
+            "lib",
+            "--shallow",
+            value,
+            "--active",
+            value,
+            "--use-git-default-sparse-checkout",
+            value,
+        ])
+        .unwrap();
+        h.run_submod_success(&["change-global", "--use-git-default-sparse-checkout", value])
+            .unwrap();
+        h.run_submod_success(&["change", "lib", "--ignore", "dirty"])
+            .unwrap();
+        h.run_submod_success(&["change-global", "--ignore", "all"])
+            .unwrap();
+        let raw: toml::Value = toml::from_str(&h.read_config().unwrap()).unwrap();
+        assert_eq!(raw["lib"]["shallow"].as_bool(), Some(value == "true"));
+        assert_eq!(raw["lib"]["active"].as_bool(), Some(value == "true"));
+        for scope in ["defaults", "lib"] {
+            assert_eq!(
+                raw[scope]["use_git_default_sparse_checkout"].as_bool(),
+                Some(value == "true")
+            );
+        }
+        h.run_submod_success(&["list"]).unwrap();
+    }
+}
+
+#[test]
+fn phase3_acceptance_r18_unset_all_supported_optional_fields() {
+    let h = TestHarness::new().unwrap();
+    h.init_git_repo().unwrap();
+    h.create_config("[defaults]\nignore='dirty'\nfetchRecurse='always'\nupdate='checkout'\nuse_git_default_sparse_checkout=true\n[lib]\nurl='./remote.git'\nactive=false\nbranch='main'\nignore='none'\nfetchRecurse='never'\nupdate='none'\nshallow=false\nuse_git_default_sparse_checkout=false\n").unwrap();
+    for (option, field) in [
+        ("branch", "branch"),
+        ("ignore", "ignore"),
+        ("fetch", "fetchRecurse"),
+        ("update", "update"),
+        ("shallow", "shallow"),
+        ("active", "active"),
+        (
+            "use-git-default-sparse-checkout",
+            "use_git_default_sparse_checkout",
+        ),
+    ] {
+        h.run_submod_success(&["change", "lib", "--unset", option])
+            .unwrap();
+        let raw: toml::Value = toml::from_str(&h.read_config().unwrap()).unwrap();
+        assert!(
+            raw["lib"].get(field).is_none(),
+            "override remained: {field}"
+        );
+        h.run_submod_success(&["list"]).unwrap();
+    }
+    for (option, field) in [
+        ("ignore", "ignore"),
+        ("fetch", "fetchRecurse"),
+        ("update", "update"),
+        (
+            "use-git-default-sparse-checkout",
+            "use_git_default_sparse_checkout",
+        ),
+    ] {
+        h.run_submod_success(&["change-global", "--unset", option])
+            .unwrap();
+        let raw: toml::Value = toml::from_str(&h.read_config().unwrap()).unwrap();
+        assert!(raw.get("defaults").and_then(|v| v.get(field)).is_none());
+        h.run_submod_success(&["list"]).unwrap();
+    }
+}
+
+#[test]
+fn phase3_acceptance_r18_all_set_unset_conflicts_preserve_state() {
+    let h = TestHarness::new().unwrap();
+    h.init_git_repo().unwrap();
+    h.create_config("[lib]\nurl='./remote.git'\nactive=false\n")
+        .unwrap();
+    for (setting, flag, value) in [
+        ("branch", "--branch", "main"),
+        ("ignore", "--ignore", "all"),
+        ("fetch", "--fetch", "never"),
+        ("update", "--update", "none"),
+        ("shallow", "--shallow", "false"),
+        ("active", "--active", "false"),
+        (
+            "use-git-default-sparse-checkout",
+            "--use-git-default-sparse-checkout",
+            "false",
+        ),
+    ] {
+        let before = h.preservation_snapshot();
+        let out = h
+            .run_submod(&["change", "lib", "--unset", setting, flag, value])
+            .unwrap();
+        assert_eq!(out.status.code(), Some(2), "conflicting {setting}: {out:?}");
+        assert_eq!(h.preservation_snapshot(), before);
+    }
+    for args in [
+        vec!["change", "lib", "--unset", "ignore,ignore"],
+        vec!["change-global", "--unset", "branch", "--branch", "main"],
+        vec!["change-global", "--unset", "branch,branch"],
+        vec!["change-global", "--unset", "ignore", "--ignore", "all"],
+    ] {
+        let before = h.preservation_snapshot();
+        let out = h.run_submod(&args).unwrap();
+        assert_eq!(
+            out.status.code(),
+            Some(2),
+            "invalid unset accepted: {out:?}"
+        );
+        assert_eq!(h.preservation_snapshot(), before);
+    }
+}
+
+#[test]
+fn phase6_global_branch_set_unset_preserves_inheritance() {
+    let h = TestHarness::new().unwrap();
+    h.init_git_repo().unwrap();
+    h.create_config("[lib]\nurl='./remote.git'\nactive=false\n[explicit]\nurl='./other.git'\nactive=false\nbranch='HEAD'\n").unwrap();
+    for branch in [Some("main"), None] {
+        let args = match branch {
+            Some(value) => vec!["change-global", "--branch", value],
+            None => vec!["change-global", "--unset", "branch"],
+        };
+        h.run_submod_success(&args).unwrap();
+        let source = h.read_config().unwrap();
+        let raw: toml::Value = toml::from_str(&source).unwrap();
+        assert_eq!(
+            raw.get("defaults")
+                .and_then(|v| v.get("branch"))
+                .and_then(|v| v.as_str()),
+            branch
+        );
+        assert!(raw["lib"].get("branch").is_none());
+        assert_eq!(raw["explicit"]["branch"].as_str(), Some("HEAD"));
+        let config = submod::config::Config::parse(&source).unwrap();
+        assert_eq!(
+            config.effective_entry("lib").unwrap().branch,
+            config.defaults.branch
+        );
+        assert_eq!(
+            config.effective_entry("explicit").unwrap().branch,
+            config.get_submodule("explicit").unwrap().branch
+        );
     }
 }

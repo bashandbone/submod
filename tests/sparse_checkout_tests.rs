@@ -141,13 +141,43 @@ mod tests {
         fs::write(&sparse_file, "tests\nexamples\n").expect("Failed to modify sparse file");
 
         // Run check command to detect mismatch
-        let stdout = harness
-            .run_submod_success(&["check"])
-            .expect("Failed to run check");
+        let before = harness.preservation_snapshot();
+        let child_before =
+            harness.git_stdout(&["-C", "lib/sparse-mismatch", "status", "--porcelain=v1"]);
+        let child_index_before =
+            harness.git_stdout(&["-C", "lib/sparse-mismatch", "ls-files", "--stage"]);
+        let child_head_before =
+            harness.git_stdout(&["-C", "lib/sparse-mismatch", "rev-parse", "HEAD"]);
+        let child_config_before =
+            harness.git_stdout(&["-C", "lib/sparse-mismatch", "config", "--local", "--list"]);
+        let output = harness.run_submod(&["check"]).expect("Failed to run check");
+        assert_eq!(output.status.code(), Some(1), "{output:?}");
+        assert_eq!(harness.preservation_snapshot(), before);
+        assert_eq!(
+            harness.git_stdout(&["-C", "lib/sparse-mismatch", "status", "--porcelain=v1"]),
+            child_before
+        );
+        assert_eq!(
+            harness.git_stdout(&["-C", "lib/sparse-mismatch", "ls-files", "--stage"]),
+            child_index_before
+        );
+        assert_eq!(
+            harness.git_stdout(&["-C", "lib/sparse-mismatch", "rev-parse", "HEAD"]),
+            child_head_before
+        );
+        assert_eq!(
+            harness.git_stdout(&["-C", "lib/sparse-mismatch", "config", "--local", "--list"]),
+            child_config_before
+        );
+        let stdout = String::from_utf8_lossy(&output.stdout);
 
-        assert!(stdout.contains("Sparse checkout mismatch"));
-        assert!(stdout.contains("Expected:"));
-        assert!(stdout.contains("Current:"));
+        assert!(stdout.contains("sparse-mismatch: drift: sparse patterns differ"));
+        assert_eq!(
+            fs::read_to_string(&sparse_file).unwrap(),
+            "tests\nexamples\n"
+        );
+        assert!(stdout.contains("expected [\"!/*\", \"src\", \"docs\"]"));
+        assert!(stdout.contains(r#"current ["tests", "examples"]"#));
     }
 
     #[test]
@@ -191,11 +221,65 @@ sparse_paths = ["src", "docs"]
             fs::remove_file(&sparse_file).expect("Failed to remove sparse file");
         }
 
+        harness.git_stdout(&[
+            "-C",
+            "lib/sparse-disabled",
+            "config",
+            "core.sparseCheckout",
+            "false",
+        ]);
+
         // Run check to detect missing sparse configuration
-        let stdout = harness
-            .run_submod_success(&["check"])
-            .expect("Failed to run check");
-        assert!(stdout.contains("Sparse checkout not configured"));
+        let before = harness.preservation_snapshot();
+        let child_before =
+            harness.git_stdout(&["-C", "lib/sparse-disabled", "status", "--porcelain=v1"]);
+        let child_index_before =
+            harness.git_stdout(&["-C", "lib/sparse-disabled", "ls-files", "--stage"]);
+        let child_head_before =
+            harness.git_stdout(&["-C", "lib/sparse-disabled", "rev-parse", "HEAD"]);
+        let child_config_before =
+            harness.git_stdout(&["-C", "lib/sparse-disabled", "config", "--local", "--list"]);
+        let output = harness.run_submod(&["check"]).expect("Failed to run check");
+        assert_eq!(output.status.code(), Some(1), "{output:?}");
+        assert_eq!(harness.preservation_snapshot(), before);
+        assert_eq!(
+            harness.git_stdout(&["-C", "lib/sparse-disabled", "status", "--porcelain=v1"]),
+            child_before
+        );
+        assert_eq!(
+            harness.git_stdout(&["-C", "lib/sparse-disabled", "ls-files", "--stage"]),
+            child_index_before
+        );
+        assert_eq!(
+            harness.git_stdout(&["-C", "lib/sparse-disabled", "rev-parse", "HEAD"]),
+            child_head_before
+        );
+        assert_eq!(
+            harness.git_stdout(&["-C", "lib/sparse-disabled", "config", "--local", "--list"]),
+            child_config_before
+        );
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let outcome = stdout
+            .lines()
+            .find(|line| line.starts_with("sparse-disabled: drift:"))
+            .unwrap_or_else(|| panic!("missing named drift outcome: {stdout}"));
+        assert!(
+            outcome.contains("sparse checkout is not configured"),
+            "{stdout}"
+        );
+        assert!(!sparse_file.exists());
+        assert_eq!(
+            harness
+                .git_stdout(&[
+                    "-C",
+                    "lib/sparse-disabled",
+                    "config",
+                    "--get",
+                    "core.sparseCheckout"
+                ])
+                .trim(),
+            "false"
+        );
     }
 
     #[test]
@@ -327,10 +411,47 @@ sparse_paths = ["src", "docs", "*.md"]
             .run_submod_success(&["check", "--verbose"])
             .expect("Failed to run check");
 
-        // Should show different status for each submodule
-        assert!(stdout.contains("no-sparse"));
-        assert!(stdout.contains("with-sparse"));
-        assert!(stdout.contains("Sparse checkout configured correctly"));
+        for name in ["no-sparse", "with-sparse"] {
+            assert!(stdout.contains(&format!("{name}: unchanged (matches configured state)")));
+        }
+        assert_eq!(
+            harness.git_stdout(&[
+                "-C",
+                "lib/with-sparse",
+                "config",
+                "--get",
+                "core.sparseCheckout"
+            ]),
+            "true"
+        );
+        assert_eq!(
+            fs::read_to_string(harness.get_sparse_checkout_file_path("lib/with-sparse")).unwrap(),
+            "!/*\nsrc\ndocs\n"
+        );
+        let full_sparse = harness
+            .git_cmd()
+            .current_dir(&harness.work_dir)
+            .args([
+                "-C",
+                "lib/no-sparse",
+                "config",
+                "--get",
+                "core.sparseCheckout",
+            ])
+            .output()
+            .unwrap();
+        assert!(
+            full_sparse.status.code() == Some(1)
+                || (full_sparse.status.success()
+                    && String::from_utf8_lossy(&full_sparse.stdout).trim() == "false")
+        );
+        assert!(
+            !harness
+                .get_sparse_checkout_file_path("lib/no-sparse")
+                .exists()
+        );
+        assert!(harness.file_exists("lib/no-sparse/tests/test.rs"));
+        assert!(!harness.file_exists("lib/with-sparse/tests/test.rs"));
     }
 
     #[test]
@@ -565,6 +686,70 @@ use_git_default_sparse_checkout = true
         assert!(
             sparse_content.lines().any(|l| l.trim() == "docs"),
             "docs pattern must be present"
+        );
+    }
+
+    /// R15: removing the declaration disables sparse checkout and restores the
+    /// complete clean tree rather than leaving stale exclusions active.
+    #[test]
+    fn r15_removing_sparse_paths_disables_sparse_and_restores_files() {
+        let harness = TestHarness::new().expect("harness");
+        harness.init_git_repo().expect("parent repo");
+        let remote = harness.create_complex_remote("r15-remote").expect("remote");
+        let url = format!("file://{}", remote.display());
+        harness
+            .run_submod_success(&[
+                "add",
+                &url,
+                "--name",
+                "library",
+                "--path",
+                "deps/library",
+                "--sparse-paths",
+                "src,docs",
+            ])
+            .expect("sparse add");
+        assert!(
+            !harness
+                .work_dir
+                .join("deps/library/examples/basic.rs")
+                .exists()
+        );
+
+        let config = harness.read_config().expect("read config");
+        let without_sparse = config
+            .lines()
+            .filter(|line| !line.trim_start().starts_with("sparse_paths"))
+            .collect::<Vec<_>>()
+            .join("\n");
+        harness
+            .create_config(&(without_sparse + "\n"))
+            .expect("remove sparse declaration");
+
+        let output = harness.run_submod(&["sync"]).expect("sync");
+        assert!(
+            output.status.success(),
+            "sync: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        assert_eq!(
+            harness.git_at(
+                &harness.work_dir.join("deps/library"),
+                &["config", "--bool", "core.sparseCheckout"]
+            ),
+            "false"
+        );
+        assert!(
+            harness
+                .work_dir
+                .join("deps/library/examples/basic.rs")
+                .is_file()
+        );
+        assert!(
+            harness
+                .work_dir
+                .join("deps/library/tests/test.rs")
+                .is_file()
         );
     }
 }

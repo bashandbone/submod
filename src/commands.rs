@@ -50,15 +50,15 @@ Use the `--config` option to specify a custom config file location.
 See the [README.md](../README.md) for full usage and configuration details.
 "#]
 
-use crate::shells::Shell;
-use clap::{Parser, Subcommand};
+use clap::{CommandFactory, Parser, Subcommand, ValueEnum, error::ErrorKind};
 
 use crate::long_abouts::COMPLETE_ME;
-use crate::options::{
+use std::{ffi::OsString, path::PathBuf};
+use submod::options::{
     SerializableFetchRecurse as FetchRecurse, SerializableIgnore as Ignore,
     SerializableUpdate as Update,
 };
-use std::{ffi::OsString, path::PathBuf};
+use submod::shells::Shell;
 
 /// Top-level CLI parser for the `submod` tool.
 ///
@@ -71,12 +71,42 @@ pub struct Cli {
     pub command: Commands,
 
     /// Path to the configuration file (default: submod.toml).
-    #[arg(long = "config", global = true, default_value = "submod.toml", value_parser = clap::value_parser!(PathBuf), value_hint = clap::ValueHint::FilePath, help = "Optionally provide a different configuration file path. Defaults to submod.toml in the current directory.")]
+    #[arg(long = "config", global = true, default_value = "submod.toml", value_parser = clap::value_parser!(PathBuf), value_hint = clap::ValueHint::FilePath, help = "Use this configuration file. Without --config, submod discovers the repository root and uses its submod.toml.")]
     pub config: PathBuf,
+
+    /// Preview a mutating command after full local validation, without locks, writes, staging, or remote access.
+    #[arg(long, global = true, action = clap::ArgAction::SetTrue)]
+    pub dry_run: bool,
 
     /// Enable verbose output with detailed status information.
     #[arg(long, short, global = true)]
     pub verbose: bool,
+}
+
+/// Optional settings that can be removed to restore inherited behavior.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, ValueEnum)]
+pub enum UnsetSetting {
+    Branch,
+    Ignore,
+    Fetch,
+    Update,
+    Shallow,
+    Active,
+    UseGitDefaultSparseCheckout,
+}
+
+impl UnsetSetting {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Branch => "branch",
+            Self::Ignore => "ignore",
+            Self::Fetch => "fetch",
+            Self::Update => "update",
+            Self::Shallow => "shallow",
+            Self::Active => "active",
+            Self::UseGitDefaultSparseCheckout => "use-git-default-sparse-checkout",
+        }
+    }
 }
 
 /// Supported commands for the `submod` tool.
@@ -149,11 +179,11 @@ pub enum Commands {
         #[arg(long = "no-init", default_value = "false", action = clap::ArgAction::SetTrue, default_missing_value = "true", help = "If given, we'll add the submodule to your submod.toml but not initialize it.")]
         no_init: bool,
     },
-    // TODO: Implement this command
     #[command(
         name = "change",
+        group(clap::ArgGroup::new("settings").required(true).multiple(true).args(["path", "branch", "sparse_paths", "clear_sparse_paths", "use_git_default_sparse_checkout", "ignore", "fetch", "update", "shallow", "url", "active", "unset"])),
         next_help_heading = "Change a Submodule's Settings",
-        about = "Change the configuration of an existing submodule. Any field you provide will overwrite an existing value (unless both are defaults). If you change the path, it will nuke-it-from-orbit (delete it and re-clone it)."
+        about = "Change the configuration of an existing submodule. Only provided fields are changed. A path change uses a safe Git-aware move for clean initialized modules; dirty, conflicted, or unsupported moves are refused without mutation."
     )]
     Change {
         #[arg(required = true, value_parser = clap::value_parser!(String), value_hint = clap::ValueHint::CommandName, help = "The name of the submodule to change. Must match an existing submodule.", long_help = "The name of the submodule to change. Must match an existing submodule in your submod.toml. Because we use this value to lookup your config, you cannot change the name from the CLI. You must manually change it in your submod.toml. All other options can be changed here.")]
@@ -169,11 +199,22 @@ pub enum Commands {
         )]
         branch: Option<String>,
 
-        #[arg(short = 'x', long = "sparse-paths", value_delimiter = ',', value_parser = clap::value_parser!(OsString), help = "Replace the sparse checkout paths (comma-separated), or add if not set. Use `--append` to append to existing sparse paths.", default_missing_value = "none")]
+        #[arg(short = 'x', long = "sparse-paths", value_delimiter = ',', value_parser = clap::value_parser!(OsString), help = "Replace the sparse checkout paths (comma-separated), or add if not set. Use `--append` to append to existing sparse paths.")]
         sparse_paths: Option<Vec<OsString>>,
 
         #[arg(requires("sparse_paths"), short = 'a', long = "append", value_parser = clap::value_parser!(bool), default_value = "false", default_missing_value = "true", help = "If given, appends the new sparse paths to the existing ones.")]
         append: bool,
+
+        #[arg(long, conflicts_with_all = ["sparse_paths", "append"], help = "Clear all sparse checkout paths.")]
+        clear_sparse_paths: bool,
+
+        #[arg(
+            long,
+            value_enum,
+            value_delimiter = ',',
+            help = "Remove optional overrides to restore inherited behavior. May be repeated."
+        )]
+        unset: Vec<UnsetSetting>,
 
         #[arg(
             long = "use-git-default-sparse-checkout",
@@ -208,11 +249,11 @@ pub enum Commands {
         #[arg(
             short = 's',
             long = "shallow",
-            default_value = "false",
+            num_args = 0..=1,
             default_missing_value = "true",
             help = "If true, sets the submodule as a shallow clone. Set false to disable shallow cloning."
         )]
-        shallow: bool,
+        shallow: Option<bool>,
 
         #[arg(short = 'U', long = "url", value_parser = clap::value_parser!(String), help = "Change the URL of the submodule. The submodule name from the url must match an existing submodule.")]
         url: Option<String>,
@@ -220,26 +261,40 @@ pub enum Commands {
         #[arg(long = "active", num_args = 0..=1, value_parser = clap::value_parser!(bool), default_missing_value = "true", help = "Set to true/false to enable or disable the submodule. Omit to leave unchanged. For a quick disable, use `submod disable <name>` instead.")]
         active: Option<bool>,
     },
-    #[command(name = "change-global", visible_aliases = ["cg", "chgl", "global"], next_help_heading = "Change Global Settings", about = "Add or change the global settings for submodules, affecting all submodules in the current repository. Any individual submodule settings will override these global settings.")]
+    #[command(name = "change-global", visible_aliases = ["cg", "chgl", "global"], next_help_heading = "Change Global Settings", about = "Patch inherited defaults. Explicit per-submodule settings take precedence.")]
+    #[command(group(clap::ArgGroup::new("settings").required(true).multiple(true).args(["branch", "ignore", "fetch", "update", "use_git_default_sparse_checkout", "unset"])))]
     ChangeGlobal {
+        #[arg(
+            long,
+            value_enum,
+            value_delimiter = ',',
+            help = "Remove a global default to restore the built-in behavior."
+        )]
+        unset: Vec<UnsetSetting>,
+        #[arg(
+            short = 'b',
+            long = "branch",
+            help = "Set the inherited tracking branch. Use --unset branch to restore each remote's default branch."
+        )]
+        branch: Option<String>,
         #[arg(
             short = 'i',
             long = "ignore",
-            help = "Sets the default ignore behavior for all submodules in this repository. This will override any individual submodule settings."
+            help = "Set the inherited ignore behavior. An explicit per-submodule value takes precedence."
         )]
         ignore: Option<Ignore>,
 
         #[arg(
             short = 'f',
             long = "fetch",
-            help = "Sets the default fetch behavior for all submodules in this repository. This will override any individual submodule settings."
+            help = "Set the inherited fetch behavior. An explicit per-submodule value takes precedence."
         )]
         fetch: Option<FetchRecurse>,
 
         #[arg(
             short = 'u',
             long = "update",
-            help = "Sets the default update behavior for all submodules in this repository. This will override any individual submodule settings."
+            help = "Set the inherited update behavior. An explicit per-submodule value takes precedence."
         )]
         update: Option<Update>,
 
@@ -274,9 +329,12 @@ pub enum Commands {
         next_help_heading = "Initialize Submodules",
         about = "Initializes missing submodules based on the configuration file."
     )]
-    Init,
+    Init {
+        /// Also initialize nested submodules selected by each managed submodule.
+        #[arg(short = 'r', long = "recursive", default_value = "false", action = clap::ArgAction::SetTrue, default_missing_value = "true")]
+        recursive: bool,
+    },
 
-    // TODO: Implement this command (use git2 + fs to delete files)
     #[command(
         name = "delete",
         visible_alias = "del",
@@ -287,6 +345,10 @@ pub enum Commands {
         /// Name of the submodule to delete.
         #[arg(help = "Name of the submodule to delete.")]
         name: String,
+
+        /// Discard tracked, untracked, and ignored content inside the verified checkout.
+        #[arg(long, action = clap::ArgAction::SetTrue, help = "Discard local content inside the verified submodule checkout. Never removes an unrelated path or repository.")]
+        force: bool,
     },
 
     #[command(
@@ -307,13 +369,21 @@ pub enum Commands {
         next_help_heading = "Update Submodules",
         about = "Updates all submodules to their configured state."
     )]
-    Update,
+    Update {
+        /// Advance each submodule to its configured remote-tracking branch.
+        #[arg(long = "remote", default_value = "false", action = clap::ArgAction::SetTrue, default_missing_value = "true")]
+        remote: bool,
+
+        /// Also update nested submodules selected by each managed submodule.
+        #[arg(short = 'r', long = "recursive", default_value = "false", action = clap::ArgAction::SetTrue, default_missing_value = "true")]
+        recursive: bool,
+    },
 
     #[command(
         name = "reset",
         visible_alias = "r",
         next_help_heading = "Reset Submodules",
-        about = "Hard resets submodules, stashing changes, resetting to the configured state, and cleaning untracked files."
+        about = "Preserve local changes in a named stash, then reset selected submodules to their parent gitlinks."
     )]
     Reset {
         #[arg(short = 'a', long = "all", default_value = "false", action = clap::ArgAction::SetTrue, default_missing_value = "true", help = "If given, resets all submodules. If not given, you must specify specific submodules to reset.")]
@@ -321,6 +391,7 @@ pub enum Commands {
 
         #[arg(
             required_unless_present = "all",
+            conflicts_with = "all",
             value_delimiter = ',',
             help = "Names of specific submodules to reset. If `--all` is not given, you must specify at least one submodule name."
         )]
@@ -333,7 +404,11 @@ pub enum Commands {
         next_help_heading = "Sync Submodules",
         about = "Runs a full sync: check, init, update. Ensures all submodules are in sync with the configuration."
     )]
-    Sync,
+    Sync {
+        /// Also initialize and update nested submodules selected by each managed submodule.
+        #[arg(short = 'r', long = "recursive", default_value = "false", action = clap::ArgAction::SetTrue, default_missing_value = "true")]
+        recursive: bool,
+    },
 
     #[command(name = "generate-config", visible_aliases = ["gc", "genconf"], next_help_heading = "Generate a Config File", about = "Generates a new configuration file.")]
     GenerateConfig {
@@ -344,25 +419,26 @@ pub enum Commands {
         #[arg(
             short = 's',
             long = "from-setup",
-            num_args = 0,
-            default_missing_value = "true",
+            action = clap::ArgAction::SetTrue,
+            conflicts_with = "template",
             help = "Generates the config from your current repository's submodule settings."
         )]
-        from_setup: Option<String>,
+        from_setup: bool,
 
         #[arg(short = 'f', long = "force", default_value = "false", action = clap::ArgAction::SetTrue, default_missing_value = "true", help = "If given, overwrites the existing configuration file without prompting.")]
         force: bool,
 
-        #[arg(short = 't', long = "template", help = "Generates a template configuration file with default values.", default_value = "false", action = clap::ArgAction::SetTrue, default_missing_value = "true")]
+        #[arg(short = 't', long = "template", conflicts_with = "from_setup", help = "Generates a template configuration file with placeholder URLs.", default_value = "false", action = clap::ArgAction::SetTrue, default_missing_value = "true")]
         template: bool,
     },
 
-    #[command(name = "nuke-it-from-orbit", visible_aliases = ["nuke-em", "nuke-it", "nuke-them"], next_help_heading = "Nuke It From Orbit", about = "Deletes all submodules or specific ones, removing them from the configuration and the filesystem. Optionally leaves them dead. 🚀💥👾💥💀.")]
+    #[command(name = "nuke-it-from-orbit", visible_aliases = ["nu", "nuke-em", "nuke-it", "nuke-them"], next_help_heading = "Nuke It From Orbit", about = "Repair selected submodules by rebuilding their checkouts, or remove them with --kill.")]
     NukeItFromOrbit {
         #[arg(long = "all", default_value = "false", action = clap::ArgAction::SetTrue, default_missing_value = "true", help = "Nuke 'em all? 🤓")]
         all: bool,
         #[arg(
             required_unless_present = "all",
+            conflicts_with = "all",
             value_delimiter = ',',
             help = "... or only specific ones? 😔 (comma-separated list of names"
         )]
@@ -370,6 +446,9 @@ pub enum Commands {
 
         #[arg(short = 'k', long = "kill", default_value = "false", action = clap::ArgAction::SetTrue, default_missing_value = "true", help = "If given, DOES NOT reinitialize the submodules and DOES NOT add them back to the config. They will be truly dead. 💀")]
         kill: bool,
+
+        #[arg(long, action = clap::ArgAction::SetTrue, help = "Discard local content inside each verified submodule checkout. Never removes unrelated paths or repositories.")]
+        force: bool,
     },
 
     // Shell completions are implemented using clap_complete/clap_complete_nushell
@@ -378,4 +457,211 @@ pub enum Commands {
         #[arg(value_enum, action = clap::ArgAction::Set, help = "The shell to generate completions for. Supported shells: `bash`, `zsh`, `fish`, `powershell`, `elvish`, `nushell`.")]
         shell: Shell,
     },
+}
+
+impl Cli {
+    /// Validate combinations whose legality depends on argument values.
+    pub fn validate(&self) -> Result<(), clap::Error> {
+        if self.dry_run
+            && matches!(
+                self.command,
+                Commands::Check | Commands::List { .. } | Commands::CompleteMe { .. }
+            )
+        {
+            return Err(Self::command().error(
+                ErrorKind::ArgumentConflict,
+                "--dry-run is only valid for mutating commands",
+            ));
+        }
+        let (unset, supplied): (&[UnsetSetting], Vec<(UnsetSetting, bool)>) = match &self.command {
+            Commands::Change {
+                branch,
+                ignore,
+                fetch,
+                update,
+                shallow,
+                active,
+                use_git_default_sparse_checkout,
+                unset,
+                ..
+            } => (
+                unset,
+                vec![
+                    (UnsetSetting::Branch, branch.is_some()),
+                    (UnsetSetting::Ignore, ignore.is_some()),
+                    (UnsetSetting::Fetch, fetch.is_some()),
+                    (UnsetSetting::Update, update.is_some()),
+                    (UnsetSetting::Shallow, shallow.is_some()),
+                    (UnsetSetting::Active, active.is_some()),
+                    (
+                        UnsetSetting::UseGitDefaultSparseCheckout,
+                        use_git_default_sparse_checkout.is_some(),
+                    ),
+                ],
+            ),
+            Commands::ChangeGlobal {
+                branch,
+                ignore,
+                fetch,
+                update,
+                use_git_default_sparse_checkout,
+                unset,
+            } => {
+                if !unset.iter().all(|setting| {
+                    matches!(
+                        setting,
+                        UnsetSetting::Branch
+                            | UnsetSetting::Ignore
+                            | UnsetSetting::Fetch
+                            | UnsetSetting::Update
+                            | UnsetSetting::UseGitDefaultSparseCheckout
+                    )
+                }) {
+                    return Err(Self::command().error(
+                        ErrorKind::InvalidValue,
+                        "Unsupported global setting in --unset",
+                    ));
+                }
+                (
+                    unset,
+                    vec![
+                        (UnsetSetting::Branch, branch.is_some()),
+                        (UnsetSetting::Ignore, ignore.is_some()),
+                        (UnsetSetting::Fetch, fetch.is_some()),
+                        (UnsetSetting::Update, update.is_some()),
+                        (
+                            UnsetSetting::UseGitDefaultSparseCheckout,
+                            use_git_default_sparse_checkout.is_some(),
+                        ),
+                    ],
+                )
+            }
+            Commands::Reset { names, .. }
+            | Commands::NukeItFromOrbit {
+                names: Some(names), ..
+            } => {
+                let mut seen = std::collections::HashSet::new();
+                for name in names {
+                    if name.trim().is_empty() {
+                        return Err(Self::command()
+                            .error(ErrorKind::InvalidValue, "Submodule target cannot be empty"));
+                    }
+                    if !seen.insert(name) {
+                        return Err(Self::command().error(
+                            ErrorKind::ArgumentConflict,
+                            format!("Duplicate submodule target: {name}"),
+                        ));
+                    }
+                }
+                return Ok(());
+            }
+            _ => return Ok(()),
+        };
+        for (index, setting) in unset.iter().enumerate() {
+            if unset[..index].contains(setting) {
+                return Err(Self::command().error(
+                    ErrorKind::ArgumentConflict,
+                    format!("Duplicate --unset setting: {}", setting.as_str()),
+                ));
+            }
+            if supplied
+                .iter()
+                .any(|(field, present)| field == setting && *present)
+            {
+                return Err(Self::command().error(
+                    ErrorKind::ArgumentConflict,
+                    format!("Cannot set and unset {} together", setting.as_str()),
+                ));
+            }
+        }
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn change_contract() {
+        for args in [
+            vec!["submod", "change", "module"],
+            vec!["submod", "cg"],
+            vec!["submod", "change", "module", "--append"],
+            vec![
+                "submod",
+                "change",
+                "module",
+                "--clear-sparse-paths",
+                "--sparse-paths",
+                "src",
+            ],
+            vec![
+                "submod",
+                "change",
+                "module",
+                "--clear-sparse-paths",
+                "--append",
+                "--sparse-paths",
+                "src",
+            ],
+            vec!["submod", "reset", "--all", "module"],
+            vec!["submod", "nuke-it", "--all", "module"],
+        ] {
+            assert!(Cli::try_parse_from(&args).is_err(), "{args:?}");
+        }
+        for args in [
+            vec![
+                "submod",
+                "change",
+                "module",
+                "--shallow=false",
+                "--unset",
+                "shallow",
+            ],
+            vec!["submod", "reset", "module,module"],
+            vec!["submod", "nuke-it", "module", "module"],
+            vec!["submod", "change", "module", "--unset", "ignore,ignore"],
+        ] {
+            assert!(
+                Cli::try_parse_from(&args).unwrap().validate().is_err(),
+                "{args:?}"
+            );
+        }
+        for (flags, expected) in [
+            (vec!["--branch", "main"], None),
+            (vec!["--shallow"], Some(true)),
+            (vec!["--shallow=false"], Some(false)),
+        ] {
+            let cli =
+                Cli::try_parse_from([vec!["submod", "change", "module"], flags].concat()).unwrap();
+            cli.validate().unwrap();
+            let Commands::Change { shallow, .. } = cli.command else {
+                panic!("wrong command")
+            };
+            assert_eq!(shallow, expected);
+        }
+        for args in [
+            vec!["submod", "change", "module", "--clear-sparse-paths"],
+            vec!["submod", "change", "module", "--unset", "shallow,branch"],
+            vec!["submod", "cg", "--unset", "branch"],
+            vec!["submod", "cg", "--use-git-default-sparse-checkout=false"],
+            vec![
+                "submod",
+                "global",
+                "--unset",
+                "use-git-default-sparse-checkout",
+            ],
+            vec![
+                "submod",
+                "change",
+                "module",
+                "--append",
+                "--sparse-paths",
+                "src",
+            ],
+        ] {
+            Cli::try_parse_from(&args).unwrap().validate().unwrap();
+        }
+    }
 }

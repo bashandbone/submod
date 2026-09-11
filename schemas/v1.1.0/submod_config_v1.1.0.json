@@ -1,81 +1,248 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://raw.githubusercontent.com/bashandbone/submod/main/schemas/submod.json",
+  "$id": "https://raw.githubusercontent.com/bashandbone/submod/main/schemas/v1.1.0/submod_config_v1.1.0.json",
   "title": "submod configuration",
-  "description": "Configuration file for submod, a git submodule management CLI.\nhttps://docs.rs/",
+  "description": "Current configuration contract. Omitted per-module settings inherit defaults, then built-in defaults. Git validates repository paths and branch names at runtime.",
   "type": "object",
   "properties": {
     "schema_version": {
       "type": "string",
-      "pattern": "^v?\\d+(\\.\\d+){0,2}$",
-      "description": "The version of the submod configuration schema in use. Accepts \"1\", \"1.0\", or \"1.0.0\" format.\nhttps://docs.rs/submod"
+      "enum": [
+        "1.0.0",
+        "1.1.0"
+      ],
+      "description": "Optional metadata. These exact legacy/current versions are accepted; omission is supported."
     },
     "defaults": {
       "type": "object",
-      "description": "Global defaults applied to all submodules. Git has no native global submodule configuration; submod resolves this by applying these settings across all submodule entries. Any settings you set for an individual submodule will override these defaults.\nhttps://docs.rs/submod/latest/submod/options/",
+      "description": "Inherited settings. Per-module declarations, including explicit false, take precedence.",
       "properties": {
-        "ignore": { "$ref": "#/$defs/ignoreValue" },
-        "update": { "$ref": "#/$defs/updateValue" },
-        "fetch":  { "$ref": "#/$defs/fetchValue" },
-        ""
+        "branch": {
+          "$ref": "#/definitions/branch"
+        },
+        "ignore": {
+          "$ref": "#/definitions/ignore"
+        },
+        "update": {
+          "$ref": "#/definitions/update"
+        },
+        "fetchRecurse": {
+          "$ref": "#/definitions/fetchRecurse"
+        },
+        "use_git_default_sparse_checkout": {
+          "$ref": "#/definitions/sparseMode"
+        },
+        "fetch": {
+          "allOf": [
+            {
+              "$ref": "#/definitions/fetchRecurse"
+            }
+          ],
+          "description": "Legacy alias for fetchRecurse; accepted with a migration warning. Use only one spelling per table."
+        },
+        "fetch_recurse": {
+          "allOf": [
+            {
+              "$ref": "#/definitions/fetchRecurse"
+            }
+          ],
+          "description": "Legacy alias for fetchRecurse; accepted with a migration warning. Use only one spelling per table."
+        }
       },
-      "additionalProperties": false
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "not": {
+            "required": [
+              "fetchRecurse",
+              "fetch"
+            ]
+          }
+        },
+        {
+          "not": {
+            "required": [
+              "fetchRecurse",
+              "fetch_recurse"
+            ]
+          }
+        },
+        {
+          "not": {
+            "required": [
+              "fetch",
+              "fetch_recurse"
+            ]
+          }
+        }
+      ]
     }
   },
   "additionalProperties": {
-    "$ref": "#/$defs/submodule"
+    "$ref": "#/definitions/submodule"
   },
-  "$defs": {
-    "ignoreValue": {
+  "definitions": {
+    "ignore": {
       "type": "string",
-      "enum": ["all", "dirty", "untracked", "none"],
+      "enum": [
+        "all",
+        "dirty",
+        "untracked",
+        "none"
+      ],
       "default": "none",
-      "description": "Controls which changes cause a submodule to appear as modified in git status.\n- \"none\": report all changes (default)\n- \"untracked\": ignore untracked files\n- \"dirty\": ignore all working tree changes, only track commits\n- \"all\": always ignore the submodule\nhttps://docs.rs/submod/latest/submod/options/"
+      "description": "Git status ignore policy. It does not disable safety checks for local work."
     },
-    "updateValue": {
+    "update": {
       "type": "string",
-      "enum": ["checkout", "rebase", "merge", "none"],
+      "enum": [
+        "checkout",
+        "merge",
+        "rebase",
+        "none"
+      ],
       "default": "checkout",
-      "description": "How to update the submodule when the superproject moves to a new commit.\n- \"checkout\": detach HEAD at the recorded commit (default)\n- \"rebase\": rebase current branch onto the recorded commit\n- \"merge\": merge the recorded commit into the current branch\n- \"none\": do not update\nhttps://docs.rs/submod/latest/submod/options/"
+      "description": "Strategy against the parent-recorded gitlink. none skips updating and fetching. Custom !command values are rejected. Only update --remote requests tracking-tip advancement."
     },
-    "fetchValue": {
+    "fetchRecurse": {
       "type": "string",
-      "enum": ["on-demand", "always", "never"],
+      "enum": [
+        "on-demand",
+        "always",
+        "never",
+        "true",
+        "false"
+      ],
       "default": "on-demand",
-      "description": "When to fetch submodule updates from the remote.\n- \"on-demand\": fetch only when needed (default)\n- \"always\": fetch on every operation\n- \"never\": never fetch automatically\nhttps://docs.rs/submod/latest/submod/options/"
+      "description": "Git fetchRecurseSubmodules policy: on-demand/true/false respectively for on-demand/always/never. Legacy strings \"true\" and \"false\" are accepted with a warning; TOML booleans are invalid. This does not promise a fetch on every operation or initialize nested checkouts."
+    },
+    "branch": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "\\S",
+      "description": "Named tracking branch, or . for the parent branch. Omission inherits defaults; with no default Git selects its remote default. Aliases current, current-in-super-project, current-in-superproject, superproject, super are accepted. Use refs/heads/current for a literal alias name. Legacy HEAD explicitly selects remote-default tracking, overriding a global branch. Git branch validation also applies. Default update remains pinned."
+    },
+    "sparseMode": {
+      "type": "boolean",
+      "default": false,
+      "description": "true passes sparse patterns to Git without adding !/*. false prepends !/* to nonempty patterns. This does not imply all files are included."
     },
     "submodule": {
       "type": "object",
-      "description": "Configuration for a single submodule. The section name is your local alias for the submodule; submod maps it to the full relative path in .gitmodules and .git/config.",
-      "required": ["url"],
+      "description": "Section name is the logical identity, distinct from checkout path. Existing Git names are preserved when unambiguously resolved.",
+      "required": [
+        "url"
+      ],
       "properties": {
+        "branch": {
+          "$ref": "#/definitions/branch"
+        },
+        "ignore": {
+          "$ref": "#/definitions/ignore"
+        },
+        "update": {
+          "$ref": "#/definitions/update"
+        },
+        "fetchRecurse": {
+          "$ref": "#/definitions/fetchRecurse"
+        },
+        "use_git_default_sparse_checkout": {
+          "$ref": "#/definitions/sparseMode"
+        },
+        "fetch": {
+          "allOf": [
+            {
+              "$ref": "#/definitions/fetchRecurse"
+            }
+          ],
+          "description": "Legacy alias for fetchRecurse; accepted with a migration warning. Use only one spelling per table."
+        },
+        "fetch_recurse": {
+          "allOf": [
+            {
+              "$ref": "#/definitions/fetchRecurse"
+            }
+          ],
+          "description": "Legacy alias for fetchRecurse; accepted with a migration warning. Use only one spelling per table."
+        },
         "url": {
           "type": "string",
-          "description": "Required. The submodule repository URL. Accepts remote URLs (https, ssh) or local paths (absolute or relative). Use the same value as in .gitmodules or .git/config."
+          "minLength": 1,
+          "allOf": [
+            {
+              "pattern": "\\S"
+            },
+            {
+              "not": {
+                "pattern": "[\\u0000\\r\\n]"
+              }
+            }
+          ],
+          "description": "Required nonempty remote URL or local repository path. Relative URLs follow Git semantics."
         },
         "path": {
           "type": "string",
-          "description": "Path where the submodule is checked out, relative to the superproject root. Defaults to the submodule name in the repository root."
+          "minLength": 1,
+          "allOf": [
+            {
+              "pattern": "\\S"
+            },
+            {
+              "not": {
+                "pattern": "[\\u0000\\r\\n]"
+              }
+            }
+          ],
+          "description": "Checkout path relative to the superproject root; defaults to the section name. Absolute paths, parent traversal and .git components are rejected; runtime containment checks apply."
         },
-        "branch": {
-          "type": "string",
-          "description": "Branch to track in the submodule. Defaults to the submodule's default branch (usually main or master).\nUse \".\" or the aliases \"current\", \"current-in-superproject\", \"superproject\", or \"super\" to track the superproject's current branch. **Do not use these strings as actual branch names in the submodule repository.** If you need to track a branch with one of these names, use the full branch name (e.g., \"refs/heads/current\")."
-        },
-        "sparse_paths": {
-          "type": "array",
-          "items": { "type": "string" },
-          "description": "Relative paths or glob patterns to include in a sparse checkout. If omitted, all files are checked out.\nWhen set, git prepends:\n  /*\n  !/*/\nThis includes only root-level files by default. To include subdirectories, add paths like \"src/\". To exclude root files, prefix with \"!\" (e.g., \"!/README.md\")."
+        "active": {
+          "type": "boolean",
+          "default": true,
+          "description": "App selection and local Git activation only; not portable .gitmodules metadata. Disabling preserves checkout and history."
         },
         "shallow": {
           "type": "boolean",
           "default": false,
-          "description": "If true, performs a shallow clone (only the most recent commit). Useful for large repositories where full history is not needed."
+          "description": "Request depth-one cloning for new repositories. Does not truncate or unshallow existing history."
         },
-        "ignore": { "$ref": "#/$defs/ignoreValue" },
-        "update": { "$ref": "#/$defs/updateValue" },
-        "fetch":  { "$ref": "#/$defs/fetchValue" }
+        "sparse_paths": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "not": {
+              "pattern": "[\\u0000\\r\\n]"
+            }
+          },
+          "description": "Ordered Git sparse-checkout patterns. Absent or empty means full checkout. By default !/* is prepended once; sparse mode can opt out. Sparse checkout limits working-tree files, not downloaded objects (partial clone)."
+        }
       },
-      "additionalProperties": false
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "not": {
+            "required": [
+              "fetchRecurse",
+              "fetch"
+            ]
+          }
+        },
+        {
+          "not": {
+            "required": [
+              "fetchRecurse",
+              "fetch_recurse"
+            ]
+          }
+        },
+        {
+          "not": {
+            "required": [
+              "fetch",
+              "fetch_recurse"
+            ]
+          }
+        }
+      ]
     }
   }
 }

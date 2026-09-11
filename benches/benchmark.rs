@@ -1,113 +1,149 @@
 // SPDX-FileCopyrightText: 2026 Adam Poulemanos
 // SPDX-License-Identifier: LicenseRef-PlainMIT OR MIT
 
-//! Benchmarks comparing two implementations of `.gitmodules` line key parsing.
-//!
-//! The benchmarks measure the performance difference between:
-//!
-//! - **`line_key_old`**: Allocates a formatted string for each key comparison.
-//! - **`line_key_new`**: Performs a zero-allocation prefix check followed by a boundary
-//!   character test.
-//!
-//! Run with:
-//! ```sh
-//! cargo bench
-//! ```
-
-use criterion::{Criterion, criterion_group, criterion_main};
+//! Production config microbenchmarks. CLI inspection/sync are measured separately
+//! by scripts/measure-performance.py, using immutable bench-profile executables.
+use criterion::{BatchSize, BenchmarkId, Criterion};
 use std::hint::black_box;
+use std::time::Instant;
+use submod::config::{Config, SubmoduleEntry};
 
-/// Returns the first key from `known_keys` that matches the start of `line`, or `None`.
-///
-/// Matching uses `format!("{key} =")` and `format!("{key}=")` to build comparison strings,
-/// which allocates once per key per line. This is the baseline ("old") implementation
-/// used to establish a performance reference point.
-///
-/// Empty lines and lines beginning with `#` are skipped immediately.
-fn line_key_old<'a>(line: &str, known_keys: &[&'a str]) -> Option<&'a str> {
-    let trimmed = line.trim();
-    if trimmed.is_empty() || trimmed.starts_with('#') {
-        return None;
+fn fixture(count: usize) -> String {
+    use std::fmt::Write as _;
+    let mut text = String::from("[defaults]\nignore = \"dirty\"\nupdate = \"checkout\"\n\n");
+    for i in 0..count {
+        let _ = write!(
+            text,
+            "[module-{i}]\npath = \"lib/module-{i}\"\nurl = \"file:///local/origin-{i}\"\nactive = true\nsparse_paths = [\"src\", \"docs\"]\n\n"
+        );
     }
-    for key in known_keys {
-        if trimmed.starts_with(&format!("{key} =")) || trimmed.starts_with(&format!("{key}=")) {
-            return Some(key);
-        }
-    }
-    None
+    text
 }
 
-/// Returns the first key from `known_keys` that matches the start of `line`, or `None`.
-///
-/// Matching first checks that `line` starts with the key as a prefix, then verifies that
-/// the very next character is `=` or ` =` — avoiding any heap allocation. This is the
-/// optimized ("new") implementation being benchmarked against [`line_key_old`].
-///
-/// Empty lines and lines beginning with `#` are skipped immediately.
-fn line_key_new<'a>(line: &str, known_keys: &[&'a str]) -> Option<&'a str> {
-    let trimmed = line.trim();
-    if trimmed.is_empty() || trimmed.starts_with('#') {
-        return None;
+fn insertion() -> SubmoduleEntry {
+    SubmoduleEntry {
+        path: Some("lib/inserted".into()),
+        url: Some("file:///local/inserted".into()),
+        active: Some(true),
+        branch: None,
+        ignore: None,
+        update: None,
+        fetch_recurse: None,
+        shallow: None,
+        no_init: None,
+        sparse_paths: None,
+        use_git_default_sparse_checkout: None,
     }
-    for key in known_keys {
-        if let Some(rest) = trimmed.strip_prefix(key)
-            && (rest.starts_with('=') || rest.starts_with(" ="))
-        {
-            return Some(key);
-        }
-    }
-    None
 }
 
-/// Registers the `line_key_old` and `line_key_new` benchmarks with Criterion.
-///
-/// Both functions are exercised over an identical set of representative input lines,
-/// covering all supported key forms (`key = value`, `key=value`, leading whitespace,
-/// unknown keys, comments, and blank lines) so the measurements are directly comparable.
-pub fn criterion_benchmark(c: &mut Criterion) {
-    let keys = vec![
-        "path",
-        "url",
-        "branch",
-        "ignore",
-        "fetch",
-        "update",
-        "active",
-        "shallow",
-        "sparse_paths",
-    ];
-    let lines = vec![
-        "path = foo",
-        "url=bar",
-        "branch = baz",
-        "ignore=qux",
-        "fetch = quux",
-        "update=corge",
-        "active = grault",
-        "shallow=garply",
-        "sparse_paths = waldo",
-        "unknown = fred",
-        "# comment",
-        "",
-        "  path = spaced  ",
-    ];
+fn validate(config: &Config, count: usize) {
+    assert_eq!(config.get_submodules().count(), count);
+    let entry = config.effective_entry("module-0").unwrap();
+    assert_eq!(entry.path.as_deref(), Some("lib/module-0"));
+    assert_eq!(entry.active, Some(true));
+    assert!(entry.ignore.is_some());
+    assert!(entry.update.is_some());
+}
 
-    c.bench_function("line_key_old", |b| {
-        b.iter(|| {
-            for line in &lines {
-                black_box(line_key_old(black_box(line), black_box(&keys)));
+fn main() {
+    // One sample per process lets the comparison driver alternate immutable
+    // baseline/candidate artifacts. Preparation and validation are not timed.
+    if let Ok(workload) = std::env::var("SUBMOD_MEASURE_CONFIG") {
+        let count: usize = std::env::var("SUBMOD_MEASURE_COUNT")
+            .unwrap()
+            .parse()
+            .unwrap();
+        let path = std::env::var("SUBMOD_MEASURE_FILE").unwrap();
+        let text = std::fs::read_to_string(&path).unwrap();
+        let config = Config::parse(&text).unwrap();
+        validate(&config, count);
+        let iterations = 1000;
+        let mut results = Vec::with_capacity(iterations);
+        let mut prepared: Vec<_> = if workload == "add" {
+            (0..iterations)
+                .map(|_| (config.clone(), "inserted".to_string(), insertion()))
+                .collect()
+        } else {
+            Vec::new()
+        };
+        let start = Instant::now();
+        match workload.as_str() {
+            "parse" => {
+                for _ in 0..iterations {
+                    results.push(Config::parse(black_box(&text)).unwrap());
+                }
             }
-        });
-    });
-
-    c.bench_function("line_key_new", |b| {
-        b.iter(|| {
-            for line in &lines {
-                black_box(line_key_new(black_box(line), black_box(&keys)));
+            "load" => {
+                for _ in 0..iterations {
+                    results.push(
+                        Config::default()
+                            .load_from_file(Some(black_box(&path)))
+                            .unwrap(),
+                    );
+                }
             }
+            "add" => {
+                for (config, name, entry) in &mut prepared {
+                    let name = std::mem::take(name);
+                    let entry = std::mem::replace(entry, insertion());
+                    config.add_submodule(name, entry);
+                }
+            }
+            _ => panic!("unknown config workload"),
+        }
+        let nanos = start.elapsed().as_nanos();
+        if workload == "add" {
+            for (config, _, _) in &prepared {
+                assert_eq!(config.get_submodules().count(), count + 1);
+                assert_eq!(
+                    config.get_submodule("inserted").unwrap().path.as_deref(),
+                    Some("lib/inserted")
+                );
+            }
+        } else {
+            for config in &results {
+                validate(config, count);
+            }
+        }
+        println!("{{\"iterations\":{iterations},\"elapsed_ns\":{nanos},\"verdict\":\"pass\"}}");
+        return;
+    }
+    let mut criterion = Criterion::default().configure_from_args();
+    let temp = tempfile::tempdir().unwrap();
+    for count in [1, 10, 100] {
+        let text = fixture(count);
+        let path = temp.path().join(format!("config-{count}.toml"));
+        std::fs::write(&path, &text).unwrap();
+        let config = Config::parse(&text).unwrap();
+        validate(&config, count);
+        criterion.bench_with_input(BenchmarkId::new("config_parse", count), &text, |b, text| {
+            b.iter(|| Config::parse(black_box(text)).unwrap());
         });
-    });
+        criterion.bench_with_input(
+            BenchmarkId::new("config_load_file", count),
+            &path,
+            |b, path| {
+                b.iter(|| {
+                    Config::default()
+                        .load_from_file(Some(black_box(path)))
+                        .unwrap()
+                });
+            },
+        );
+        criterion.bench_with_input(
+            BenchmarkId::new("config_add_one", count),
+            &config,
+            |b, config| {
+                b.iter_batched(
+                    || (config.clone(), "inserted".to_string(), insertion()),
+                    |(mut config, name, entry)| {
+                        config.add_submodule(name, entry);
+                        black_box(config)
+                    },
+                    BatchSize::SmallInput,
+                );
+            },
+        );
+    }
+    criterion.final_summary();
 }
-
-criterion_group!(benches, criterion_benchmark);
-criterion_main!(benches);

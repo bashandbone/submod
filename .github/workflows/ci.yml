@@ -2,6 +2,13 @@
 #
 # SPDX-License-Identifier: LicenseRef-PlainMIT OR MIT
 
+# Third-party actions are pinned to immutable commit SHAs (reviewed
+# 2026-09-11; version comments record the moving ref each SHA was taken
+# from). To update: resolve the new tag/branch SHA with
+# `git ls-remote https://github.com/<owner>/<repo>`, review the upstream
+# diff, and update the SHA and comment together. There is no automation
+# policy beyond this procedure.
+
 name: CI
 
 on:
@@ -15,49 +22,43 @@ env:
 
 jobs:
   test:
-    name: Test Suite
-    runs-on: ubuntu-latest
-    # beta/nightly are informational: a toolchain regression upstream should not
-    # gate merges, but we still want to see it.
-    continue-on-error: ${{ matrix.rust != 'stable' }}
+    name: Test Suite (stable, ${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
-        rust:
-          - stable
-          - beta
-          - nightly
+        os: [ubuntu-latest, macos-latest, windows-latest]
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           submodules: recursive
 
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@master
+      - name: Install Rust (stable)
+        uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87 # stable
         with:
-          toolchain: ${{ matrix.rust }}
+          toolchain: stable
           components: rustfmt, clippy
 
       - name: Cache cargo registry
-        uses: actions/cache@v6
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
           path: ~/.cargo/registry
-          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}-${{ matrix.rust }}
+          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}-stable
 
       - name: Cache cargo index
-        uses: actions/cache@v6
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
           path: ~/.cargo/git
-          key: ${{ runner.os }}-cargo-index-${{ hashFiles('**/Cargo.lock') }}-${{ matrix.rust }}
+          key: ${{ runner.os }}-cargo-index-${{ hashFiles('**/Cargo.lock') }}-stable
 
       - name: Cache cargo build
-        uses: actions/cache@v6
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
           path: target
-          key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}-${{ matrix.rust }}
+          key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}-stable
 
       - name: Install cargo-nextest
-        uses: taiki-e/install-action@v2
+        uses: taiki-e/install-action@fa23953489c080190314742a9b907f8e97c6767c # v2
         with:
           tool: cargo-nextest
 
@@ -68,7 +69,60 @@ jobs:
           git config --global user.name "CI"
 
       - name: Run tests
-        run: cargo nextest run --all-features --no-fail-fast
+        run: cargo nextest run --locked --all-features --profile ci --no-fail-fast
+
+      - name: Run doctests
+        run: cargo test --locked --all-features --doc
+
+  test-informational:
+    name: Test Suite (${{ matrix.rust }}, informational)
+    runs-on: ubuntu-latest
+    # beta/nightly are informational: a toolchain regression upstream should not
+    # gate merges, but we still want to see it.
+    continue-on-error: true
+    strategy:
+      fail-fast: false
+      matrix:
+        rust:
+          - beta
+          - nightly
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          submodules: recursive
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87 # stable
+        with:
+          toolchain: ${{ matrix.rust }}
+          components: rustfmt, clippy
+
+      - name: Install cargo-nextest
+        uses: taiki-e/install-action@fa23953489c080190314742a9b907f8e97c6767c # v2
+        with:
+          tool: cargo-nextest
+
+      - name: Setup git
+        run: |
+          git config --global user.email "ci@example.com"
+          git config --global user.name "CI"
+
+      - name: Run tests
+        run: cargo nextest run --locked --all-features --profile ci --no-fail-fast
+
+  msrv:
+    name: MSRV check (Rust 1.89)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Install Rust 1.89
+        uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87 # stable
+        with:
+          toolchain: "1.89"
+
+      - name: Check MSRV build
+        run: cargo +1.89 check --locked --all-features
 
   lint:
     name: lint
@@ -76,10 +130,10 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Install hk with mise
-        uses: jdx/mise-action@v4
+        uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4
         env:
           HK_MISE: 1
           MISE_YES: 1
@@ -97,7 +151,7 @@ jobs:
             hk = { version = "1.48", depends = ["pkl"], postinstall = 'hk install --mise || true'}
             pkl = "latest"
             typos = { version = "latest", depends = ["rust"] }
-    
+
       # mise installs the toolchain without optional components, so cargo_fmt and
       # cargo_clippy have no binary to call.
       - name: Add rustfmt and clippy components
@@ -120,21 +174,55 @@ jobs:
       checks: write
       contents: read
     steps:
-      - uses: actions/checkout@v7
-      - uses: rustsec/audit-check@v2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      # Advisory exceptions live in deny.toml (canonical) and audit.toml; this
+      # step intentionally carries no inline ignore list so the two files
+      # cannot drift from what CI enforces. The v2 branch HEAD below was
+      # reviewed 2026-09-11.
+      - uses: rustsec/audit-check@69366f33c96575abad1ee0dba8212993eecbe998 # v2
         with:
           token: ${{ secrets.GITHUB_TOKEN || github.token }}
-          # Keep in sync with the `ignore` list in deny.toml, which documents why
-          # each of these is accepted.
-          ignore: RUSTSEC-2024-0364
+
+  package:
+    name: Package check
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Install Rust (stable)
+        uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87 # stable
+        with:
+          toolchain: stable
+
+      - name: Verify packaged source builds and tests
+        run: |
+          cargo package --locked
+          pkg=$(ls target/package/submod-*.crate | head -n 1)
+          rm -rf /tmp/submod-package-check
+          mkdir -p /tmp/submod-package-check
+          tar xzf "$pkg" -C /tmp/submod-package-check
+          cd /tmp/submod-package-check/submod-*
+          cargo build --locked --all-features
+          cargo test --locked --all-features --lib
+
+      - name: Validate schemas and template generation
+        run: |
+          for schema in schemas/v1.0.0/*.json schemas/v1.1.0/*.json schemas/current/*.json schemas/submod.json schemas/latest/*.json; do
+            python3 -c "import json,sys; json.load(open(sys.argv[1]))" "$schema" \
+              || { echo "::error::invalid schema JSON: $schema"; exit 1; }
+          done
+          cargo run --locked -- generate-config --template --force --output /tmp/submod-template-check.toml
+          test -s /tmp/submod-template-check.toml
 
   coverage:
     name: Code Coverage
     runs-on: ubuntu-latest
     permissions:
-      contents: write
+      contents: read
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           submodules: recursive
 
@@ -148,7 +236,7 @@ jobs:
           git config --global user.email "ci@example.com"
           git config --global user.name "CI"
       - name: install other components
-        uses: taiki-e/install-action@v2
+        uses: taiki-e/install-action@fa23953489c080190314742a9b907f8e97c6767c # v2
         with:
           tool: cargo-nextest,cargo-llvm-cov
 
@@ -161,7 +249,7 @@ jobs:
             --ignore-filename-regex '\.cargo[/\\]registry|\.cargo[/\\]git|rustup[/\\]toolchains|/rustc/|scripts[/\\]|tests[/\\]|examples[/\\]|benches[/\\]|target[/\\]|.*long_about.rs|.*lib.rs' \
             --manifest-path Cargo.toml
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v7
+        uses: codecov/codecov-action@a99c28d3f0da835de33ff2feb2e15691c7b9641f # v7
         with:
           files: lcov.info
           token: ${{ secrets.CODECOV_TOKEN }}

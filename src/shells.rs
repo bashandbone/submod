@@ -52,7 +52,7 @@ impl clap::ValueEnum for Shell {
             Self::Fish => PossibleValue::new("fish"),
             Self::PowerShell => PossibleValue::new("powershell").alias("pwsh"),
             Self::Zsh => PossibleValue::new("zsh"),
-            Self::Nushell => PossibleValue::new("nushell"),
+            Self::Nushell => PossibleValue::new("nushell").alias("nu"),
         })
     }
 }
@@ -304,6 +304,10 @@ mod tests {
 
     #[test]
     fn test_shell_from_str_alias() {
+        assert_eq!(
+            <Shell as std::str::FromStr>::from_str("nu").unwrap(),
+            Shell::Nushell
+        );
         assert_eq!(
             <Shell as std::str::FromStr>::from_str("pwsh").unwrap(),
             Shell::PowerShell

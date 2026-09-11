@@ -100,16 +100,18 @@ mod git2_ops_tests {
     fn test_write_and_read_git_config_local() {
         let harness = TestHarness::new().expect("harness");
         harness.init_git_repo().expect("init repo");
-        let ops = Git2Operations::new(Some(&harness.work_dir)).expect("ops");
+        let mgr = GitOpsManager::new(Some(&harness.work_dir), false).expect("mgr");
 
         let mut entries = HashMap::new();
         entries.insert("submod.testkey".to_string(), "testvalue123".to_string());
         let config = GitConfig { entries };
 
-        ops.write_git_config(&config, ConfigLevel::Local)
+        mgr.write_git_config(&config, ConfigLevel::Local)
             .expect("write config should succeed");
 
-        let read_back = ops
+        // The retained git2 reader must see the natively written value.
+        let git2_ops = Git2Operations::new(Some(&harness.work_dir)).expect("git2");
+        let read_back = git2_ops
             .read_git_config(ConfigLevel::Local)
             .expect("read after write should succeed");
         assert_eq!(
@@ -123,47 +125,44 @@ mod git2_ops_tests {
     fn test_set_config_value_local() {
         let harness = TestHarness::new().expect("harness");
         harness.init_git_repo().expect("init repo");
-        let ops = Git2Operations::new(Some(&harness.work_dir)).expect("ops");
+        let mgr = GitOpsManager::new(Some(&harness.work_dir), false).expect("mgr");
 
-        ops.set_config_value("submod.singlekey", "singlevalue", ConfigLevel::Local)
+        mgr.set_config_value("submod.singlekey", "singlevalue", ConfigLevel::Local)
             .expect("set_config_value should succeed");
 
-        let config = ops
-            .read_git_config(ConfigLevel::Local)
-            .expect("read config");
         assert_eq!(
-            config.entries.get("submod.singlekey").map(String::as_str),
-            Some("singlevalue"),
+            harness
+                .git_stdout(&["config", "--local", "--get", "submod.singlekey"])
+                .trim(),
+            "singlevalue",
+            "set value must land in real local Git config"
         );
     }
 
     #[test]
-    fn test_write_gitmodules_empty_entries() {
+    fn test_write_gitmodules_persists_unregistered_entry() {
         let harness = TestHarness::new().expect("harness");
         harness.init_git_repo().expect("init repo");
-        let mut ops = Git2Operations::new(Some(&harness.work_dir)).expect("ops");
-        // Writing empty entries should silently succeed (nothing to do).
-        ops.write_gitmodules(&SubmoduleEntries::default())
-            .expect("writing empty entries should succeed");
-    }
-
-    #[test]
-    fn test_write_gitmodules_skips_unknown_submodule() {
-        let harness = TestHarness::new().expect("harness");
-        harness.init_git_repo().expect("init repo");
-        let mut ops = Git2Operations::new(Some(&harness.work_dir)).expect("ops");
-        // Entries that reference a submodule not yet added are silently skipped.
-        ops.write_gitmodules(&one_entry_entries())
-            .expect("writing unknown submodule entry should not error");
+        let mut mgr = GitOpsManager::new(Some(&harness.work_dir), false).expect("mgr");
+        // Native writes persist declarations; completion of the registration
+        // is the reconciliation layer's job, not the write path's.
+        mgr.write_gitmodules(&one_entry_entries())
+            .expect("writing an unregistered entry should not error");
+        assert!(
+            harness.gitmodules_entries().contains("lib/test"),
+            "native write must persist lib/test in real .gitmodules state"
+        );
     }
 
     // ---- Error paths (submodule not found) --------------------------------
+    // Mutations run natively through the manager; the retained git2 backend
+    // keeps only its read methods (status, sparse patterns) below.
 
     #[test]
     fn test_init_submodule_not_found() {
         let harness = TestHarness::new().expect("harness");
         harness.init_git_repo().expect("init repo");
-        let mut ops = Git2Operations::new(Some(&harness.work_dir)).expect("ops");
+        let mut ops = GitOpsManager::new(Some(&harness.work_dir), false).expect("mgr");
         assert!(ops.init_submodule("nonexistent").is_err());
     }
 
@@ -171,7 +170,7 @@ mod git2_ops_tests {
     fn test_deinit_submodule_not_found() {
         let harness = TestHarness::new().expect("harness");
         harness.init_git_repo().expect("init repo");
-        let mut ops = Git2Operations::new(Some(&harness.work_dir)).expect("ops");
+        let mut ops = GitOpsManager::new(Some(&harness.work_dir), false).expect("mgr");
         assert!(ops.deinit_submodule("nonexistent", true).is_err());
     }
 
@@ -179,7 +178,7 @@ mod git2_ops_tests {
     fn test_update_submodule_not_found() {
         let harness = TestHarness::new().expect("harness");
         harness.init_git_repo().expect("init repo");
-        let mut ops = Git2Operations::new(Some(&harness.work_dir)).expect("ops");
+        let mut ops = GitOpsManager::new(Some(&harness.work_dir), false).expect("mgr");
         assert!(
             ops.update_submodule("nonexistent", &SubmoduleUpdateOptions::default())
                 .is_err()
@@ -190,8 +189,8 @@ mod git2_ops_tests {
     fn test_delete_submodule_not_found() {
         let harness = TestHarness::new().expect("harness");
         harness.init_git_repo().expect("init repo");
-        let mut ops = Git2Operations::new(Some(&harness.work_dir)).expect("ops");
-        assert!(ops.delete_submodule("nonexistent").is_err());
+        let mut ops = GitOpsManager::new(Some(&harness.work_dir), false).expect("mgr");
+        assert!(ops.delete_submodule("nonexistent", false).is_err());
     }
 
     #[test]
@@ -206,7 +205,7 @@ mod git2_ops_tests {
     fn test_fetch_submodule_not_found() {
         let harness = TestHarness::new().expect("harness");
         harness.init_git_repo().expect("init repo");
-        let ops = Git2Operations::new(Some(&harness.work_dir)).expect("ops");
+        let ops = GitOpsManager::new(Some(&harness.work_dir), false).expect("mgr");
         assert!(ops.fetch_submodule("nonexistent").is_err());
     }
 
@@ -214,7 +213,7 @@ mod git2_ops_tests {
     fn test_reset_submodule_not_found() {
         let harness = TestHarness::new().expect("harness");
         harness.init_git_repo().expect("init repo");
-        let ops = Git2Operations::new(Some(&harness.work_dir)).expect("ops");
+        let ops = GitOpsManager::new(Some(&harness.work_dir), false).expect("mgr");
         assert!(ops.reset_submodule("nonexistent", true).is_err());
     }
 
@@ -222,7 +221,7 @@ mod git2_ops_tests {
     fn test_clean_submodule_not_found() {
         let harness = TestHarness::new().expect("harness");
         harness.init_git_repo().expect("init repo");
-        let ops = Git2Operations::new(Some(&harness.work_dir)).expect("ops");
+        let ops = GitOpsManager::new(Some(&harness.work_dir), false).expect("mgr");
         assert!(ops.clean_submodule("nonexistent", true, true).is_err());
     }
 
@@ -230,7 +229,7 @@ mod git2_ops_tests {
     fn test_stash_submodule_not_found() {
         let harness = TestHarness::new().expect("harness");
         harness.init_git_repo().expect("init repo");
-        let ops = Git2Operations::new(Some(&harness.work_dir)).expect("ops");
+        let ops = GitOpsManager::new(Some(&harness.work_dir), false).expect("mgr");
         assert!(ops.stash_submodule("nonexistent", false).is_err());
     }
 
@@ -238,7 +237,7 @@ mod git2_ops_tests {
     fn test_enable_sparse_checkout_not_found() {
         let harness = TestHarness::new().expect("harness");
         harness.init_git_repo().expect("init repo");
-        let ops = Git2Operations::new(Some(&harness.work_dir)).expect("ops");
+        let ops = GitOpsManager::new(Some(&harness.work_dir), false).expect("mgr");
         assert!(ops.enable_sparse_checkout("nonexistent").is_err());
     }
 
@@ -246,7 +245,7 @@ mod git2_ops_tests {
     fn test_set_sparse_patterns_not_found() {
         let harness = TestHarness::new().expect("harness");
         harness.init_git_repo().expect("init repo");
-        let ops = Git2Operations::new(Some(&harness.work_dir)).expect("ops");
+        let ops = GitOpsManager::new(Some(&harness.work_dir), false).expect("mgr");
         assert!(
             ops.set_sparse_patterns("nonexistent", &["src/".to_string()])
                 .is_err()
@@ -259,15 +258,6 @@ mod git2_ops_tests {
         harness.init_git_repo().expect("init repo");
         let ops = Git2Operations::new(Some(&harness.work_dir)).expect("ops");
         assert!(ops.get_sparse_patterns("nonexistent").is_err());
-    }
-
-    #[test]
-    fn test_apply_sparse_checkout_not_supported() {
-        let harness = TestHarness::new().expect("harness");
-        harness.init_git_repo().expect("init repo");
-        let ops = Git2Operations::new(Some(&harness.work_dir)).expect("ops");
-        // git2 apply_sparse_checkout is always an error.
-        assert!(ops.apply_sparse_checkout("any").is_err());
     }
 
     // ---- Tests with a real submodule (set up via CLI) ----------------------
@@ -405,7 +395,7 @@ mod git2_ops_tests {
             ])
             .expect("add submodule");
 
-        let ops = Git2Operations::new(Some(&harness.work_dir)).expect("ops");
+        let ops = GitOpsManager::new(Some(&harness.work_dir), false).expect("mgr");
 
         ops.enable_sparse_checkout("lib/sparsesub")
             .expect("enable_sparse_checkout");
@@ -421,7 +411,7 @@ mod git2_ops_tests {
     }
 
     #[test]
-    fn test_with_submodule_write_gitmodules_updates_existing() {
+    fn test_native_metadata_update_preserves_checkout() {
         let harness = TestHarness::new().expect("harness");
         harness.init_git_repo().expect("init repo");
         let remote = harness.create_test_remote("g2_write_sub").expect("remote");
@@ -438,38 +428,29 @@ mod git2_ops_tests {
             ])
             .expect("add submodule");
 
-        let mut ops = Git2Operations::new(Some(&harness.work_dir)).expect("ops");
-        let mut entries = ops.read_gitmodules().expect("read_gitmodules");
-        // write_gitmodules with the same entries should succeed without error
-        ops.write_gitmodules(&entries).expect("write_gitmodules");
-
-        // Verify that updating `active` sets it in the git configuration
-        // In .gitmodules the git2 fallback might name the submodule by its path 'lib/writesub'
-        let name = if entries.get("write-sub").is_some() {
-            "write-sub"
-        } else {
-            "lib/writesub"
-        };
-
-        if let Some(mut entry) = entries.get(name).cloned() {
-            entry.active = Some(false);
-            entries.update_entry(name.to_string(), entry);
-        }
-        ops.write_gitmodules(&entries)
-            .expect("write_gitmodules active false");
-
-        // Check git2 config manually or via read_gitmodules? Actually read_gitmodules in git2
-        // doesn't read active from .git/config, but wait, it is set in `.git/config`!
-        let config_path = harness.work_dir.join(".git").join("config");
-        let config_content = std::fs::read_to_string(&config_path).expect("read git config");
-        assert!(
-            config_content.contains("active = false"),
-            "submodule should be inactive in config"
+        let before_head = harness.git_stdout(&["-C", "lib/writesub", "rev-parse", "HEAD"]);
+        let before_index = harness.git_stdout(&["ls-files", "--stage", "--", "lib/writesub"]);
+        harness
+            .run_submod_success(&["change", "write-sub", "--active", "false"])
+            .expect("native metadata update");
+        assert_eq!(
+            harness.git_stdout(&["config", "--get", "submodule.write-sub.active"]),
+            "false"
+        );
+        assert!(!harness.gitmodules_entries().contains(".active"));
+        assert!(harness.read_config().unwrap().contains("active = false"));
+        assert_eq!(
+            harness.git_stdout(&["-C", "lib/writesub", "rev-parse", "HEAD"]),
+            before_head
+        );
+        assert_eq!(
+            harness.git_stdout(&["ls-files", "--stage", "--", "lib/writesub"]),
+            before_index
         );
     }
 
     #[test]
-    fn test_with_submodule_write_gitmodules_active_none() {
+    fn test_native_metadata_roundtrip_preserves_unspecified_activation() {
         let harness = TestHarness::new().expect("harness");
         harness.init_git_repo().expect("init repo");
         let remote = harness
@@ -488,27 +469,30 @@ mod git2_ops_tests {
             ])
             .expect("add submodule");
 
-        let mut ops = Git2Operations::new(Some(&harness.work_dir)).expect("ops");
-        let mut entries = ops.read_gitmodules().expect("read_gitmodules");
-
-        let name = if entries.get("write-sub-none").is_some() {
-            "write-sub-none"
-        } else {
-            "lib/writesubnone"
-        };
-
-        if let Some(mut entry) = entries.get(name).cloned() {
-            entry.active = None;
-            entries.update_entry(name.to_string(), entry);
-        }
-        ops.write_gitmodules(&entries)
-            .expect("write_gitmodules active none");
-
-        let config_path = harness.work_dir.join(".git").join("config");
-        let config_content = std::fs::read_to_string(&config_path).expect("read git config");
-        assert!(
-            !config_content.contains("active ="),
-            "submodule active should be untouched"
+        harness.git_stdout(&["config", "submodule.write-sub-none.custom", "retained"]);
+        let before_head = harness.git_stdout(&["-C", "lib/writesubnone", "rev-parse", "HEAD"]);
+        let before_index = harness.git_stdout(&["ls-files", "--stage", "--", "lib/writesubnone"]);
+        let before_active =
+            harness.git_stdout(&["config", "--get", "submodule.write-sub-none.active"]);
+        harness
+            .run_submod_success(&["change", "write-sub-none", "--url", &remote_url])
+            .expect("native metadata round-trip without activation option");
+        assert_eq!(
+            harness.git_stdout(&["config", "--get", "submodule.write-sub-none.active"]),
+            before_active
+        );
+        assert_eq!(
+            harness.git_stdout(&["config", "--get", "submodule.write-sub-none.custom"]),
+            "retained"
+        );
+        assert!(!harness.gitmodules_entries().contains(".active"));
+        assert_eq!(
+            harness.git_stdout(&["-C", "lib/writesubnone", "rev-parse", "HEAD"]),
+            before_head
+        );
+        assert_eq!(
+            harness.git_stdout(&["ls-files", "--stage", "--", "lib/writesubnone"]),
+            before_index
         );
     }
 }
@@ -520,7 +504,6 @@ mod git2_ops_tests {
 #[cfg(test)]
 mod gix_ops_tests {
     use super::*;
-    use submod::config::SubmoduleAddOptions;
 
     #[test]
     fn test_new_from_valid_path() {
@@ -575,10 +558,8 @@ mod gix_ops_tests {
     fn test_write_git_config_local() {
         let harness = TestHarness::new().expect("harness");
         harness.init_git_repo().expect("init repo");
-        let ops = GixOperations::new(Some(&harness.work_dir)).expect("ops");
+        let mgr = GitOpsManager::new(Some(&harness.work_dir), false).expect("mgr");
 
-        // gix write_git_config requires 3-part keys (section.subsection.name).
-        // 2-part keys produce an empty "name" segment which gix rejects.
         let mut entries = HashMap::new();
         entries.insert(
             "remote.testremote.url".to_string(),
@@ -586,11 +567,14 @@ mod gix_ops_tests {
         );
         let config = GitConfig { entries };
 
-        let result = ops.write_git_config(&config, ConfigLevel::Local);
-        assert!(
-            result.is_ok(),
-            "writing a 3-part key to local config should succeed: {:?}",
-            result.err()
+        mgr.write_git_config(&config, ConfigLevel::Local)
+            .expect("writing a 3-part key to local config should succeed");
+        assert_eq!(
+            harness
+                .git_stdout(&["config", "--local", "--get", "remote.testremote.url"])
+                .trim(),
+            "https://example.com",
+            "written value must land in real local Git config"
         );
     }
 
@@ -598,54 +582,36 @@ mod gix_ops_tests {
     fn test_write_git_config_global_level_fails() {
         let harness = TestHarness::new().expect("harness");
         harness.init_git_repo().expect("init repo");
-        let ops = GixOperations::new(Some(&harness.work_dir)).expect("ops");
+        let mgr = GitOpsManager::new(Some(&harness.work_dir), false).expect("mgr");
 
         let config = GitConfig {
             entries: HashMap::new(),
         };
-        let result = ops.write_git_config(&config, ConfigLevel::Global);
+        let result = mgr.write_git_config(&config, ConfigLevel::Global);
         assert!(
             result.is_err(),
-            "gix only supports local config writing; global should fail"
+            "the manager only supports local config writing; global should fail"
         );
     }
 
     #[test]
-    fn test_write_git_config_two_part_key_fails() {
+    fn test_write_git_config_two_part_key_succeeds() {
         let harness = TestHarness::new().expect("harness");
         harness.init_git_repo().expect("init repo");
-        let ops = GixOperations::new(Some(&harness.work_dir)).expect("ops");
-        // gix write_git_config splits on '.' with splitn(3, '.'), mapping
-        // "section.name" → section="section", subsection=Some("name"), name="".
-        // An empty name is invalid, so 2-part keys are rejected.
+        let mgr = GitOpsManager::new(Some(&harness.work_dir), false).expect("mgr");
+        // Native `git config --local` accepts 2-part keys; the old gix
+        // restriction no longer applies.
         let mut entries = HashMap::new();
         entries.insert("submod.gixkey".to_string(), "gixvalue".to_string());
         let config = GitConfig { entries };
-        let result = ops.write_git_config(&config, ConfigLevel::Local);
-        assert!(
-            result.is_err(),
-            "gix write_git_config rejects 2-part keys (name part is empty)"
-        );
-    }
-
-    #[test]
-    fn test_set_config_value_local() {
-        let harness = TestHarness::new().expect("harness");
-        harness.init_git_repo().expect("init repo");
-        let ops = GixOperations::new(Some(&harness.work_dir)).expect("ops");
-        // set_config_value reads the existing config then calls write_git_config.
-        // The existing local config contains 2-part keys (e.g. user.name) that
-        // gix cannot round-trip through write_git_config, so this always fails.
-        // The test exists to exercise the set_config_value → read → merge → write
-        // code path for coverage.
-        let result = ops.set_config_value(
-            "remote.gixremote.url",
-            "https://gix.example.com",
-            ConfigLevel::Local,
-        );
-        assert!(
-            result.is_err(),
-            "expected failure: existing 2-part config keys cannot be round-tripped by gix"
+        mgr.write_git_config(&config, ConfigLevel::Local)
+            .expect("native write accepts 2-part keys");
+        assert_eq!(
+            harness
+                .git_stdout(&["config", "--local", "--get", "submod.gixkey"])
+                .trim(),
+            "gixvalue",
+            "written 2-part value must land in real local Git config"
         );
     }
 
@@ -653,9 +619,9 @@ mod gix_ops_tests {
     fn test_write_gitmodules_creates_file() {
         let harness = TestHarness::new().expect("harness");
         harness.init_git_repo().expect("init repo");
-        let mut ops = GixOperations::new(Some(&harness.work_dir)).expect("ops");
+        let mut mgr = GitOpsManager::new(Some(&harness.work_dir), false).expect("mgr");
 
-        ops.write_gitmodules(&one_entry_entries())
+        mgr.write_gitmodules(&one_entry_entries())
             .expect("write_gitmodules should succeed");
 
         // The .gitmodules file should be created.
@@ -672,168 +638,32 @@ mod gix_ops_tests {
     }
 
     #[test]
-    fn test_write_gitmodules_active_false() {
+    fn test_write_gitmodules_keeps_active_app_only() {
         let harness = TestHarness::new().expect("harness");
         harness.init_git_repo().expect("init repo");
-        let mut ops = GixOperations::new(Some(&harness.work_dir)).expect("ops");
+        let mut mgr = GitOpsManager::new(Some(&harness.work_dir), false).expect("mgr");
 
-        let mut entries = one_entry_entries();
-        if let Some(mut entry) = entries.get("test-lib").cloned() {
-            entry.active = Some(false);
-            entries.update_entry("test-lib".to_string(), entry);
+        for active in [Some(false), None] {
+            let mut entries = one_entry_entries();
+            if let Some(mut entry) = entries.get("test-lib").cloned() {
+                entry.active = active;
+                entries.update_entry("test-lib".to_string(), entry);
+            }
+
+            mgr.write_gitmodules(&entries)
+                .expect("write_gitmodules should succeed");
+
+            let content = std::fs::read_to_string(harness.work_dir.join(".gitmodules"))
+                .expect("read .gitmodules");
+            assert!(
+                !content.contains("active"),
+                "active stays app-only and must not leak into .gitmodules (active={active:?})"
+            );
+            assert!(
+                content.contains("lib/test"),
+                ".gitmodules should still contain the path we wrote"
+            );
         }
-
-        ops.write_gitmodules(&entries)
-            .expect("write_gitmodules should succeed");
-
-        let content = std::fs::read_to_string(harness.work_dir.join(".gitmodules"))
-            .expect("read .gitmodules");
-        assert!(
-            content.contains("active = false"),
-            ".gitmodules should contain active = false"
-        );
-    }
-
-    #[test]
-    fn test_write_gitmodules_active_none() {
-        let harness = TestHarness::new().expect("harness");
-        harness.init_git_repo().expect("init repo");
-        let mut ops = GixOperations::new(Some(&harness.work_dir)).expect("ops");
-
-        let mut entries = one_entry_entries();
-        if let Some(mut entry) = entries.get("test-lib").cloned() {
-            entry.active = None;
-            entries.update_entry("test-lib".to_string(), entry);
-        }
-
-        ops.write_gitmodules(&entries).expect("write_gitmodules");
-        let content = std::fs::read_to_string(harness.work_dir.join(".gitmodules")).expect("read");
-        assert!(!content.contains("active ="));
-    }
-
-    #[test]
-    fn test_write_gitmodules_empty_entries() {
-        let harness = TestHarness::new().expect("harness");
-        harness.init_git_repo().expect("init repo");
-        let mut ops = GixOperations::new(Some(&harness.work_dir)).expect("ops");
-        // Writing empty entries should succeed and create an empty .gitmodules file.
-        ops.write_gitmodules(&SubmoduleEntries::default())
-            .expect("write empty gitmodules should succeed");
-    }
-
-    // ---- Stubs that always return errors ----------------------------------
-
-    #[test]
-    fn test_add_submodule_not_implemented() {
-        let harness = TestHarness::new().expect("harness");
-        harness.init_git_repo().expect("init repo");
-        let mut ops = GixOperations::new(Some(&harness.work_dir)).expect("ops");
-        let add_opts = SubmoduleAddOptions {
-            name: "stub-sub".to_string(),
-            path: std::path::PathBuf::from("lib/stub"),
-            url: "https://example.com/repo.git".to_string(),
-            branch: None,
-            ignore: None,
-            update: None,
-            fetch_recurse: None,
-            shallow: false,
-            no_init: false,
-        };
-        let result = ops.add_submodule(&add_opts);
-        assert!(
-            result.is_err(),
-            "gix add_submodule should be not implemented"
-        );
-        let msg = result.unwrap_err().to_string();
-        assert!(
-            msg.contains("gix add_submodule not implemented"),
-            "unexpected error: {msg}"
-        );
-    }
-
-    #[test]
-    fn test_get_submodule_status_not_implemented() {
-        let harness = TestHarness::new().expect("harness");
-        harness.init_git_repo().expect("init repo");
-        let ops = GixOperations::new(Some(&harness.work_dir)).expect("ops");
-        assert!(ops.get_submodule_status("any").is_err());
-    }
-
-    #[test]
-    fn test_reset_submodule_not_supported() {
-        let harness = TestHarness::new().expect("harness");
-        harness.init_git_repo().expect("init repo");
-        let ops = GixOperations::new(Some(&harness.work_dir)).expect("ops");
-        let err = ops.reset_submodule("any", true).unwrap_err().to_string();
-        assert!(
-            err.contains("not yet supported"),
-            "unexpected message: {err}"
-        );
-    }
-
-    #[test]
-    fn test_clean_submodule_not_supported() {
-        let harness = TestHarness::new().expect("harness");
-        harness.init_git_repo().expect("init repo");
-        let ops = GixOperations::new(Some(&harness.work_dir)).expect("ops");
-        let err = ops
-            .clean_submodule("any", true, true)
-            .unwrap_err()
-            .to_string();
-        assert!(
-            err.contains("not yet supported"),
-            "unexpected message: {err}"
-        );
-    }
-
-    #[test]
-    fn test_stash_submodule_not_supported() {
-        let harness = TestHarness::new().expect("harness");
-        harness.init_git_repo().expect("init repo");
-        let ops = GixOperations::new(Some(&harness.work_dir)).expect("ops");
-        let err = ops.stash_submodule("any", false).unwrap_err().to_string();
-        assert!(
-            err.contains("not yet supported"),
-            "unexpected message: {err}"
-        );
-    }
-
-    #[test]
-    fn test_enable_sparse_checkout_deferred() {
-        let harness = TestHarness::new().expect("harness");
-        harness.init_git_repo().expect("init repo");
-        let ops = GixOperations::new(Some(&harness.work_dir)).expect("ops");
-        // Deferred to git2 — always returns an error from gix.
-        assert!(ops.enable_sparse_checkout("any").is_err());
-    }
-
-    #[test]
-    fn test_set_sparse_patterns_deferred() {
-        let harness = TestHarness::new().expect("harness");
-        harness.init_git_repo().expect("init repo");
-        let ops = GixOperations::new(Some(&harness.work_dir)).expect("ops");
-        assert!(
-            ops.set_sparse_patterns("any", &["src/".to_string()])
-                .is_err()
-        );
-    }
-
-    #[test]
-    fn test_get_sparse_patterns_deferred() {
-        let harness = TestHarness::new().expect("harness");
-        harness.init_git_repo().expect("init repo");
-        let ops = GixOperations::new(Some(&harness.work_dir)).expect("ops");
-        assert!(ops.get_sparse_patterns("any").is_err());
-    }
-
-    #[test]
-    fn test_apply_sparse_checkout_deferred() {
-        let harness = TestHarness::new().expect("harness");
-        harness.init_git_repo().expect("init repo");
-        let ops = GixOperations::new(Some(&harness.work_dir)).expect("ops");
-        // apply_sparse_checkout calls get_sparse_patterns internally, which
-        // also defers to git2 and errors immediately.
-        assert!(ops.apply_sparse_checkout("any").is_err());
     }
 
     // ---- Tests with a real submodule (set up via CLI) --------------------
@@ -872,7 +702,7 @@ mod gix_ops_tests {
     fn test_gix_deinit_submodule_not_found() {
         let harness = TestHarness::new().expect("harness");
         harness.init_git_repo().expect("init repo");
-        let mut ops = GixOperations::new(Some(&harness.work_dir)).expect("ops");
+        let mut ops = GitOpsManager::new(Some(&harness.work_dir), false).expect("mgr");
         // deinit reads .gitmodules first; if the path isn't there it should error.
         let result = ops.deinit_submodule("nonexistent", true);
         assert!(result.is_err(), "should fail for nonexistent submodule");
@@ -882,8 +712,8 @@ mod gix_ops_tests {
     fn test_gix_delete_submodule_not_found() {
         let harness = TestHarness::new().expect("harness");
         harness.init_git_repo().expect("init repo");
-        let mut ops = GixOperations::new(Some(&harness.work_dir)).expect("ops");
-        let result = ops.delete_submodule("nonexistent");
+        let mut ops = GitOpsManager::new(Some(&harness.work_dir), false).expect("mgr");
+        let result = ops.delete_submodule("nonexistent", false);
         assert!(result.is_err(), "should fail for nonexistent submodule");
     }
 }
@@ -973,11 +803,11 @@ mod git_ops_manager_tests {
         entries.insert("submod.mgrkey".to_string(), "mgrvalue".to_string());
         let config = GitConfig { entries };
 
-        // The manager falls back to git2 for this 2-part key (gix rejects it).
+        // The manager writes natively; 2-part keys are accepted.
         mgr.write_git_config(&config, ConfigLevel::Local)
-            .expect("write_git_config should succeed via git2 fallback");
+            .expect("write_git_config should succeed");
 
-        // Read back using git2 directly to avoid gix snapshot-caching issues.
+        // Read back through the retained git2 reader.
         let git2_ops = Git2Operations::new(Some(&harness.work_dir)).expect("git2");
         let read_back = git2_ops
             .read_git_config(ConfigLevel::Local)
@@ -1003,11 +833,11 @@ mod git_ops_manager_tests {
     }
 
     #[test]
-    fn test_apply_sparse_checkout_fallback_chain() {
+    fn test_apply_sparse_checkout_rejects_unknown_path() {
         let harness = TestHarness::new().expect("harness");
         harness.init_git_repo().expect("init repo");
         let mgr = GitOpsManager::new(Some(&harness.work_dir), false).expect("mgr");
-        // gix → git2 → CLI fallback; will ultimately fail since no submodule/path exists.
+        // Native sparse application; fails since no submodule/path exists.
         let result = mgr.apply_sparse_checkout("nonexistent_path_xyz");
         assert!(
             result.is_err(),
@@ -1133,5 +963,905 @@ mod data_types_tests {
             entries: HashMap::new(),
         };
         assert!(config.entries.is_empty());
+    }
+}
+
+#[test]
+fn regression_r04_delete_preserves_prefix_sibling_index_entries() {
+    let h = TestHarness::new().unwrap();
+    h.init_git_repo().unwrap();
+    let remote = h.create_test_remote("prefix").unwrap();
+    std::fs::write(h.work_dir.join("library.txt"), b"sibling").unwrap();
+    std::fs::create_dir(h.work_dir.join("lib-extra")).unwrap();
+    std::fs::write(h.work_dir.join("lib-extra/file"), b"other sibling").unwrap();
+    h.git_stdout(&["add", "library.txt", "lib-extra/file"]);
+    h.git_stdout(&[
+        "submodule",
+        "add",
+        "--name",
+        "lib",
+        remote.to_str().unwrap(),
+        "lib",
+    ]);
+    h.create_config(&format!(
+        "[m]\npath = \"lib\"\nurl = {:?}\n",
+        remote.to_str().unwrap()
+    ))
+    .unwrap();
+    let before = h.git_stdout(&["ls-files", "--stage", "--", "library.txt", "lib-extra/file"]);
+    assert_eq!(h.index_gitlink_mode("lib").as_deref(), Some("160000"));
+    h.run_submod_success(&["delete", "m"]).unwrap();
+    assert_eq!(
+        h.git_stdout(&["ls-files", "--stage", "--", "library.txt", "lib-extra/file"]),
+        before
+    );
+    assert_eq!(
+        std::fs::read(h.work_dir.join("library.txt")).unwrap(),
+        b"sibling"
+    );
+    assert_eq!(
+        std::fs::read(h.work_dir.join("lib-extra/file")).unwrap(),
+        b"other sibling"
+    );
+    assert_eq!(h.index_gitlink_mode("lib"), None);
+}
+
+#[test]
+fn regression_r04_delete_refuses_held_index_lock() {
+    let h = TestHarness::new().unwrap();
+    h.init_git_repo().unwrap();
+    let remote = h.create_test_remote("locked").unwrap();
+    h.git_stdout(&[
+        "submodule",
+        "add",
+        "--name",
+        "m",
+        remote.to_str().unwrap(),
+        "lib",
+    ]);
+    h.create_config(&format!(
+        "[m]\npath = \"lib\"\nurl = {:?}\n",
+        remote.to_str().unwrap()
+    ))
+    .unwrap();
+    let before = h.preservation_snapshot();
+    let contents = std::fs::read(h.work_dir.join("lib/LICENSE")).unwrap();
+    std::fs::write(h.work_dir.join(".git/index.lock"), "held by test\n").unwrap();
+    let output = h.run_submod(&["delete", "m"]).unwrap();
+    assert_eq!(
+        h.preservation_snapshot(),
+        before,
+        "locked index must prevent all mutation: {output:?}"
+    );
+    assert_eq!(
+        std::fs::read(h.work_dir.join("lib/LICENSE")).ok(),
+        Some(contents)
+    );
+    assert!(!output.status.success(), "{output:?}");
+}
+
+#[test]
+fn regression_r16_duplicate_paths_rejected_before_init() {
+    let h = TestHarness::new().unwrap();
+    h.init_git_repo().unwrap();
+    let remote = h.create_test_remote("duplicate").unwrap();
+    h.create_config(&format!(
+        "[alias]\npath = \"lib\"\nurl = {0:?}\n[other]\npath = \"lib\"\nurl = {0:?}\n",
+        remote.to_str().unwrap()
+    ))
+    .unwrap();
+    let before = h.preservation_snapshot();
+    let output = h.run_submod(&["init"]).unwrap();
+    assert_eq!(
+        h.preservation_snapshot(),
+        before,
+        "duplicate paths mutated state: {output:?}"
+    );
+    assert!(!h.work_dir.join("lib").exists());
+    assert!(!output.status.success(), "{output:?}");
+}
+
+#[test]
+fn test_fixture_path_display_preserves_drive_and_relative_paths() {
+    for spelling in [
+        "C:/fixtures/remote.git",
+        "relative/remote.git",
+        "/tmp/remote.git",
+    ] {
+        assert_eq!(
+            common::TestPath(std::path::PathBuf::from(spelling))
+                .display()
+                .to_string(),
+            spelling
+        );
+    }
+}
+
+#[test]
+fn phase2_r16_overlapping_paths_rejected_before_init() {
+    let h = TestHarness::new().unwrap();
+    h.init_git_repo().unwrap();
+    let remote = h.create_test_remote("overlap").unwrap();
+    h.create_config(&format!(
+        "[parent]\npath = \"lib\"\nurl = {0:?}\n[child]\npath = \"lib/nested\"\nurl = {0:?}\n",
+        remote.to_str().unwrap()
+    ))
+    .unwrap();
+    let before = h.preservation_snapshot();
+    let output = h.run_submod(&["init"]).unwrap();
+    assert_eq!(h.preservation_snapshot(), before, "{output:?}");
+    assert!(!h.work_dir.join("lib").exists(), "{output:?}");
+    assert!(!output.status.success(), "{output:?}");
+}
+
+#[test]
+fn phase2_r16_formatted_logical_name_reused_by_exact_path() {
+    let h = TestHarness::new().unwrap();
+    h.init_git_repo().unwrap();
+    let remote = h.create_test_remote("logical").unwrap();
+    h.git_stdout(&[
+        "submodule",
+        "add",
+        "--name",
+        "logical.name",
+        remote.to_str().unwrap(),
+        "vendor/child",
+    ]);
+    h.create_config(&format!(
+        "[alias]\npath = \"vendor/child\"\nurl = {:?}\n",
+        remote.to_str().unwrap()
+    ))
+    .unwrap();
+    // Git accepts quoted values and compact assignment; substring matching does not.
+    std::fs::write(h.work_dir.join(".gitmodules"), format!("# preserve this comment\n[submodule \"logical.name\"]\n\tpath=\"vendor/child\"\n\turl={:?}\n", remote.to_str().unwrap())).unwrap();
+    h.git_stdout(&["add", ".gitmodules", "submod.toml"]);
+    h.git_stdout(&["commit", "-m", "registered logical identity"]);
+    let child = h.work_dir.join("vendor/child");
+    let head = h.git_at(&child, &["rev-parse", "HEAD"]);
+    let gitdir = h.git_at(&child, &["rev-parse", "--absolute-git-dir"]);
+    let index = h.git_stdout(&["ls-files", "--stage"]);
+    let output = h.run_submod(&["init"]).unwrap();
+    assert!(output.status.success(), "{output:?}");
+    assert_eq!(
+        h.git_stdout(&[
+            "config",
+            "--file",
+            ".gitmodules",
+            "--get-regexp",
+            r"^submodule\..*\.path$"
+        ]),
+        "submodule.logical.name.path vendor/child"
+    );
+    assert_eq!(h.git_at(&child, &["rev-parse", "HEAD"]), head);
+    assert_eq!(
+        h.git_at(&child, &["rev-parse", "--absolute-git-dir"]),
+        gitdir
+    );
+    assert_eq!(h.git_stdout(&["ls-files", "--stage"]), index);
+    assert!(!h.work_dir.join("alias").exists());
+}
+
+#[test]
+fn phase2_r16_prefix_registration_does_not_match_new_path() {
+    let h = TestHarness::new().unwrap();
+    h.init_git_repo().unwrap();
+    let remote = h.create_test_remote("prefix-match").unwrap();
+    h.git_stdout(&[
+        "submodule",
+        "add",
+        "--name",
+        "existing",
+        remote.to_str().unwrap(),
+        "library",
+    ]);
+    h.create_config(&format!(
+        "[alias]\npath = \"lib\"\nurl = {:?}\n",
+        remote.to_str().unwrap()
+    ))
+    .unwrap();
+    let existing_head = h.git_at(&h.work_dir.join("library"), &["rev-parse", "HEAD"]);
+    let existing_index = h.git_stdout(&["ls-files", "--stage", "--", "library"]);
+    let output = h.run_submod(&["init"]).unwrap();
+    assert!(output.status.success(), "{output:?}");
+    assert_eq!(
+        h.git_stdout(&[
+            "config",
+            "--file",
+            ".gitmodules",
+            "--get",
+            "submodule.alias.path"
+        ]),
+        "lib"
+    );
+    assert_eq!(h.index_gitlink_mode("lib").as_deref(), Some("160000"));
+    assert!(h.work_dir.join("lib/LICENSE").is_file());
+    assert_eq!(
+        h.git_at(&h.work_dir.join("library"), &["rev-parse", "HEAD"]),
+        existing_head
+    );
+    assert_eq!(
+        h.git_stdout(&["ls-files", "--stage", "--", "library"]),
+        existing_index
+    );
+}
+
+#[test]
+fn phase2_context_nested_cwd_add_uses_repository_root() {
+    let h = TestHarness::new().unwrap();
+    h.init_git_repo().unwrap();
+    h.create_config("[defaults]\n").unwrap();
+    let remote = h.create_test_remote("nested-context").unwrap();
+    let nested = h.work_dir.join("nested/deeper");
+    std::fs::create_dir_all(&nested).unwrap();
+    let refs = h.git_stdout(&["show-ref"]);
+    let root_index = h.git_stdout(&["ls-files", "--stage", "--", "README.md"]);
+    let output = h
+        .run_submod_at(
+            &nested,
+            &[
+                "add",
+                remote.to_str().unwrap(),
+                "--name",
+                "alias",
+                "--path",
+                "vendor/child",
+            ],
+        )
+        .unwrap();
+    assert!(output.status.success(), "{output:?}");
+    assert_eq!(
+        h.index_gitlink_mode("vendor/child").as_deref(),
+        Some("160000")
+    );
+    assert!(h.work_dir.join("vendor/child/LICENSE").is_file());
+    assert!(h.read_config().unwrap().contains("[alias]"));
+    assert!(!nested.join("submod.toml").exists());
+    assert!(!nested.join("vendor").exists());
+    assert_eq!(h.git_stdout(&["show-ref"]), refs);
+    assert_eq!(
+        h.git_stdout(&["ls-files", "--stage", "--", "README.md"]),
+        root_index
+    );
+}
+
+#[test]
+fn phase2_context_linked_worktree_mutates_only_selected_checkout() {
+    let h = TestHarness::new().unwrap();
+    h.init_git_repo().unwrap();
+    h.create_config("[defaults]\n").unwrap();
+    h.git_stdout(&["add", "submod.toml"]);
+    h.git_stdout(&["commit", "-m", "shared initial configuration"]);
+    let remote = h.create_test_remote("linked-context").unwrap();
+    let linked = h.temp_dir.path().join("linked");
+    h.git_stdout(&[
+        "worktree",
+        "add",
+        "-b",
+        "linked-branch",
+        linked.to_str().unwrap(),
+    ]);
+    let main_index = h.git_stdout(&["ls-files", "--stage"]);
+    let main_config = std::fs::read(h.config_path()).unwrap();
+    let refs = h.git_stdout(&["show-ref"]);
+    let nested = linked.join("nested/deeper");
+    std::fs::create_dir_all(&nested).unwrap();
+    let output = h
+        .run_submod_at(
+            &nested,
+            &[
+                "add",
+                remote.to_str().unwrap(),
+                "--name",
+                "logical",
+                "--path",
+                "vendor/child",
+            ],
+        )
+        .unwrap();
+    assert!(output.status.success(), "{output:?}");
+    assert_eq!(
+        h.git_at(
+            &linked,
+            &[
+                "config",
+                "--file",
+                ".gitmodules",
+                "--get",
+                "submodule.logical.path"
+            ]
+        ),
+        "vendor/child"
+    );
+    assert!(
+        h.git_at(&linked, &["ls-files", "--stage", "--", "vendor/child"])
+            .starts_with("160000 ")
+    );
+    assert!(linked.join("vendor/child/LICENSE").is_file());
+    assert!(
+        std::fs::read_to_string(linked.join("submod.toml"))
+            .unwrap()
+            .contains("[logical]")
+    );
+    let child_gitdir = h.git_at(
+        &linked.join("vendor/child"),
+        &["rev-parse", "--absolute-git-dir"],
+    );
+    let expected_gitdir = h.git_at(
+        &linked,
+        &[
+            "rev-parse",
+            "--path-format=absolute",
+            "--git-path",
+            "modules/logical",
+        ],
+    );
+    assert_eq!(
+        std::fs::canonicalize(child_gitdir).unwrap(),
+        std::fs::canonicalize(expected_gitdir).unwrap()
+    );
+    assert!(!h.work_dir.join("vendor").exists());
+    assert!(!nested.join("vendor").exists());
+    assert!(!nested.join("submod.toml").exists());
+    assert_eq!(h.git_stdout(&["ls-files", "--stage"]), main_index);
+    assert_eq!(std::fs::read(h.config_path()).unwrap(), main_config);
+    assert_eq!(h.git_stdout(&["show-ref"]), refs);
+}
+
+#[test]
+fn phase2_r16_duplicate_git_registrations_rejected_before_mutation() {
+    let h = TestHarness::new().unwrap();
+    h.init_git_repo().unwrap();
+    let remote = h.create_test_remote("ambiguous-git").unwrap();
+    h.git_stdout(&[
+        "submodule",
+        "add",
+        "--name",
+        "logical",
+        remote.to_str().unwrap(),
+        "child",
+    ]);
+    h.git_stdout(&[
+        "config",
+        "--file",
+        ".gitmodules",
+        "submodule.other.path",
+        "child",
+    ]);
+    h.git_stdout(&[
+        "config",
+        "--file",
+        ".gitmodules",
+        "submodule.other.url",
+        remote.to_str().unwrap(),
+    ]);
+    h.git_stdout(&["add", ".gitmodules"]);
+    h.create_config(&format!(
+        "[alias]\npath = \"child\"\nurl = {:?}\n",
+        remote.to_str().unwrap()
+    ))
+    .unwrap();
+    let before = h.preservation_snapshot();
+    let child = h.work_dir.join("child");
+    let refs = h.git_at(&child, &["show-ref"]);
+    let contents = std::fs::read(child.join("LICENSE")).unwrap();
+    let output = h.run_submod(&["init"]).unwrap();
+    assert_eq!(h.preservation_snapshot(), before, "{output:?}");
+    assert_eq!(h.git_at(&child, &["show-ref"]), refs);
+    assert_eq!(std::fs::read(child.join("LICENSE")).unwrap(), contents);
+    assert!(
+        !output.status.success(),
+        "ambiguous registration accepted: {output:?}"
+    );
+}
+
+#[test]
+fn phase2_r16_case_colliding_paths_rejected_on_insensitive_filesystem() {
+    let h = TestHarness::new().unwrap();
+    h.init_git_repo().unwrap();
+    std::fs::write(h.work_dir.join("CaseProbe"), b"probe").unwrap();
+    if !h.work_dir.join("caseprobe").exists() {
+        return; // Case-sensitive filesystems permit these distinct paths.
+    }
+    let remote = h.create_test_remote("case-collision").unwrap();
+    h.create_config(&format!(
+        "[first]\npath = \"Lib\"\nurl = {0:?}\n[second]\npath = \"lib\"\nurl = {0:?}\n",
+        remote.to_str().unwrap()
+    ))
+    .unwrap();
+    let before = h.preservation_snapshot();
+    let output = h.run_submod(&["init"]).unwrap();
+    assert_eq!(h.preservation_snapshot(), before, "{output:?}");
+    assert!(!h.work_dir.join("Lib").exists(), "{output:?}");
+    assert!(!output.status.success(), "{output:?}");
+}
+
+#[test]
+fn phase2_r16_case_normalized_ancestor_overlap_rejected_before_init() {
+    let h = TestHarness::new().unwrap();
+    h.init_git_repo().unwrap();
+    let remote = h.create_test_remote("case-ancestor-overlap").unwrap();
+    h.create_config(&format!(
+        "[parent]\npath = \"Lib\"\nurl = {0:?}\n[child]\npath = \"lib/nested\"\nurl = {0:?}\n",
+        remote.to_str().unwrap()
+    ))
+    .unwrap();
+    let before = h.preservation_snapshot();
+    let output = h.run_submod(&["init"]).unwrap();
+    assert_eq!(h.preservation_snapshot(), before, "{output:?}");
+    assert!(!h.work_dir.join("Lib").exists(), "{output:?}");
+    assert!(!h.work_dir.join("lib").exists(), "{output:?}");
+    assert!(!output.status.success(), "{output:?}");
+}
+
+#[test]
+fn phase2_r16_existing_nested_logical_name_is_accepted_without_mutation() {
+    let h = TestHarness::new().unwrap();
+    h.init_git_repo().unwrap();
+    let remote = h.create_test_remote("nested-logical-name").unwrap();
+    h.git_stdout(&["submodule", "add", remote.to_str().unwrap(), "vendor/lib"]);
+    h.create_config(&format!(
+        "[nickname]\npath = \"vendor/lib\"\nurl = {:?}\n",
+        remote.to_str().unwrap()
+    ))
+    .unwrap();
+    h.git_stdout(&["add", "submod.toml"]);
+    h.git_stdout(&["commit", "-m", "native nested logical name"]);
+    assert_eq!(
+        h.git_stdout(&[
+            "config",
+            "--file",
+            ".gitmodules",
+            "--get-regexp",
+            r"^submodule\..*\.path$"
+        ]),
+        "submodule.vendor/lib.path vendor/lib"
+    );
+    let child = h.work_dir.join("vendor/lib");
+    let before = h.preservation_snapshot();
+    let head = h.git_at(&child, &["rev-parse", "HEAD"]);
+    let refs = h.git_at(&child, &["show-ref"]);
+    let index = h.git_at(&child, &["ls-files", "--stage"]);
+    let config = h.git_at(&child, &["config", "--local", "--list"]);
+    let gitdir = h.git_at(&child, &["rev-parse", "--absolute-git-dir"]);
+    let contents = std::fs::read(child.join("LICENSE")).unwrap();
+    let output = h.run_submod(&["init"]).unwrap();
+    assert!(output.status.success(), "{output:?}");
+    assert_eq!(h.preservation_snapshot(), before, "{output:?}");
+    assert_eq!(h.git_at(&child, &["rev-parse", "HEAD"]), head);
+    assert_eq!(h.git_at(&child, &["show-ref"]), refs);
+    assert_eq!(h.git_at(&child, &["ls-files", "--stage"]), index);
+    assert_eq!(h.git_at(&child, &["config", "--local", "--list"]), config);
+    assert_eq!(
+        h.git_at(&child, &["rev-parse", "--absolute-git-dir"]),
+        gitdir
+    );
+    assert_eq!(std::fs::read(child.join("LICENSE")).unwrap(), contents);
+}
+
+#[cfg(unix)] // Windows filenames cannot contain the literal '*' fixture component.
+#[test]
+fn phase2_r04_delete_literal_glob_preserves_unrelated_submodule() {
+    let h = TestHarness::new().unwrap();
+    h.init_git_repo().unwrap();
+    let remote = h.create_test_remote("literal-pathspec").unwrap();
+    for (name, path) in [("logical", "lib*"), ("sibling", "lib-extra")] {
+        h.git_stdout(&[
+            "--literal-pathspecs",
+            "submodule",
+            "add",
+            "--name",
+            name,
+            remote.to_str().unwrap(),
+            path,
+        ]);
+    }
+    h.git_stdout(&["commit", "-m", "Record literal and sibling gitlinks"]);
+    h.create_config(&format!(
+        "[logical]\npath = \"lib*\"\nurl = {:?}\n",
+        remote.to_str().unwrap()
+    ))
+    .unwrap();
+    let exact_stage =
+        |path: &str| h.git_stdout(&["--literal-pathspecs", "ls-files", "--stage", "--", path]);
+    assert!(exact_stage("lib*").starts_with("160000 "));
+    let sibling_stage = exact_stage("lib-extra");
+    assert!(sibling_stage.starts_with("160000 "));
+    let sibling_section = || {
+        h.git_stdout(&[
+            "config",
+            "-f",
+            ".gitmodules",
+            "--get-regexp",
+            "^submodule[.]sibling[.]",
+        ])
+    };
+    let section = sibling_section();
+    let local_config = h.git_stdout(&[
+        "config",
+        "--local",
+        "--get-regexp",
+        "^submodule[.]sibling[.]",
+    ]);
+    let child = h.work_dir.join("lib-extra");
+    let head = h.git_at(&child, &["rev-parse", "HEAD"]);
+    let refs = h.git_at(&child, &["show-ref"]);
+    let child_index = h.git_at(&child, &["ls-files", "--stage"]);
+    let gitdir = h.git_at(&child, &["rev-parse", "--absolute-git-dir"]);
+    let config_bytes = std::fs::read(std::path::Path::new(&gitdir).join("config")).unwrap();
+    let paths = h.git_at(&child, &["ls-files", "-z"]);
+    let files: Vec<_> = paths
+        .split('\0')
+        .filter(|path| !path.is_empty())
+        .chain(std::iter::once(".git"))
+        .map(|path| (path.to_owned(), std::fs::read(child.join(path)).unwrap()))
+        .collect();
+
+    h.run_submod_success(&["delete", "logical"]).unwrap();
+
+    assert_eq!(exact_stage("lib*"), "");
+    assert!(!h.work_dir.join("lib*").exists());
+    assert_eq!(exact_stage("lib-extra"), sibling_stage);
+    assert_eq!(sibling_section(), section);
+    assert_eq!(h.gitmodules_entries(), section);
+    assert_eq!(
+        h.git_stdout(&[
+            "config",
+            "--local",
+            "--get-regexp",
+            "^submodule[.]sibling[.]",
+        ]),
+        local_config
+    );
+    assert_eq!(h.git_at(&child, &["rev-parse", "HEAD"]), head);
+    assert_eq!(h.git_at(&child, &["show-ref"]), refs);
+    assert_eq!(h.git_at(&child, &["ls-files", "--stage"]), child_index);
+    assert_eq!(
+        h.git_at(&child, &["rev-parse", "--absolute-git-dir"]),
+        gitdir
+    );
+    assert_eq!(
+        std::fs::read(std::path::Path::new(&gitdir).join("config")).unwrap(),
+        config_bytes
+    );
+    for (path, bytes) in files {
+        assert_eq!(
+            std::fs::read(child.join(&path)).unwrap(),
+            bytes,
+            "sibling file changed: {path}"
+        );
+    }
+}
+
+#[test]
+fn phase2_r01_materialization_refuses_redirected_child_gitfile() {
+    for command in [vec!["update"], vec!["init"]] {
+        let h = TestHarness::new().unwrap();
+        h.init_git_repo().unwrap();
+        let other = TestHarness::new().unwrap();
+        other.init_git_repo().unwrap();
+        let remote = h.create_test_remote("materialization-redirect").unwrap();
+        h.git_stdout(&[
+            "submodule",
+            "add",
+            "--name",
+            "logical",
+            remote.to_str().unwrap(),
+            "child",
+        ]);
+        h.create_config(&format!(
+            "[logical]\npath = \"child\"\nurl = {:?}\n",
+            remote.to_str().unwrap()
+        ))
+        .unwrap();
+        h.git_stdout(&["add", "submod.toml"]);
+        h.git_stdout(&["commit", "-m", "Register intended child"]);
+        let child = h.work_dir.join("child");
+        let intended_head = h.git_at(&child, &["rev-parse", "HEAD"]);
+        let child_paths = h.git_at(&child, &["ls-files", "-z"]);
+        let child_files: Vec<_> = child_paths
+            .split('\0')
+            .filter(|path| !path.is_empty())
+            .map(|path| (path.to_owned(), std::fs::read(child.join(path)).unwrap()))
+            .collect();
+        std::fs::write(
+            other.work_dir.join("sentinel"),
+            b"unrelated committed bytes\0\xff",
+        )
+        .unwrap();
+        other.git_stdout(&["add", "sentinel"]);
+        other.git_stdout(&["commit", "-m", "Distinct unrelated history"]);
+        other.git_stdout(&["branch", "unrelated-history"]);
+        other.git_stdout(&["config", "core.worktree", other.work_dir.to_str().unwrap()]);
+        other.git_stdout(&["config", "submod.sentinel", "unrelated configuration"]);
+        let other_head = other.git_stdout(&["rev-parse", "HEAD"]);
+        assert_ne!(other_head, intended_head);
+        let other_gitdir = other.git_stdout(&["rev-parse", "--absolute-git-dir"]);
+        let pointer = format!("gitdir: {other_gitdir}\n");
+        std::fs::write(child.join(".git"), pointer.as_bytes()).unwrap();
+        let before = h.preservation_snapshot();
+        let parent_index = std::fs::read(h.work_dir.join(".git/index")).unwrap();
+        let other_before = other.preservation_snapshot();
+        let other_bytes: Vec<_> = [
+            ".git/HEAD",
+            ".git/index",
+            ".git/config",
+            ".git/refs/heads/unrelated-history",
+            "sentinel",
+        ]
+        .into_iter()
+        .map(|path| (path, std::fs::read(other.work_dir.join(path)).unwrap()))
+        .collect();
+
+        let output = h.run_submod(&command).unwrap();
+
+        assert!(
+            !output.status.success(),
+            "{command:?} accepted redirected child: {output:?}"
+        );
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        assert!(
+            !stderr.contains("unexpected argument"),
+            "{command:?}: {stderr}"
+        );
+        assert!(
+            stderr.contains("child") || stderr.contains("worktree") || stderr.contains("gitdir"),
+            "missing repository-boundary diagnostic: {stderr}"
+        );
+        assert_eq!(h.preservation_snapshot(), before, "{command:?}: {output:?}");
+        assert_eq!(
+            std::fs::read(h.work_dir.join(".git/index")).unwrap(),
+            parent_index
+        );
+        assert_eq!(
+            other.preservation_snapshot(),
+            other_before,
+            "{command:?}: {output:?}"
+        );
+        assert_eq!(other.git_stdout(&["rev-parse", "HEAD"]), other_head);
+        assert_eq!(
+            std::fs::read(child.join(".git")).unwrap(),
+            pointer.as_bytes()
+        );
+        for (path, bytes) in &child_files {
+            assert_eq!(
+                std::fs::read(child.join(path)).unwrap(),
+                *bytes,
+                "{command:?} changed child {path}"
+            );
+        }
+        for (path, bytes) in other_bytes {
+            assert_eq!(
+                std::fs::read(other.work_dir.join(path)).unwrap(),
+                bytes,
+                "{command:?} changed unrelated {path}"
+            );
+        }
+    }
+}
+
+#[cfg(unix)] // Windows filenames cannot contain the literal '*' fixture component.
+#[test]
+fn phase2_r23_move_literal_glob_preserves_unrelated_submodule() {
+    let h = TestHarness::new().unwrap();
+    h.init_git_repo().unwrap();
+    let remote = h.create_test_remote("literal-move-pathspec").unwrap();
+    for (name, path) in [("logical", "move*"), ("sibling", "move-extra")] {
+        h.git_stdout(&[
+            "--literal-pathspecs",
+            "submodule",
+            "add",
+            "--name",
+            name,
+            remote.to_str().unwrap(),
+            path,
+        ]);
+    }
+    h.git_stdout(&["commit", "-m", "Record literal and sibling gitlinks"]);
+    h.create_config(&format!(
+        "[logical]\npath = \"move*\"\nurl = {:?}\n",
+        remote.to_str().unwrap()
+    ))
+    .unwrap();
+    let exact_stage =
+        |path: &str| h.git_stdout(&["--literal-pathspecs", "ls-files", "--stage", "--", path]);
+    let source_stage = exact_stage("move*");
+    assert!(source_stage.starts_with("160000 "));
+    let source = h.work_dir.join("move*");
+    let source_head = h.git_at(&source, &["rev-parse", "HEAD"]);
+    let source_refs = h.git_at(&source, &["show-ref"]);
+    let source_gitdir = h.git_at(&source, &["rev-parse", "--absolute-git-dir"]);
+    let source_paths = h.git_at(&source, &["ls-files", "-z"]);
+    let source_files: Vec<_> = source_paths
+        .split('\0')
+        .filter(|path| !path.is_empty())
+        .map(|path| (path.to_owned(), std::fs::read(source.join(path)).unwrap()))
+        .collect();
+    let sibling_stage = exact_stage("move-extra");
+    assert!(sibling_stage.starts_with("160000 "));
+    let sibling_section = || {
+        h.git_stdout(&[
+            "config",
+            "-f",
+            ".gitmodules",
+            "--get-regexp",
+            "^submodule[.]sibling[.]",
+        ])
+    };
+    let section = sibling_section();
+    let local_config = h.git_stdout(&[
+        "config",
+        "--local",
+        "--get-regexp",
+        "^submodule[.]sibling[.]",
+    ]);
+    let child = h.work_dir.join("move-extra");
+    let head = h.git_at(&child, &["rev-parse", "HEAD"]);
+    let refs = h.git_at(&child, &["show-ref"]);
+    let child_index = h.git_at(&child, &["ls-files", "--stage"]);
+    let gitdir = h.git_at(&child, &["rev-parse", "--absolute-git-dir"]);
+    let config_bytes = std::fs::read(std::path::Path::new(&gitdir).join("config")).unwrap();
+    let paths = h.git_at(&child, &["ls-files", "-z"]);
+    let files: Vec<_> = paths
+        .split('\0')
+        .filter(|path| !path.is_empty())
+        .chain(std::iter::once(".git"))
+        .map(|path| (path.to_owned(), std::fs::read(child.join(path)).unwrap()))
+        .collect();
+
+    h.run_submod_success(&["change", "logical", "--path", "moved"])
+        .unwrap();
+
+    assert_eq!(exact_stage("move*"), "");
+    assert!(!h.work_dir.join("move*").exists());
+    assert_eq!(exact_stage("move-extra"), sibling_stage);
+    assert_eq!(sibling_section(), section);
+    assert_eq!(
+        exact_stage("moved"),
+        source_stage.replace("\tmove*", "\tmoved")
+    );
+    assert_eq!(
+        h.git_stdout(&[
+            "config",
+            "-f",
+            ".gitmodules",
+            "--get",
+            "submodule.logical.path"
+        ]),
+        "moved"
+    );
+    let moved = h.work_dir.join("moved");
+    assert_eq!(h.git_at(&moved, &["rev-parse", "HEAD"]), source_head);
+    assert_eq!(h.git_at(&moved, &["show-ref"]), source_refs);
+    assert_eq!(
+        h.git_at(&moved, &["rev-parse", "--absolute-git-dir"]),
+        source_gitdir
+    );
+    for (path, bytes) in source_files {
+        assert_eq!(
+            std::fs::read(moved.join(&path)).unwrap(),
+            bytes,
+            "moved file changed: {path}"
+        );
+    }
+    assert_eq!(
+        h.git_stdout(&[
+            "config",
+            "--local",
+            "--get-regexp",
+            "^submodule[.]sibling[.]",
+        ]),
+        local_config
+    );
+    assert_eq!(h.git_at(&child, &["rev-parse", "HEAD"]), head);
+    assert_eq!(h.git_at(&child, &["show-ref"]), refs);
+    assert_eq!(h.git_at(&child, &["ls-files", "--stage"]), child_index);
+    assert_eq!(
+        h.git_at(&child, &["rev-parse", "--absolute-git-dir"]),
+        gitdir
+    );
+    assert_eq!(
+        std::fs::read(std::path::Path::new(&gitdir).join("config")).unwrap(),
+        config_bytes
+    );
+    for (path, bytes) in files {
+        assert_eq!(
+            std::fs::read(child.join(&path)).unwrap(),
+            bytes,
+            "sibling file changed: {path}"
+        );
+    }
+}
+
+#[cfg(unix)] // Windows filenames cannot contain the literal ':' fixture component.
+#[test]
+fn phase2_r04_delete_literal_magic_preserves_unrelated_submodule() {
+    let h = TestHarness::new().unwrap();
+    h.init_git_repo().unwrap();
+    let remote = h.create_test_remote("literal-magic-pathspec").unwrap();
+    for (name, path) in [("logical", ":(top)magic"), ("sibling", "lib-extra")] {
+        h.git_stdout(&[
+            "--literal-pathspecs",
+            "submodule",
+            "add",
+            "--name",
+            name,
+            remote.to_str().unwrap(),
+            path,
+        ]);
+    }
+    h.git_stdout(&["commit", "-m", "Record literal and sibling gitlinks"]);
+    h.create_config(&format!(
+        "[logical]\npath = \":(top)magic\"\nurl = {:?}\n",
+        remote.to_str().unwrap()
+    ))
+    .unwrap();
+    let exact_stage =
+        |path: &str| h.git_stdout(&["--literal-pathspecs", "ls-files", "--stage", "--", path]);
+    assert!(exact_stage(":(top)magic").starts_with("160000 "));
+    let sibling_stage = exact_stage("lib-extra");
+    assert!(sibling_stage.starts_with("160000 "));
+    let sibling_section = || {
+        h.git_stdout(&[
+            "config",
+            "-f",
+            ".gitmodules",
+            "--get-regexp",
+            "^submodule[.]sibling[.]",
+        ])
+    };
+    let section = sibling_section();
+    let local_config = h.git_stdout(&[
+        "config",
+        "--local",
+        "--get-regexp",
+        "^submodule[.]sibling[.]",
+    ]);
+    let child = h.work_dir.join("lib-extra");
+    let head = h.git_at(&child, &["rev-parse", "HEAD"]);
+    let refs = h.git_at(&child, &["show-ref"]);
+    let child_index = h.git_at(&child, &["ls-files", "--stage"]);
+    let gitdir = h.git_at(&child, &["rev-parse", "--absolute-git-dir"]);
+    let config_bytes = std::fs::read(std::path::Path::new(&gitdir).join("config")).unwrap();
+    let paths = h.git_at(&child, &["ls-files", "-z"]);
+    let files: Vec<_> = paths
+        .split('\0')
+        .filter(|path| !path.is_empty())
+        .chain(std::iter::once(".git"))
+        .map(|path| (path.to_owned(), std::fs::read(child.join(path)).unwrap()))
+        .collect();
+
+    h.run_submod_success(&["delete", "logical"]).unwrap();
+
+    assert_eq!(exact_stage(":(top)magic"), "");
+    assert!(!h.work_dir.join(":(top)magic").exists());
+    assert_eq!(exact_stage("lib-extra"), sibling_stage);
+    assert_eq!(sibling_section(), section);
+    assert_eq!(h.gitmodules_entries(), section);
+    assert_eq!(
+        h.git_stdout(&[
+            "config",
+            "--local",
+            "--get-regexp",
+            "^submodule[.]sibling[.]",
+        ]),
+        local_config
+    );
+    assert_eq!(h.git_at(&child, &["rev-parse", "HEAD"]), head);
+    assert_eq!(h.git_at(&child, &["show-ref"]), refs);
+    assert_eq!(h.git_at(&child, &["ls-files", "--stage"]), child_index);
+    assert_eq!(
+        h.git_at(&child, &["rev-parse", "--absolute-git-dir"]),
+        gitdir
+    );
+    assert_eq!(
+        std::fs::read(std::path::Path::new(&gitdir).join("config")).unwrap(),
+        config_bytes
+    );
+    for (path, bytes) in files {
+        assert_eq!(
+            std::fs::read(child.join(&path)).unwrap(),
+            bytes,
+            "sibling file changed: {path}"
+        );
     }
 }

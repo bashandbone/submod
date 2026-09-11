@@ -77,21 +77,36 @@ feature-depth = 1
 # The url(s) of the advisory databases to use
 # db-urls = ["https://github.com/rustsec/advisory-db"]
 # A list of advisory IDs to ignore. Note that ignored advisories will still
-# output a note when they are encountered.
+# output a note when they are encountered. This list is intentionally empty:
+# every retired exception below documents why it left, so a re-entry fails
+# instead of silently passing.
 ignore = [
-  "RUSTSEC-2024-0364", # gitoxide-core does not neutralize special characters for terminals. No patched version available.
+  # RUSTSEC-2024-0364 (gitoxide-core terminal-output manipulation) was ignored
+  # while submod depended on gitoxide-core directly. Phase 7 removed that
+  # dependency and gitoxide-core is no longer in the graph at all, so the
+  # ignore was deleted rather than left unused — its return means the
+  # dependency regressed and must fail loudly.
   # RUSTSEC-2024-0436 (paste, unmaintained) and RUSTSEC-2026-0044 / RUSTSEC-2026-0048
   # (aws-lc-sys X.509) used to be ignored here. All three arrived through one root:
   # gix[blocking-http-transport-curl-rustls] -> curl-sys -> rustls-ffi -> {rustls -> aws-lc-rs, paste}.
-  # submod now builds gix with blocking-http-transport-curl-openssl, so curl shares the
-  # single openssl-sys that git2/libgit2-sys/libssh2-sys already link. rustls, aws-lc-sys
-  # and paste are no longer in the graph at all, so the ignores are gone rather than merely
-  # unused — a re-entry of any of them means the TLS backend regressed and should fail.
+  # submod first moved gix to blocking-http-transport-curl-openssl and Phase 7
+  # then removed gix transport features entirely. rustls, aws-lc-sys and paste
+  # are no longer in the graph at all, so those ignores are gone rather than
+  # merely unused — a re-entry of any of them means the TLS backend regressed
+  # and should fail.
   # "RUSTSEC-0000-0000",
   # { id = "RUSTSEC-0000-0000", reason = "you can specify a reason the advisory is ignored" },
   # "a-crate-that-is-yanked@0.1.1", # you can also ignore yanked crate versions if you wish
   # { crate = "a-crate-that-is-yanked@0.1.1", reason = "you can specify why you are ignoring the yanked crate" },
 ]
+# Yanked-crate note (not an exception): bisync 0.3.0 is yanked and remains
+# reachable via submod -> gix(status) -> gix-protocol -> bisync. Upstream
+# (GitoxideLabs/gitoxide#2939) the author withdrew bisync as a supply-chain
+# maintenance risk and the macro port into gix-macros (#2940) is unreleased,
+# so there is no owning-dependency update that removes it yet. bisync provides
+# only compile-time barrier macros to gix-protocol; it contributes no runtime
+# transport surface to submod's read-only gix use. No blanket yanked-package
+# allowance is added; revisit when gix releases without it.
 # If this is true, then cargo deny will use the git executable to fetch advisory database.
 # If this is false, then it uses a built-in git library.
 # Setting this to true can be helpful if you have special authentication requirements that cargo-deny does not support.

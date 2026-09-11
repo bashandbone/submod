@@ -4,10 +4,182 @@
 //! Utility functions for working with `Gitoxide` APIs commonly used across the codebase.
 #![allow(dead_code)]
 
-use anyhow::Result;
+use anyhow::{Context as _, Result};
 use git2::Repository as Git2Repository;
 use gix::open::Options;
-use std::path::PathBuf;
+use std::path::{Component, Path, PathBuf};
+
+/// Render untrusted human text without terminal controls or URL credentials.
+///
+/// This is a display boundary only: never use it on Git records, stored values,
+/// command arguments, or generated completion scripts. Compose intentional line
+/// separators after sanitizing fields; embedded newlines and tabs are escaped.
+#[must_use]
+pub fn safe_human_text(input: &str) -> String {
+    fn looks_like_host_port(authority: &str) -> bool {
+        let Some((host, port)) = authority.rsplit_once(':') else {
+            return false;
+        };
+        !host.is_empty()
+            && (host == "localhost"
+                || host.contains('.')
+                || (host.starts_with('[') && host.ends_with(']'))
+                || host.parse::<std::net::IpAddr>().is_ok())
+            && port.parse::<u16>().is_ok_and(|port| port != 0)
+    }
+
+    let mut redacted = String::with_capacity(input.len());
+    let mut remaining = input;
+    while let Some(marker) = remaining.find("://") {
+        let authority_start = marker + 3;
+        redacted.push_str(&remaining[..authority_start]);
+        remaining = &remaining[authority_start..];
+        let mut authority_end = remaining
+            .find(|c: char| c.is_whitespace() || matches!(c, '/' | '?' | '#' | '"' | '<' | '>'))
+            .unwrap_or(remaining.len());
+        // Adjacent URLs in diagnostic prose may have no separating whitespace.
+        if let Some(next_marker) = remaining.find("://") {
+            let scheme_start = remaining[..next_marker]
+                .char_indices()
+                .rev()
+                .find(|(_, c)| !c.is_ascii_alphanumeric() && !matches!(c, '+' | '-' | '.'))
+                .map_or(0, |(index, c)| index + c.len_utf8());
+            authority_end = authority_end.min(scheme_start);
+        }
+        let ordinary_authority_end = authority_end;
+        let ordinary_authority = &remaining[..ordinary_authority_end];
+        let malformed_authority_delimiter = remaining[authority_end..]
+            .chars()
+            .next()
+            .is_some_and(|c| c.is_control() || matches!(c, '"' | '<' | '>'));
+        // A malformed but accepted display value can put a control, quote, or angle
+        // bracket inside password text. Look past that delimiter only when the
+        // ordinary authority already contains the user/password separator. This
+        // avoids treating a later email address in diagnostic prose as URL userinfo.
+        if !ordinary_authority.contains('@')
+            && ordinary_authority.contains(':')
+            && (!looks_like_host_port(ordinary_authority) || malformed_authority_delimiter)
+        {
+            let extended_end = remaining
+                .find(|c: char| matches!(c, '/' | '?' | '#' | ',' | ')' | ']'))
+                .unwrap_or(remaining.len());
+            if remaining[..extended_end].contains('@') {
+                authority_end = extended_end;
+            }
+        }
+        let authority = &remaining[..authority_end];
+        if let Some(at) = authority.rfind('@') {
+            redacted.push_str("[redacted]@");
+            redacted.push_str(&authority[at + 1..]);
+        } else {
+            redacted.push_str(&remaining[..authority_end]);
+        }
+        remaining = &remaining[authority_end..];
+    }
+    redacted.push_str(remaining);
+    let mut safe = String::with_capacity(redacted.len());
+    for c in redacted.chars() {
+        if c.is_control() {
+            safe.extend(c.escape_default());
+        } else {
+            safe.push(c);
+        }
+    }
+    safe
+}
+
+/// Repository locations resolved by native Git, including linked worktrees.
+#[derive(Debug, Clone)]
+pub struct RepositoryContext {
+    /// Canonical directory from which the command was invoked.
+    pub invocation_dir: PathBuf,
+    /// Worktree root used for all module checkout paths.
+    pub worktree_root: PathBuf,
+    /// Worktree-specific Git metadata directory.
+    pub git_dir: PathBuf,
+    /// Shared Git metadata directory, also shared by linked worktrees.
+    pub common_dir: PathBuf,
+    /// Default root config or explicit invocation-relative config.
+    pub config_path: PathBuf,
+}
+
+impl RepositoryContext {
+    /// Discover a worktree and resolve its config; an explicit config must exist.
+    pub fn discover(invocation_dir: &Path, explicit_config: Option<&Path>) -> Result<Self> {
+        let invocation_dir = invocation_dir.canonicalize()?;
+        let worktree_root = git_path(&invocation_dir, &["--show-toplevel"]).map_err(|error| {
+            anyhow::anyhow!("A non-bare repository worktree is required: {error}")
+        })?;
+        let git_dir = git_path(&invocation_dir, &["--absolute-git-dir"])?;
+        let common_dir = git_path(
+            &invocation_dir,
+            &["--path-format=absolute", "--git-common-dir"],
+        )?;
+        let config_path = match explicit_config {
+            Some(path) => {
+                let path = invocation_dir.join(path);
+                match std::fs::symlink_metadata(&path) {
+                    Ok(metadata) if !metadata.is_file() && !metadata.file_type().is_symlink() => {
+                        anyhow::bail!("Explicit config path is not a file: {}", path.display());
+                    }
+                    Ok(_) => {}
+                    Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                        anyhow::bail!("Explicit config file not found: {}", path.display())
+                    }
+                    Err(error) => return Err(error.into()),
+                }
+                path
+            }
+            None => worktree_root.join("submod.toml"),
+        };
+        Ok(Self {
+            invocation_dir,
+            worktree_root,
+            git_dir,
+            common_dir,
+            config_path,
+        })
+    }
+}
+
+pub(crate) fn git_path(directory: &Path, args: &[&str]) -> Result<PathBuf> {
+    let output = std::process::Command::new("git")
+        .arg("--no-optional-locks")
+        .arg("rev-parse")
+        .args(args)
+        .current_dir(directory)
+        .output()?;
+    if !output.status.success() {
+        anyhow::bail!(
+            "git rev-parse {} failed in {}: {}",
+            args.join(" "),
+            directory.display(),
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+    git_path_from_stdout(output.stdout)
+}
+
+/// Decode a single path printed by Git without losing Unix path bytes.
+pub(crate) fn git_path_from_stdout(mut bytes: Vec<u8>) -> Result<PathBuf> {
+    if bytes.last() == Some(&b'\n') {
+        bytes.pop();
+    }
+    #[cfg(unix)]
+    let path = {
+        use std::os::unix::ffi::OsStringExt;
+        PathBuf::from(std::ffi::OsString::from_vec(bytes))
+    };
+    #[cfg(not(unix))]
+    let path = PathBuf::from(String::from_utf8(bytes)?);
+    if !path.is_absolute() {
+        anyhow::bail!(
+            "Git returned a non-absolute repository path: {}",
+            path.display()
+        );
+    }
+    Ok(path)
+}
 
 /// Get the current repository using git2, with an optional provided repository. If no repository is provided, it will attempt to discover one in the current directory.
 pub fn get_current_git2_repository(
@@ -123,7 +295,10 @@ pub fn path_to_string_lossy(path: &std::path::Path) -> String {
         return s.to_string();
     }
     let lossy = path.to_string_lossy();
-    eprintln!("Warning: Path contains non-UTF-8 characters, using lossy conversion: {lossy}");
+    eprintln!(
+        "Warning: Path contains non-UTF-8 characters, using lossy conversion: {}",
+        safe_human_text(&lossy)
+    );
     lossy.to_string()
 }
 
@@ -225,100 +400,188 @@ pub fn get_name(
     }
 }
 
-/// Validate a submodule path to ensure it is not absolute and does not escape
-/// the repository root via directory traversal (`..`) or symbolic links.
-pub fn validate_submodule_path(
-    repo_root: &std::path::Path,
-    path: &std::path::Path,
-) -> Result<(), anyhow::Error> {
-    if path.is_absolute() {
-        return Err(anyhow::anyhow!("Submodule path cannot be absolute"));
-    }
-
-    let repo_root = repo_root
-        .canonicalize()
-        .unwrap_or_else(|_| repo_root.to_path_buf());
-
-    let mut current = repo_root.clone();
-    for component in path.components() {
-        match component {
-            std::path::Component::Normal(c) => {
-                current.push(c);
-                // If current exists and is a symlink, read it and check target
-                if current.is_symlink() {
-                    let target = std::fs::read_link(&current)?;
-                    let resolved = if target.is_absolute() {
-                        target
-                    } else {
-                        current.parent().unwrap().join(target)
-                    };
-                    let canonical_resolved = resolved
-                        .canonicalize()
-                        .unwrap_or_else(|_| normalize_path_only(&resolved));
-                    if !canonical_resolved.starts_with(&repo_root) {
-                        return Err(anyhow::anyhow!(
-                            "Submodule path escapes repository root via symlink: {}",
-                            canonical_resolved.display()
-                        ));
-                    }
-                    current = canonical_resolved;
-                }
-            }
-            std::path::Component::ParentDir => {
-                current.pop();
-                if !current.starts_with(&repo_root) {
-                    return Err(anyhow::anyhow!("Submodule path escapes repository root"));
-                }
-            }
-            std::path::Component::CurDir => {}
-            std::path::Component::Prefix(_) | std::path::Component::RootDir => {
-                return Err(anyhow::anyhow!(
-                    "Submodule path cannot contain root or prefix components"
-                ));
-            }
-        }
-    }
-
-    // Also check the final resolved path
-    let final_canonical = current
-        .canonicalize()
-        .unwrap_or_else(|_| normalize_path_only(&current));
-    if !final_canonical.starts_with(&repo_root) {
-        return Err(anyhow::anyhow!(
-            "Submodule path resolves outside repository root"
-        ));
-    }
-
-    Ok(())
-}
-
-fn normalize_path_only(path: &std::path::Path) -> std::path::PathBuf {
-    use std::path::{Component, PathBuf};
+/// Normalize harmless dots while rejecting root and administrative destinations.
+pub fn normalize_submodule_path(path: &Path) -> Result<PathBuf> {
     let mut normalized = PathBuf::new();
     for component in path.components() {
         match component {
-            Component::ParentDir => {
-                normalized.pop();
+            Component::Normal(name) => {
+                let git_alias = name.to_str().is_some_and(|name| {
+                    name.trim_end_matches(['.', ' '])
+                        .eq_ignore_ascii_case(".git")
+                });
+                if name.as_encoded_bytes().eq_ignore_ascii_case(b".git") || git_alias {
+                    anyhow::bail!("Submodule path cannot contain Git administrative components");
+                }
+                normalized.push(name);
             }
             Component::CurDir => {}
-            Component::Normal(c) => {
-                normalized.push(c);
-            }
-            Component::RootDir => {
-                normalized.push(Component::RootDir);
-            }
-            Component::Prefix(p) => {
-                normalized.push(Component::Prefix(p));
+            Component::ParentDir => anyhow::bail!("Submodule path cannot contain '..' components"),
+            Component::RootDir | Component::Prefix(_) => {
+                anyhow::bail!("Submodule path cannot contain root or prefix components")
             }
         }
     }
-    normalized
+    if normalized.as_os_str().is_empty() {
+        anyhow::bail!("Submodule path must be a nonempty strict descendant of the repository root");
+    }
+    Ok(normalized)
+}
+
+/// Validate a mutation destination without following any symlink components.
+pub fn validate_submodule_path(repo_root: &Path, path: &Path) -> Result<()> {
+    let normalized = normalize_submodule_path(path)?;
+    let mut current = repo_root
+        .canonicalize()
+        .with_context(|| format!("Could not inspect repository root {}", repo_root.display()))?;
+    for component in normalized.components() {
+        current.push(component);
+        match std::fs::symlink_metadata(&current) {
+            Ok(metadata) if metadata.file_type().is_symlink() => {
+                anyhow::bail!("Submodule path contains a symlink: {}", current.display());
+            }
+            Ok(_) => {}
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+            Err(error) => {
+                return Err(error).with_context(|| {
+                    format!("Could not inspect submodule path {}", current.display())
+                });
+            }
+        }
+    }
+    Ok(())
 }
 
 #[cfg(test)]
 #[cfg_attr(coverage_nightly, coverage(off))]
 mod tests {
     use super::*;
+
+    fn checked_git(directory: &Path, args: &[&str]) {
+        let output = std::process::Command::new("git")
+            .args(["-c", "commit.gpgsign=false"])
+            .args(args)
+            .current_dir(directory)
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success(),
+            "{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+
+    #[test]
+    fn repository_context_nested_and_linked_worktrees() {
+        let temp = tempfile::tempdir().unwrap();
+        let root = temp.path().canonicalize().unwrap();
+        checked_git(&root, &["init", "main"]);
+        let main = root.join("main");
+        checked_git(
+            &main,
+            &[
+                "-c",
+                "user.name=Fixture",
+                "-c",
+                "user.email=fixture@example.invalid",
+                "commit",
+                "--allow-empty",
+                "-m",
+                "initial",
+            ],
+        );
+        checked_git(&main, &["worktree", "add", "-b", "linked", "../linked"]);
+        for name in ["main", "linked"] {
+            let worktree = root.join(name);
+            let nested = worktree.join("nested/deeper");
+            std::fs::create_dir_all(&nested).unwrap();
+            let context = RepositoryContext::discover(&nested, None).unwrap();
+            assert_eq!(context.invocation_dir, nested);
+            assert_eq!(context.worktree_root, worktree);
+            assert_eq!(context.common_dir, main.join(".git"));
+            assert_eq!(
+                context.git_dir,
+                if name == "main" {
+                    main.join(".git")
+                } else {
+                    main.join(".git/worktrees/linked")
+                }
+            );
+            assert_eq!(context.config_path, worktree.join("submod.toml"));
+            std::fs::write(nested.join("custom.toml"), "").unwrap();
+            let explicit =
+                RepositoryContext::discover(&nested, Some(Path::new("custom.toml"))).unwrap();
+            assert_eq!(explicit.config_path, nested.join("custom.toml"));
+            assert!(RepositoryContext::discover(&nested, Some(Path::new("missing.toml"))).is_err());
+        }
+        assert!(RepositoryContext::discover(&root, None).is_err());
+        checked_git(&root, &["init", "--bare", "bare"]);
+        let error = RepositoryContext::discover(&root.join("bare"), None).unwrap_err();
+        assert!(error.to_string().contains("non-bare repository worktree"));
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn repository_context_preserves_newline_paths() {
+        use std::os::unix::ffi::OsStringExt;
+        let temp = tempfile::tempdir().unwrap();
+        let root = temp
+            .path()
+            .canonicalize()
+            .unwrap()
+            .join(std::ffi::OsString::from_vec(b"repo-\n".to_vec()));
+        std::fs::create_dir(&root).unwrap();
+        checked_git(&root, &["init"]);
+        let context = RepositoryContext::discover(&root, None).unwrap();
+        assert_eq!(context.worktree_root, root);
+        assert_eq!(context.git_dir, root.join(".git"));
+        assert_eq!(context.common_dir, root.join(".git"));
+        let child = PathBuf::from(std::ffi::OsString::from_vec(b"child-\xff".to_vec()));
+        assert_eq!(normalize_submodule_path(&child).unwrap(), child);
+        assert_eq!(
+            normalize_submodule_path(Path::new("./vendor/./child")).unwrap(),
+            Path::new("vendor/child")
+        );
+    }
+
+    #[test]
+    fn mutation_paths_reject_root_admin_and_parent_components() {
+        let root = tempfile::tempdir().unwrap();
+        for path in [
+            "",
+            ".",
+            "././",
+            ".git",
+            "vendor/.GiT/objects",
+            "vendor/../child",
+            "../child",
+        ] {
+            assert!(
+                validate_submodule_path(root.path(), std::path::Path::new(path)).is_err(),
+                "accepted {path:?}"
+            );
+        }
+        assert!(validate_submodule_path(root.path(), &root.path().join("child")).is_err());
+        assert!(
+            validate_submodule_path(root.path(), std::path::Path::new("./vendor/./new-child"))
+                .is_ok()
+        );
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn mutation_paths_reject_all_symlink_components() {
+        let root = tempfile::tempdir().unwrap();
+        std::fs::create_dir(root.path().join("real")).unwrap();
+        std::os::unix::fs::symlink("real", root.path().join("alias")).unwrap();
+        std::os::unix::fs::symlink("missing", root.path().join("dangling")).unwrap();
+        for path in ["alias", "alias/child", "dangling/child"] {
+            assert!(
+                validate_submodule_path(root.path(), std::path::Path::new(path)).is_err(),
+                "accepted {path}"
+            );
+        }
+    }
 
     #[test]
     fn test_get_name_valid_name() {
@@ -558,5 +821,64 @@ mod tests {
 
         let result = path_to_string_lossy(path);
         assert_eq!(result, format!("a{}b", std::char::REPLACEMENT_CHARACTER));
+    }
+}
+
+#[cfg(test)]
+mod human_output_tests {
+    use super::safe_human_text;
+
+    #[test]
+    fn redacts_all_url_userinfo_before_escaping_controls() {
+        assert_eq!(
+            safe_human_text(
+                "clone 'https://USER_A:PASS_A@example.invalid/a', then (file://USER_B:P%40SS_B@localhost/b): failed\r\n"
+            ),
+            "clone 'https://[redacted]@example.invalid/a', then (file://[redacted]@localhost/b): failed\\r\\n"
+        );
+        assert_eq!(
+            safe_human_text("https://u:p@host,https://x:y@other"),
+            "https://[redacted]@host,https://[redacted]@other"
+        );
+        assert_eq!(
+            safe_human_text("https://u:p'ass@host/éhttps://x:y@other"),
+            "https://[redacted]@host/éhttps://[redacted]@other"
+        );
+        assert_eq!(
+            safe_human_text("ssh://token@host/a https://u:p@ss@host/b"),
+            "ssh://[redacted]@host/a https://[redacted]@host/b"
+        );
+        assert_eq!(
+            safe_human_text("https://R26_FAKE_USER:PA\tSS@example.invalid/a"),
+            "https://[redacted]@example.invalid/a"
+        );
+        assert_eq!(
+            safe_human_text("https://R26_FAKE_USER:PA\"SS@example.invalid/a"),
+            "https://[redacted]@example.invalid/a"
+        );
+        assert_eq!(
+            safe_human_text("https://R26_FAKE_USER:PA<SS@example.invalid/a"),
+            "https://[redacted]@example.invalid/a"
+        );
+        assert_eq!(
+            safe_human_text("remote https://example.invalid failed for alice@example.org"),
+            "remote https://example.invalid failed for alice@example.org"
+        );
+        assert_eq!(
+            safe_human_text("remote https://example.invalid:443 failed for alice@example.org"),
+            "remote https://example.invalid:443 failed for alice@example.org"
+        );
+        assert_eq!(
+            safe_human_text("https://user.example:443\tPRIVATE@example.invalid/repo"),
+            "https://[redacted]@example.invalid/repo"
+        );
+        assert_eq!(
+            safe_human_text("bibliothèque/été\t\u{1b}[2J\u{8}\u{7f}\u{85}"),
+            "bibliothèque/été\\t\\u{1b}[2J\\u{8}\\u{7f}\\u{85}"
+        );
+        assert_eq!(
+            safe_human_text("https://example.invalid/path@example.invalid?q=yes"),
+            "https://example.invalid/path@example.invalid?q=yes"
+        );
     }
 }

@@ -9,6 +9,10 @@
 # and shell out to git are serialized among themselves to avoid any residual
 # contention on shared git state (e.g. lock files in /tmp).
 
+# Test groups were introduced in cargo-nextest 0.9.48. Older runners silently
+# ignore the isolation below and invalidate the retained performance ceilings.
+nextest-version = { required = "0.9.55", recommended = "0.9.128" }
+
 [test-groups]
 serial-integration = { max-threads = 1 }
 
@@ -19,7 +23,7 @@ fail-fast = false
 # group. config_tests and command_contract_tests are safe to run in parallel
 # with everything (they use isolated temp dirs and per-test gitconfig).
 [[profile.default.overrides]]
-filter = 'binary_id(submod::integration_tests) | binary_id(submod::sparse_checkout_tests) | binary_id(submod::error_handling_tests) | binary_id(submod::performance_tests)'
+filter = 'binary(integration_tests) | binary(sparse_checkout_tests) | binary(error_handling_tests) | binary(performance_tests) | binary(reconciliation_lifecycle_tests) | binary(reconciliation_metadata_tests) | binary(reconciliation_sparse_tests) | binary(phase5_checkout_recovery_tests) | binary(phase5_delete_move_tests) | binary(phase5_reset_batch_tests) | binary(phase6_cli_contract_tests) | binary(phase6_output_tests) | binary(phase6_onboarding_tests)'
 test-group = 'serial-integration'
 
 # CI profile: fail fast but still serialize integration tests
@@ -27,5 +31,5 @@ test-group = 'serial-integration'
 fail-fast = true
 
 [[profile.ci.overrides]]
-filter = 'binary_id(submod::integration_tests) | binary_id(submod::sparse_checkout_tests) | binary_id(submod::error_handling_tests) | binary_id(submod::performance_tests)'
+filter = 'binary(integration_tests) | binary(sparse_checkout_tests) | binary(error_handling_tests) | binary(performance_tests) | binary(reconciliation_lifecycle_tests) | binary(reconciliation_metadata_tests) | binary(reconciliation_sparse_tests) | binary(phase5_checkout_recovery_tests) | binary(phase5_delete_move_tests) | binary(phase5_reset_batch_tests) | binary(phase6_cli_contract_tests) | binary(phase6_output_tests) | binary(phase6_onboarding_tests)'
 test-group = 'serial-integration'

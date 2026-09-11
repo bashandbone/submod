@@ -2,6 +2,16 @@
 #
 # SPDX-License-Identifier: LicenseRef-PlainMIT OR MIT
 
+# Third-party actions are pinned to immutable commit SHAs (reviewed
+# 2026-09-11; version comments record the moving ref each SHA was taken
+# from). See .github/workflows/ci.yml for the update procedure.
+#
+# Release order is: verify-tag (exact tag commit) -> build archives ->
+# linkage/smoke on the exact archives -> upload -> publish. No release
+# mutation (draft, upload, publish) happens before verification passes.
+# workflow_dispatch is dry-run only: it builds and checks but publishes
+# nothing. Never tag or publish merely to test this workflow.
+
 name: Release
 
 on:
@@ -14,24 +24,86 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  create-release:
+  verify-tag:
+    name: Verify tag commit
     runs-on: ubuntu-latest
     permissions:
-      contents: write
+      contents: read
     steps:
-      - uses: actions/checkout@v7
-      - uses: taiki-e/create-gh-release-action@v1
-        if: github.event_name != 'workflow_dispatch'
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
-          changelog: CHANGELOG.md
-          token: ${{ secrets.GITHUB_TOKEN }}
-          draft: true
+          fetch-depth: 0
+          fetch-tags: true
+          lfs: false
+
+      - name: Resolve tag to commit
+        run: |
+          set -euo pipefail
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            echo "dry run: verifying checked-out HEAD only"
+            git rev-parse HEAD
+            exit 0
+          fi
+          tag="${GITHUB_REF#refs/tags/}"
+          expected=$(git rev-list -n 1 "$tag")
+          actual=$(git rev-parse HEAD)
+          echo "tag $tag resolves to $expected; HEAD is $actual"
+          test "$expected" = "$actual" || { echo "::error::tag/commit mismatch"; exit 1; }
+          test "$actual" = "${{ github.sha }}" || { echo "::error::HEAD is not the push SHA"; exit 1; }
+
+      - name: Install Rust (stable)
+        uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87 # stable
+        with:
+          toolchain: stable
+          components: rustfmt, clippy
+
+      - name: Install Rust 1.89 (MSRV gate below needs it)
+        uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87 # stable
+        with:
+          toolchain: "1.89"
+
+      - name: Install cargo-nextest
+        uses: taiki-e/install-action@fa23953489c080190314742a9b907f8e97c6767c # v2
+        with:
+          tool: cargo-nextest
+
+      - name: Install cargo-deny and cargo-audit
+        uses: taiki-e/install-action@fa23953489c080190314742a9b907f8e97c6767c # v2
+        with:
+          tool: cargo-deny,cargo-audit
+
+      - name: Setup git
+        run: |
+          git config --global user.email "ci@example.com"
+          git config --global user.name "CI"
+
+      - name: Required functional tests on the exact tag commit
+        run: cargo nextest run --locked --all-features --profile ci --no-fail-fast
+
+      - name: Doctests on the exact tag commit
+        run: cargo test --locked --all-features --doc
+
+      - name: MSRV build gate
+        run: cargo +1.89 check --locked --all-features
+
+      - name: Lint gate
+        run: |
+          cargo fmt --all -- --check
+          cargo clippy --locked --all-targets --all-features
+
+      - name: Security gates
+        run: |
+          cargo deny check
+          cargo audit
+
+      - name: Package gate
+        run: cargo package --locked
 
   build:
     runs-on: ${{ matrix.os }}
-    needs: [create-release]
+    needs: [verify-tag]
     permissions:
-      contents: write
+      contents: read
     env:
       # Force curl-sys to build libcurl from source instead of probing pkg-config
       # for whatever the build image happens to expose. A release binary that
@@ -50,94 +122,143 @@ jobs:
           - target: aarch64-apple-darwin
             os: macos-latest
             build-tool: cargo
+            native-exec: true
           - target: x86_64-unknown-linux-gnu
             os: ubuntu-latest
             build-tool: cross
+            native-exec: true
           - target: aarch64-unknown-linux-gnu
             os: ubuntu-latest
             build-tool: cross
-          # musl targets link every native dependency statically — OpenSSL (shared
-          # by curl and libgit2 since submod dropped rustls), libgit2 and libssh2
-          # come from the vendored features below, and musl itself replaces the
-          # glibc the -gnu targets link dynamically. The result runs on any Linux.
+            native-exec: false
+          # musl targets link every native dependency statically — OpenSSL,
+          # libgit2 and libssh2 come from the vendored features below, and musl
+          # itself replaces the glibc the -gnu targets link dynamically. The
+          # result runs on any Linux.
           - target: x86_64-unknown-linux-musl
             os: ubuntu-latest
             build-tool: cross
+            native-exec: true
           - target: aarch64-unknown-linux-musl
             os: ubuntu-latest
             build-tool: cross
+            native-exec: false
           - target: x86_64-pc-windows-msvc
             os: windows-latest
             build-tool: cargo
+            native-exec: true
           - target: aarch64-pc-windows-msvc
             os: windows-latest
             build-tool: cargo
+            native-exec: false
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           fetch-depth: 0
           fetch-tags: true
           lfs: false
-      - uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@49a0bdc70d2e1b713ca9e2869b211fcce03d3c1c # v2
         with:
           shared-key: rust-${{ matrix.target }}
-      - uses: taiki-e/upload-rust-binary-action@v1
-        with:
-          bin: submod
-          checksum: sha256
-          target: ${{ matrix.target }}
-          build-tool: ${{ matrix.build-tool }}
-          token: ${{ secrets.GITHUB_TOKEN }}
-          features: git2/vendored-libgit2,git2/vendored-openssl
-          dry-run: ${{ github.event_name == 'workflow_dispatch' }}
 
-      # A dry run builds the archive and then throws it away, which left the whole
-      # point of the musl targets — that the binary is actually static — argued
-      # from build-script logic rather than measured. These two steps only run on
-      # workflow_dispatch, so a real tag release is unaffected.
-      - name: Verify Linux binary linkage
-        if: github.event_name == 'workflow_dispatch' && contains(matrix.target, 'linux')
+      - name: Install Rust target
+        uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87 # stable
+        with:
+          toolchain: stable
+          targets: ${{ matrix.target }}
+
+      - name: Install cross
+        if: matrix.build-tool == 'cross'
+        uses: taiki-e/install-action@fa23953489c080190314742a9b907f8e97c6767c # v2
+        with:
+          tool: cross
+
+      - name: Build release archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          ${{ matrix.build-tool }} build --locked --release \
+            --target ${{ matrix.target }} \
+            --features git2/vendored-libgit2,git2/vendored-openssl
+          bin="target/${{ matrix.target }}/release/submod"
+          if [[ "${{ matrix.target }}" == *windows* ]]; then bin="$bin.exe"; fi
+          staging="archive-staging/submod-${{ matrix.target }}"
+          mkdir -p "$staging"
+          cp "$bin" "$staging/"
+          cp README.md CHANGELOG.md "$staging/" 2>/dev/null || true
+          tar czf "submod-${{ matrix.target }}.tar.gz" -C archive-staging "submod-${{ matrix.target }}"
+          (cd archive-staging && sha256sum "../submod-${{ matrix.target }}.tar.gz" > "../submod-${{ matrix.target }}.tar.gz.sha256" || shasum -a 256 "../submod-${{ matrix.target }}.tar.gz" > "../submod-${{ matrix.target }}.tar.gz.sha256")
+
+      - name: Verify archive linkage and smoke the exact bytes
+        shell: bash
         env:
           TARGET: ${{ matrix.target }}
         run: |
           set -euo pipefail
-          mkdir -p /tmp/linkcheck
+          rm -rf /tmp/linkcheck && mkdir -p /tmp/linkcheck
           tar xzf "submod-${TARGET}.tar.gz" -C /tmp/linkcheck
-          desc=$(file /tmp/linkcheck/submod)
-          echo "$desc"
-          case "$TARGET" in
-            *musl*)
-              # Rust links musl targets as static-pie by default, which `file`
-              # reports as "static-pie linked" rather than "statically linked".
-              # Accept either; reject anything dynamically linked.
-              case "$desc" in
-                *"statically linked"*|*"static-pie linked"*)
-                  echo "OK: ${TARGET} is statically linked" ;;
-                *)
-                  echo "::error::${TARGET} is not statically linked: ${desc}"
-                  exit 1 ;;
-              esac
-              ;;
-            *)
-              echo "note: ${TARGET} is a glibc target; dynamic linking is expected" ;;
-          esac
+          if [[ "$TARGET" == *windows* ]]; then
+            cli="/tmp/linkcheck/submod-${TARGET}/submod.exe"
+          else
+            cli="/tmp/linkcheck/submod-${TARGET}/submod"
+          fi
+          if [[ "$TARGET" == *linux* ]]; then
+            desc=$(file "$cli")
+            echo "$desc"
+            case "$TARGET" in
+              *musl*)
+                # Rust links musl targets as static-pie by default, which `file`
+                # reports as "static-pie linked" rather than "statically linked".
+                # Accept either; reject anything dynamically linked.
+                case "$desc" in
+                  *"statically linked"*|*"static-pie linked"*)
+                    echo "OK: ${TARGET} is statically linked" ;;
+                  *)
+                    echo "::error::${TARGET} is not statically linked: ${desc}"
+                    exit 1 ;;
+                esac
+                ;;
+              *gnu*)
+                # GNU targets link glibc dynamically; reject unexpected
+                # vendored-native linkage hiding as a system library.
+                case "$desc" in
+                  *"dynamically linked"*) echo "OK: ${TARGET} is dynamically linked (glibc expected)" ;;
+                  *) echo "::error::unexpected linkage for ${TARGET}: ${desc}"; exit 1 ;;
+                esac
+                ;;
+            esac
+          fi
+          if [[ "${{ matrix.native-exec }}" == "true" ]]; then
+            "$cli" --version
+            "$cli" --help >/dev/null
+            # Local disposable-repository smoke on the exact archive bytes.
+            smoke=$(mktemp -d)
+            git config --global user.email "release-smoke@example.com" 2>/dev/null || true
+            git config --global user.name "ReleaseSmoke" 2>/dev/null || true
+            git init -b main "$smoke/origin" && (cd "$smoke/origin" && echo hi > f && git add f && git commit -qm init)
+            git init -b main "$smoke/parent" && (cd "$smoke/parent" && git commit -qm init --allow-empty)
+            (cd "$smoke/parent" && printf '[s]\npath = "lib"\nurl = "%s"\n' "$smoke/origin" > submod.toml && "$cli" init && "$cli" check)
+            rm -rf "$smoke"
+            echo "OK: ${TARGET} smoke passed"
+          else
+            echo "note: ${TARGET} cannot execute on ${{ matrix.os }}; archive checksum recorded, execution unverified on this runner"
+          fi
+          sha256sum -c "submod-${TARGET}.tar.gz.sha256" 2>/dev/null || shasum -a 256 -c "submod-${TARGET}.tar.gz.sha256"
 
-      - name: Upload dry-run archive for inspection
-        if: github.event_name == 'workflow_dispatch'
-        uses: actions/upload-artifact@v7
+      - name: Upload archive for inspection
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
-          name: dry-run-${{ matrix.target }}
-          path: submod-${{ matrix.target }}.*
-          retention-days: 7
+          name: submod-${{ matrix.target }}
+          path: |
+            submod-${{ matrix.target }}.tar.gz
+            submod-${{ matrix.target }}.tar.gz.sha256
+          retention-days: 30
           if-no-files-found: error
 
   publish:
     name: Publish to crates.io
     needs: [build]
-    # workflow_dispatch is the dry run: `build` already honors it via its
-    # dry-run input, but this job and `github_release` did not, so a manual
-    # dispatch still ran `cargo publish` against crates.io and cut a real
-    # GitHub release. Only a v* tag push publishes anything.
+    # workflow_dispatch is the dry run: only a v* tag push publishes anything.
     if: github.event_name != 'workflow_dispatch'
     runs-on: ubuntu-latest
     environment: cratesio
@@ -145,13 +266,21 @@ jobs:
       contents: read
       id-token: write
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
+          fetch-depth: 0
+          fetch-tags: true
           submodules: recursive
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: rust-lang/crates-io-auth-action@v1
+      - name: Confirm verified tag commit
+        run: |
+          set -euo pipefail
+          tag="${GITHUB_REF#refs/tags/}"
+          test "$(git rev-list -n 1 "$tag")" = "$(git rev-parse HEAD)" || { echo "::error::tag/commit mismatch"; exit 1; }
+      - uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87 # stable
+      - uses: rust-lang/crates-io-auth-action@c6f97d42243bad5fab37ca0427f495c86d5b1a18 # v1
         id: auth
-      - run: cargo publish --allow-dirty
+      # Locked, clean-source publication of the verified commit: no --allow-dirty.
+      - run: cargo publish --locked
         env:
           CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
 
@@ -163,12 +292,18 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v6
-      - name: Publish Release
-        uses: softprops/action-gh-release@v3
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          fetch-depth: 1
+      - name: Download checked archives
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          path: release-archives
+      - uses: softprops/action-gh-release@5113cdc90fd4d541c801c55356214017bf5ae34b # v3
         with:
           body_path: CHANGELOG.md
           draft: false
           prerelease: false
+          files: release-archives/**/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
