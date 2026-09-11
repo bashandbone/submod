@@ -24,6 +24,7 @@ extend-ignore-identifiers-re = [
 ignore-hidden = false
 ignore-files = true
 extend-exclude = [
+  "docs/IMPLEMENTATION_REPORT.md",
   "/usr/**/*",
   "/tmp/**/*",
   "/**/node_modules/**",
