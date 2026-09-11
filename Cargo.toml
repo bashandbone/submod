@@ -115,13 +115,15 @@ suspicious = { level = "warn", priority = -1 }
 too_many_lines = "allow"
 
 [lints.rust]
-unexpected_cfgs = {
-  level = "warn",
-# Warn about missing documentation
+# Warn about unreachable code
+unreachable_code = "warn"
+# Deny unsafe code unless explicitly allowed
+unsafe_code = "deny"
+# Warn about unused items
+unused = { level = "warn", priority = -1 }
 
-
-
-}
+[lints.rust.unexpected_cfgs]
+level = "warn"
 missing_docs = "warn"
 # Allow cfg(coverage) and cfg(coverage_nightly) set by cargo-llvm-cov
 check-cfg = [
@@ -129,12 +131,6 @@ check-cfg = [
   "cfg(coverage_nightly)",
   "cfg(coverage_attribute)",
 ]
-# Warn about unreachable code
-unreachable_code = "warn"
-# Deny unsafe code unless explicitly allowed
-unsafe_code = "deny"
-# Warn about unused items
-unused = { level = "warn", priority = -1 }
 
 [profile.bench]
 inherits = "release"
