@@ -2682,7 +2682,7 @@ impl GitOperations for GitOpsManager {
             .collect();
         match opts.strategy {
             SerializableUpdate::Checkout | SerializableUpdate::Unspecified => {
-                args.push("--checkout".into())
+                args.push("--checkout".into());
             }
             SerializableUpdate::Merge => args.push("--merge".into()),
             SerializableUpdate::Rebase => args.push("--rebase".into()),
@@ -2728,15 +2728,7 @@ impl GitOperations for GitOpsManager {
                 String::from_utf8_lossy(&head_entry.stderr).trim()
             );
         }
-        if !head_entry.stdout.is_empty() {
-            let mut args: Vec<OsString> = vec!["rm".into()];
-            if force {
-                args.push("--force".into());
-            }
-            args.push("--".into());
-            args.push(pathspec.clone());
-            self.git(args)?;
-        } else {
+        if head_entry.stdout.is_empty() {
             // A newly added gitlink has no HEAD entry, so ordinary `git rm` refuses it as
             // staged. Deinitialize the already-verified clean checkout, remove only the exact
             // cached gitlink, then remove its exact portable section with Git's config parser.
@@ -2761,6 +2753,14 @@ impl GitOperations for GitOpsManager {
                 OsStr::new(&format!("submodule.{registered_name}")),
             ])?;
             self.git(["add", "--", ".gitmodules"])?;
+        } else {
+            let mut args: Vec<OsString> = vec!["rm".into()];
+            if force {
+                args.push("--force".into());
+            }
+            args.push("--".into());
+            args.push(pathspec.clone());
+            self.git(args)?;
         }
         let local_pattern = format!(
             r"^submodule\.{}\.",
