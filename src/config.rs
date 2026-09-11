@@ -232,6 +232,24 @@ impl SubmoduleDefaults {
     }
 }
 
+/// Serialize a submodule path for `submod.toml` using Git's spelling.
+///
+/// Nested paths use forward slashes in `.gitmodules` on every platform, so
+/// keep that spelling where the OS separates with backslashes. A Unix
+/// backslash is a filename character rather than a separator and stays
+/// verbatim, so the fold is Windows-only.
+fn stored_submodule_path(path: &Path) -> String {
+    let text = path.to_string_lossy();
+    #[cfg(windows)]
+    {
+        text.replace('\\', "/")
+    }
+    #[cfg(not(windows))]
+    {
+        text.into_owned()
+    }
+}
+
 /// Options for adding a submodule
 #[derive(Debug, Clone)]
 pub struct SubmoduleAddOptions {
@@ -263,7 +281,7 @@ impl SubmoduleAddOptions {
     pub fn into_submodule_entry(self) -> SubmoduleEntry {
         SubmoduleEntry {
             url: Some(self.url),
-            path: Some(self.path.to_string_lossy().to_string()),
+            path: Some(stored_submodule_path(&self.path)),
             branch: self.branch,
             ignore: self.ignore,
             update: self.update,
@@ -2418,6 +2436,25 @@ mod tests {
         let entry = opts.into_submodule_entry();
         assert_eq!(entry.active, Some(false)); // no_init=true → active=false
         assert_eq!(entry.no_init, Some(true));
+    }
+
+    #[test]
+    fn test_add_options_entry_path_uses_git_separators() {
+        // Join with the native separator the way path normalization does, so
+        // the stored spelling stays `lib/noinit` even on Windows.
+        let opts = SubmoduleAddOptions {
+            name: "mymod".to_string(),
+            path: PathBuf::from("lib").join("noinit"),
+            url: "https://example.com/repo.git".to_string(),
+            branch: None,
+            ignore: None,
+            update: None,
+            fetch_recurse: None,
+            shallow: false,
+            no_init: true,
+        };
+        let entry = opts.into_submodule_entry();
+        assert_eq!(entry.path, Some("lib/noinit".to_string()));
     }
 
     #[test]

@@ -28,10 +28,34 @@ pub fn safe_human_text(input: &str) -> String {
             && port.parse::<u16>().is_ok_and(|port| port != 0)
     }
 
+    /// Locate the next URL authority: `scheme://`, or a scheme-less `//`
+    /// reference such as the one Git prints when it echoes a file URL
+    /// without its scheme. A `//` continuing a scheme (`://`) belongs to
+    /// that scheme and is skipped here.
+    fn next_authority_marker(text: &str) -> Option<(usize, bool)> {
+        let scheme = text.find("://");
+        let mut bare_search = 0;
+        loop {
+            let Some(bare) = text[bare_search..]
+                .find("//")
+                .map(|index| bare_search + index)
+            else {
+                return scheme.map(|marker| (marker, true));
+            };
+            if bare == 0 || text.as_bytes()[bare - 1] != b':' {
+                return match scheme {
+                    Some(marker) if marker < bare => Some((marker, true)),
+                    _ => Some((bare, false)),
+                };
+            }
+            bare_search = bare + 2;
+        }
+    }
+
     let mut redacted = String::with_capacity(input.len());
     let mut remaining = input;
-    while let Some(marker) = remaining.find("://") {
-        let authority_start = marker + 3;
+    while let Some((marker, scheme_present)) = next_authority_marker(remaining) {
+        let authority_start = marker + if scheme_present { 3 } else { 2 };
         redacted.push_str(&remaining[..authority_start]);
         remaining = &remaining[authority_start..];
         let mut authority_end = remaining
@@ -93,7 +117,7 @@ pub fn safe_human_text(input: &str) -> String {
 pub struct RepositoryContext {
     /// Canonical directory from which the command was invoked.
     pub invocation_dir: PathBuf,
-    /// Worktree root used for all module checkout paths.
+    /// Canonical worktree root used for all module checkout paths.
     pub worktree_root: PathBuf,
     /// Worktree-specific Git metadata directory.
     pub git_dir: PathBuf,
@@ -109,6 +133,15 @@ impl RepositoryContext {
         let invocation_dir = invocation_dir.canonicalize()?;
         let worktree_root = git_path(&invocation_dir, &["--show-toplevel"]).map_err(|error| {
             anyhow::anyhow!("A non-bare repository worktree is required: {error}")
+        })?;
+        // Git spells the reported top-level per platform (forward slashes on
+        // Windows), so canonicalize it exactly like the invocation directory:
+        // every checkout comparison below assumes a canonical root.
+        let worktree_root = worktree_root.canonicalize().with_context(|| {
+            format!(
+                "Discovered worktree root is missing: {}",
+                worktree_root.display()
+            )
         })?;
         let git_dir = git_path(&invocation_dir, &["--absolute-git-dir"])?;
         let common_dir = git_path(
@@ -401,6 +434,20 @@ pub fn get_name(
 }
 
 /// Normalize harmless dots while rejecting root and administrative destinations.
+/// Whether an I/O failure means "nothing is there" for an existence probe.
+///
+/// `NotFound` is the portable answer. Names the OS refuses to state at all
+/// (Windows rejects control characters such as `\n` and `"` with
+/// `InvalidFilename`) likewise hold nothing to preserve, so probes treat
+/// them as absent and let the later mutating call report the OS truth.
+#[must_use]
+pub fn is_absent_path(error: &std::io::Error) -> bool {
+    matches!(
+        error.kind(),
+        std::io::ErrorKind::NotFound | std::io::ErrorKind::InvalidFilename
+    )
+}
+
 pub fn normalize_submodule_path(path: &Path) -> Result<PathBuf> {
     let mut normalized = PathBuf::new();
     for component in path.components() {
@@ -441,7 +488,7 @@ pub fn validate_submodule_path(repo_root: &Path, path: &Path) -> Result<()> {
                 anyhow::bail!("Submodule path contains a symlink: {}", current.display());
             }
             Ok(_) => {}
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+            Err(error) if is_absent_path(&error) => {}
             Err(error) => {
                 return Err(error).with_context(|| {
                     format!("Could not inspect submodule path {}", current.display())
@@ -456,6 +503,20 @@ pub fn validate_submodule_path(repo_root: &Path, path: &Path) -> Result<()> {
 #[cfg_attr(coverage_nightly, coverage(off))]
 mod tests {
     use super::*;
+
+    #[test]
+    fn absent_path_covers_missing_and_unstatable_names() {
+        use std::io::{Error, ErrorKind};
+        assert!(is_absent_path(&Error::new(ErrorKind::NotFound, "gone")));
+        assert!(is_absent_path(&Error::new(
+            ErrorKind::InvalidFilename,
+            "unstatable"
+        )));
+        assert!(!is_absent_path(&Error::new(
+            ErrorKind::PermissionDenied,
+            "denied"
+        )));
+    }
 
     fn checked_git(directory: &Path, args: &[&str]) {
         let output = std::process::Command::new("git")
@@ -879,6 +940,18 @@ mod human_output_tests {
         assert_eq!(
             safe_human_text("https://example.invalid/path@example.invalid?q=yes"),
             "https://example.invalid/path@example.invalid?q=yes"
+        );
+        // Git echoes some file URLs without their scheme; the credentials
+        // must still be redacted while plain UNC shares stay untouched.
+        assert_eq!(
+            safe_human_text(
+                "fatal: '//R26_FAKE_USER:R26_FAKE_PASS@localhostC:/w/missing.git' nope"
+            ),
+            "fatal: '//[redacted]@localhostC:/w/missing.git' nope"
+        );
+        assert_eq!(
+            safe_human_text("share //server/share/file and C:/win/path stay"),
+            "share //server/share/file and C:/win/path stay"
         );
     }
 }
