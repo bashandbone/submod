@@ -94,8 +94,13 @@ impl TestHarness {
         let git_config_global = temp_dir.path().join("gitconfig");
         fs::write(
             &git_config_global,
-            "[protocol \"file\"]\n\tallow = always\n[core]\n\tautocrlf = false\n\tfilemode = false\n[commit]\n\tgpgsign = false\n[tag]\n\tgpgsign = false\n[user]\n\tname = Test User\n\temail = test@example.com\n",
+            "[protocol \"file\"]\n\tallow = always\n[core]\n\tautocrlf = false\n\tfilemode = false\n[commit]\n\tgpgsign = false\n[tag]\n\tgpgsign = false\n[user]\n\tname = Test User\n\temail = test@example.com\n[maintenance]\n\tauto = false\n[gc]\n\tauto = false\n",
         )?;
+        // Since Git 2.46 `git commit` spawns a detached `git maintenance run --auto`
+        // that transiently creates and asynchronously deletes
+        // `.git/objects/maintenance.lock`. Byte-exact tree snapshots race that
+        // background deletion (notably on slow/loaded macOS runners), so keep all
+        // fixture and binary-spawned git commands free of background writers.
 
         Ok(Self {
             temp_dir,
