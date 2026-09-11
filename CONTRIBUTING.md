@@ -39,7 +39,7 @@ This project adheres to a Code of Conduct that we expect all contributors to fol
 
 Before contributing, ensure you have:
 
-- **Rust 1.87+** - Latest stable version recommended
+- **Rust 1.89+** - MSRV is 1.89 (see `Cargo.toml`); latest stable recommended
 - **Git** - For version control
 - **Basic Git knowledge** - Understanding of branches, commits, and pull requests
 - **GitHub account** - For submitting contributions
@@ -78,7 +78,7 @@ curl https://mise.run | sh
 mise install
 
 # This automatically installs:
-# - Rust 1.87+
+# - Rust 1.89+ (MSRV)
 # - hk (git hooks)
 # - cargo tools (nextest, audit, deny, watch)
 # - prettier, typos, and other linters
@@ -230,10 +230,10 @@ My philosophy on testing is "test what matters." Tests focus on integration and 
 
 ### Test Categories
 
-1. **Unit Tests** - We currently don't have unit tests, but they can be added in the future for critical functionality.
+1. **Unit Tests** - Unit tests are minimal by design; most coverage comes from integration tests below. Run the library unit tests with:
 
    ```bash
-   cargo test --test unit_tests
+   cargo test --lib
    ```
 
 2. **Integration Tests** - Test complete workflows

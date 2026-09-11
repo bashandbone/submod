@@ -178,11 +178,31 @@ ignore = "all"
 
         // Test parsing performance
         let parse_start = Instant::now();
-        harness
-            .run_submod_success(&["check", "--verbose"])
+        let output = harness
+            .run_submod(&["check", "--verbose"])
             .expect("Failed to run check");
         let parse_duration = parse_start.elapsed();
         println!("Large config parse time: {parse_duration:?}");
+
+        assert_eq!(output.status.code(), Some(1));
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let config = submod::Config::default()
+            .load_from_file(Some(&harness.config_path()))
+            .expect("Failed to load large config");
+        for i in 0..100 {
+            let name = format!("large-submodule-{i}");
+            let path = format!("lib/large{i}");
+            let diagnostic = format!("{name}: drift: checkout is missing");
+            assert!(
+                stdout.lines().any(|line| line == diagnostic),
+                "Missing diagnostic: {diagnostic}\n{stdout}"
+            );
+            assert_eq!(
+                config.get_submodule(&name).unwrap().path.as_deref(),
+                Some(path.as_str())
+            );
+        }
+        assert_eq!(harness.read_config().unwrap(), large_config);
 
         // Performance assertions
         assert!(
@@ -399,6 +419,26 @@ ignore = "all"
         );
     }
 
+    /// Restores the process working directory on drop so a mid-test panic
+    /// cannot pollute sibling tests sharing this process.
+    struct CwdGuard {
+        previous: std::path::PathBuf,
+    }
+
+    impl CwdGuard {
+        fn enter(dir: &std::path::Path) -> Self {
+            let previous = std::env::current_dir().expect("Failed to get current directory");
+            std::env::set_current_dir(dir).expect("Failed to set CWD");
+            Self { previous }
+        }
+    }
+
+    impl Drop for CwdGuard {
+        fn drop(&mut self) {
+            std::env::set_current_dir(&self.previous).ok();
+        }
+    }
+
     #[test]
     fn test_memory_usage_with_large_operations() {
         let harness = TestHarness::new().expect("Failed to create test harness");
@@ -425,9 +465,9 @@ ignore = "all"
                 .expect("Failed to add submodule");
         }
 
-        // Switch directory to the test workspace to run in-process
-        let orig_dir = std::env::current_dir().expect("Failed to get current directory");
-        std::env::set_current_dir(&harness.work_dir).expect("Failed to set CWD");
+        // Switch directory to the test workspace to run in-process.
+        // The guard restores it even if an operation below panics.
+        let _cwd = CwdGuard::enter(&harness.work_dir);
 
         reset_peak_memory();
         let mem_start = get_current_memory();
@@ -460,19 +500,19 @@ ignore = "all"
         let peak_mem = get_peak_memory();
         let net_peak = peak_mem.saturating_sub(mem_start);
 
-        // Restore working directory
-        std::env::set_current_dir(orig_dir).ok();
-
         println!("Large operations in-process time: {duration:?}");
         println!(
-            "Peak memory usage during large operations: {} KB",
+            "Rust allocator high-water delta during large operations: {} KB \
+             (test-process Rust allocations only; excludes Git child processes, \
+             native C allocations, stacks, and total process RSS)",
             net_peak / 1024
         );
 
-        // Assert memory usage is within reasonable bounds (e.g. less than 20 MB)
+        // Assert Rust allocation growth stays within reasonable bounds
+        // (e.g. less than 20 MB). This is not a process peak-memory limit.
         assert!(
             net_peak < 20 * 1024 * 1024,
-            "Peak memory usage too high: {net_peak} bytes"
+            "Rust allocation growth too high: {net_peak} bytes"
         );
 
         // If we reach here without OOM or crashes, the test passes
@@ -556,13 +596,34 @@ active = true
             .create_config(unicode_config)
             .expect("Failed to create unicode config");
 
-        let stdout = harness
-            .run_submod_success(&["check", "--verbose"])
+        let output = harness
+            .run_submod(&["check", "--verbose"])
             .expect("Failed to run check");
         let duration = start_time.elapsed();
 
         println!("Unicode config processing time: {duration:?}");
-        assert!(stdout.contains("Checking submodule configurations"));
+        assert_eq!(output.status.code(), Some(1));
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let config = submod::Config::default()
+            .load_from_file(Some(&harness.config_path()))
+            .expect("Failed to load unicode config");
+        for (name, path) in [
+            ("测试-submodule", "lib/测试"),
+            ("émoji-test-🚀", "lib/émoji🚀"),
+            ("special-chars-!@#$%", "lib/special"),
+        ] {
+            let diagnostic = format!("{name}: drift: checkout is missing");
+            assert!(
+                stdout.lines().any(|line| line == diagnostic),
+                "Missing diagnostic: {diagnostic}\n{stdout}"
+            );
+            assert_eq!(
+                config.get_submodule(name).unwrap().path.as_deref(),
+                Some(path)
+            );
+            assert!(!harness.dir_exists(path));
+        }
+        assert_eq!(harness.read_config().unwrap(), unicode_config);
 
         // Performance assertion
         assert!(

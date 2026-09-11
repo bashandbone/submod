@@ -19,23 +19,24 @@ local linters = new Mapping<String, Step> {
         // sources — letting cargo-deny's own exit code decide. This was
         // `check advisories` with `-A unsound -A unmaintained -A yanked -A notice`,
         // which meant `deny.toml`'s licenses/bans/sources policy was configured but
-        // never enforced by any hook or CI job. The four allowances are gone too:
-        // they suppress nothing in the current graph, so keeping them would only
-        // hide a *future* unmaintained or yanked dependency. If one lands, add it to
-        // `ignore` in deny.toml with a reason rather than reinstating a blanket -A.
+        // never enforced by any hook or CI job. The four allowances are gone:
+        // keeping them would only hide a *future* unmaintained or yanked
+        // dependency. The one known yanked crate (bisync 0.3.0, via gix) is
+        // reported as a warning and documented in deny.toml, not suppressed.
         // (The previous `-f json ... | jq -e '.[].vulnerabilities | length == 0'`
         // pipeline no longer parses: with `-f json` cargo-deny streams one object
         // per diagnostic, not an array, so jq failed with exit 5 on every run.)
-        // --exclude-dev is a top-level flag; it moved off the `check` subcommand.
-        check = "cargo deny --all-features --manifest-path {{ workspace_indicator }} --exclude-dev -L warn check --hide-inclusion-graph"
+        // No --exclude-dev: release assurance covers the graph used to
+        // build/test/package, dev dependencies included.
+        check = "cargo deny --all-features --manifest-path {{ workspace_indicator }} -L warn check --hide-inclusion-graph"
     }
     ["cargo_fmt"] = Builtins.cargo_fmt
     ["cargo_clippy"] = Builtins.cargo_clippy
     ["cargo_check"] = Builtins.cargo_check
     ["cargo_test"] = new Step {
         workspace_indicator = "Cargo.toml"
-        glob = "src/**/*.rs"
-        check = "cargo nextest --manifest-path {{ workspace_indicator }} run --all-features --no-fail-fast"
+        glob = List("src/**/*.rs", "tests/**/*.rs", "Cargo.toml", "Cargo.lock", "schemas/**", "sample_config/**", ".config/nextest.toml", "scripts/run-tests.sh", "hk.pkl")
+        check = "cargo nextest --manifest-path {{ workspace_indicator }} run --locked --all-features --no-fail-fast"
         env = new Mapping<String, String> {
             ["RUST_BACKTRACE"] = "1"
         }
@@ -64,7 +65,7 @@ local linters = new Mapping<String, Step> {
 
 local ci = (linters) {
     ["cargo_test"] {
-        check = "cargo nextest --manifest-path {{ workspace_indicator }} run --all-features --fail-fast -p ci"
+        check = "cargo nextest --manifest-path {{ workspace_indicator }} run --locked --all-features --fail-fast --profile ci"
     }
 }
 

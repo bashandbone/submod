@@ -20,13 +20,11 @@ Features:
 - Manage submodule entries and defaults programmatically.
 "]
 
-use crate::git_ops::GitOperations;
 use crate::options::SerializableBranch;
 use crate::options::{
-    ConfigLevel, GitmodulesConvert, SerializableFetchRecurse, SerializableIgnore,
-    SerializableUpdate,
+    GitmodulesConvert, SerializableFetchRecurse, SerializableIgnore, SerializableUpdate,
 };
-use anyhow::Result;
+use anyhow::{Context, Result};
 use serde::de::Deserializer;
 use serde::ser::SerializeMap;
 use serde::{Deserialize, Serialize, Serializer};
@@ -34,8 +32,7 @@ use std::path::PathBuf;
 use std::{collections::HashMap, path::Path};
 // TODO: Implement figment::Profile for modular configs
 use figment::{
-    Figment, Metadata, Provider, Result as FigmentResult,
-    providers::{Format, Toml},
+    Metadata, Provider, Result as FigmentResult,
     value::{Dict, Map, Value},
 };
 
@@ -86,7 +83,7 @@ impl Default for SubmoduleGitOptions {
         Self {
             ignore: Some(SerializableIgnore::default()),
             fetch_recurse: Some(SerializableFetchRecurse::default()),
-            branch: Some(SerializableBranch::default()),
+            branch: None,
             update: Some(SerializableUpdate::default()),
         }
     }
@@ -156,7 +153,7 @@ impl TryFrom<SubmoduleGitOptions> for Git2SubmoduleOptions {
             })?,
             None => git2::SubmoduleUpdate::Default,
         };
-        let branch = options.branch.map(|b| b.to_string());
+        let branch = options.branch.map(|b| b.to_gitmodules());
         let fetch_recurse = options.fetch_recurse.map(|fr| fr.to_gitmodules());
         Ok(Self::new(ignore, update, branch, fetch_recurse))
     }
@@ -167,6 +164,9 @@ impl TryFrom<SubmoduleGitOptions> for Git2SubmoduleOptions {
 /// And overridden by submodule-specific configurations
 #[derive(Debug, Default, Clone, Ord, PartialOrd, Eq, PartialEq, Hash, Serialize, Deserialize)]
 pub struct SubmoduleDefaults {
+    /// Branch inherited by modules without an explicit branch declaration.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub branch: Option<SerializableBranch>,
     /// [`Ignore`][SerializableIgnore] setting for submodules
     pub ignore: Option<SerializableIgnore>,
     /// [`Update`][SerializableUpdate] setting for submodules
@@ -201,6 +201,9 @@ impl SubmoduleDefaults {
     #[must_use]
     pub fn merge_from(&self, other: Self) -> Self {
         let mut mut_self = self.clone();
+        if other.branch.is_some() {
+            mut_self.branch = other.branch;
+        }
         if other.ignore.is_some() {
             mut_self.ignore = other.ignore;
         }
@@ -217,6 +220,7 @@ impl SubmoduleDefaults {
             let ignore = mut_self.ignore;
             let update = mut_self.update;
             Self {
+                branch: mut_self.branch,
                 ignore: ignore.or_else(|| Some(SerializableIgnore::default())),
                 fetch_recurse: mut_self
                     .fetch_recurse
@@ -308,6 +312,8 @@ pub struct SubmoduleUpdateOptions {
     pub recursive: bool,
     /// Whether to force the update
     pub force: bool,
+    /// Whether to advance to the configured remote tracking target.
+    pub remote: bool,
 }
 
 #[allow(dead_code)]
@@ -319,6 +325,7 @@ impl SubmoduleUpdateOptions {
             strategy,
             recursive,
             force,
+            remote: false,
         }
     }
 
@@ -329,6 +336,7 @@ impl SubmoduleUpdateOptions {
             strategy: self.strategy.clone(),
             recursive: self.recursive,
             force: true, // Set force to true
+            remote: self.remote,
         }
     }
 
@@ -337,11 +345,9 @@ impl SubmoduleUpdateOptions {
     pub fn from_options(options: SubmoduleGitOptions) -> Self {
         Self {
             strategy: options.update.unwrap_or_default(),
-            recursive: matches!(
-                options.fetch_recurse,
-                Some(SerializableFetchRecurse::Always)
-            ),
+            recursive: false,
             force: false, // Default to not force
+            remote: false,
         }
     }
 }
@@ -539,7 +545,7 @@ impl SubmoduleEntry {
             .cloned()
             .map_or_else(|| Some(name.to_string()), Some);
         let branch =
-            SerializableBranch::from_gitmodules(entries.get("branch").map_or("", |b| b.as_str()))
+            SerializableBranch::from_git_branch(entries.get("branch").map_or("", |b| b.as_str()))
                 .ok();
         let ignore = entries
             .get("ignore")
@@ -704,26 +710,15 @@ impl From<OtherSubmoduleSettings> for SubmoduleEntry {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SubmoduleEntries {
     submodules: Option<HashMap<SubmoduleName, SubmoduleEntry>>,
-    sparse_checkouts: Option<HashMap<SubmoduleName, Vec<String>>>,
 }
 
 impl<'de> Deserialize<'de> for SubmoduleEntries {
     /// Deserialize from the flat TOML format where each top-level key is a submodule name.
-    /// Accepts a map where each key maps to a [`SubmoduleEntry`], building both the
-    /// `submodules` map and the `sparse_checkouts` map from each entry's `sparse_paths`.
+    /// Each entry owns its sparse patterns.
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         let map: HashMap<SubmoduleName, SubmoduleEntry> = HashMap::deserialize(deserializer)?;
-        let mut sparse_checkouts: HashMap<SubmoduleName, Vec<String>> = HashMap::new();
-        for (name, entry) in &map {
-            if let Some(paths) = &entry.sparse_paths
-                && !paths.is_empty()
-            {
-                sparse_checkouts.insert(name.clone(), paths.clone());
-            }
-        }
         Ok(Self {
             submodules: Some(map),
-            sparse_checkouts: Some(sparse_checkouts),
         })
     }
 }
@@ -748,7 +743,6 @@ impl Default for SubmoduleEntries {
     fn default() -> Self {
         Self {
             submodules: Some(HashMap::new()),
-            sparse_checkouts: Some(HashMap::new()),
         }
     }
 }
@@ -761,27 +755,26 @@ impl SubmoduleEntries {
         submodules: Option<HashMap<SubmoduleName, SubmoduleEntry>>,
         sparse_checkouts: Option<HashMap<SubmoduleName, Vec<String>>>,
     ) -> Self {
-        Self {
-            submodules: submodules.or_else(|| Some(HashMap::new())),
-            sparse_checkouts: sparse_checkouts.or_else(|| Some(HashMap::new())),
+        let mut entries = Self {
+            submodules: Some(submodules.unwrap_or_default()),
+        };
+        for (name, paths) in sparse_checkouts.unwrap_or_default() {
+            entries.add_checkout(name, &paths, true);
         }
+        entries
     }
 
     /// Add a submodule entry
     #[must_use]
     pub fn add_submodule(mut self, name: SubmoduleName, entry: SubmoduleEntry) -> Self {
-        let submodules = self.submodules.get_or_insert_with(HashMap::new);
-        submodules.insert(name, entry);
+        self.update_entry(name, entry);
         self
     }
 
     /// Remove a submodule entry
     #[must_use]
-    pub fn remove_submodule(&mut self, name: &str) -> Self {
-        if let Some(submodules) = &mut self.submodules {
-            submodules.remove(name);
-        }
-        self.clone()
+    pub fn remove_submodule(&mut self, name: &str) -> Option<SubmoduleEntry> {
+        self.submodules.as_mut()?.remove(name)
     }
 
     /// Returns a list of all submodule names, or `None` if no submodules are configured.
@@ -800,58 +793,42 @@ impl SubmoduleEntries {
 
     /// Get the sparse checkouts map
     #[must_use]
-    pub const fn sparse_checkouts(&self) -> Option<&HashMap<SubmoduleName, Vec<String>>> {
-        self.sparse_checkouts.as_ref()
+    pub fn sparse_checkouts(&self) -> Option<HashMap<SubmoduleName, Vec<String>>> {
+        Some(
+            self.sparse_iter()
+                .map(|(name, paths)| (name.clone(), paths.clone()))
+                .collect(),
+        )
     }
 
-    /// Add a sparse checkout
+    /// Add or replace patterns on the authoritative entry.
     pub fn add_checkout(&mut self, name: SubmoduleName, checkout: &[String], replace: bool) {
-        if let Some(sparse_checkouts) = &mut self.sparse_checkouts {
-            if let Some(existing_checkout) = sparse_checkouts.get(&name) {
-                if replace {
-                    // Replace the existing checkout with the new one
-                    sparse_checkouts.insert(name, checkout.to_vec());
-                } else {
-                    // Append to the existing checkout
-                    let mut new_checkout = existing_checkout.clone();
-                    new_checkout.extend_from_slice(checkout);
-                    sparse_checkouts.insert(name, new_checkout);
-                }
-            } else {
-                // No existing checkout, just insert the new one
-                sparse_checkouts.insert(name, checkout.to_vec());
+        if let Some(entry) = self.submodules.as_mut().and_then(|m| m.get_mut(&name)) {
+            let paths = entry.sparse_paths.get_or_insert_with(Vec::new);
+            if replace {
+                paths.clear();
             }
-        } else {
-            self.sparse_checkouts = Some(HashMap::from([(name, checkout.to_vec())]));
+            paths.extend_from_slice(checkout);
         }
     }
 
-    /// Remove a sparse checkout by name
+    /// Remove all sparse patterns.
     pub fn delete_checkout(&mut self, name: &str) {
-        if let Some(sparse_checkouts) = &mut self.sparse_checkouts {
-            sparse_checkouts.remove(name);
-        }
+        self.set_sparse_paths_for(name, Vec::new());
     }
 
-    /// Remove a sparse checkout path
+    /// Remove a sparse pattern.
     pub fn remove_sparse_path(&mut self, name: &str, path: &str) {
-        if let Some(sparse_checkouts) = &mut self.sparse_checkouts
-            && let Some(paths) = sparse_checkouts.get_mut(name)
-        {
-            paths.retain(|p| p != path);
-            if paths.is_empty() {
-                sparse_checkouts.remove(name); // Remove the entry if no paths left
+        if let Some(entry) = self.submodules.as_mut().and_then(|m| m.get_mut(name)) {
+            if let Some(paths) = &mut entry.sparse_paths {
+                paths.retain(|p| p != path);
             }
         }
     }
 
-    /// Add a sparse path
+    /// Append a sparse pattern.
     pub fn add_sparse_path(&mut self, name: SubmoduleName, path: String) {
-        if let Some(sparse_checkouts) = &mut self.sparse_checkouts {
-            sparse_checkouts.entry(name).or_default().push(path);
-        } else {
-            self.sparse_checkouts = Some(HashMap::from([(name, vec![path])]));
-        }
+        self.add_checkout(name, &[path], false);
     }
 
     /// Get a submodule entry by name
@@ -875,21 +852,19 @@ impl SubmoduleEntries {
 
     /// Get an iterator over all sparse checkouts
     pub fn sparse_iter(&self) -> impl Iterator<Item = (&SubmoduleName, &Vec<String>)> {
-        self.sparse_checkouts
-            .as_ref()
-            .into_iter()
-            .flat_map(|s| s.iter())
+        self.submodule_iter().filter_map(|(name, entry)| {
+            entry
+                .sparse_paths
+                .as_ref()
+                .filter(|p| !p.is_empty())
+                .map(|paths| (name, paths))
+        })
     }
 
     /// Get an iterator that returns a tuple of submodule and sparse checkout
-    pub fn iter(&self) -> impl Iterator<Item = (&SubmoduleName, (&SubmoduleEntry, Vec<String>))> {
+    pub fn iter(&self) -> impl Iterator<Item = (&SubmoduleName, (&SubmoduleEntry, &[String]))> {
         self.submodule_iter().map(move |(name, entry)| {
-            let sparse = self
-                .sparse_checkouts
-                .as_ref()
-                .and_then(|s| s.get(name))
-                .cloned()
-                .unwrap_or_else(Vec::new);
+            let sparse = entry.sparse_paths.as_deref().unwrap_or_default();
             (name, (entry, sparse))
         })
     }
@@ -906,44 +881,19 @@ impl SubmoduleEntries {
         }
         Self {
             submodules: Some(submodules),
-            sparse_checkouts: Some(HashMap::new()),
         }
     }
     /// Insert or replace a submodule entry by name.
     pub fn update_entry(&mut self, name: SubmoduleName, entry: SubmoduleEntry) {
-        // Ensure the submodules map exists and update/insert the entry.
-        let submodules = self.submodules.get_or_insert_with(HashMap::new);
-
-        // Keep sparse_checkouts in sync with the entry's sparse paths.
-        match &entry.sparse_paths {
-            Some(paths) if !paths.is_empty() => {
-                let sparse_map = self.sparse_checkouts.get_or_insert_with(HashMap::new);
-                sparse_map.insert(name.clone(), paths.clone());
-            }
-            _ => {
-                if let Some(sparse_map) = self.sparse_checkouts.as_mut() {
-                    sparse_map.remove(&name);
-                }
-            }
-        }
-        submodules.insert(name, entry);
+        self.submodules
+            .get_or_insert_with(HashMap::new)
+            .insert(name, entry);
     }
 
-    /// Set sparse paths for an existing submodule entry in-place, keeping `sparse_checkouts` in sync.
-    ///
-    /// Does nothing if no submodule with `name` exists.
+    /// Set sparse paths for an existing entry.
     pub fn set_sparse_paths_for(&mut self, name: &str, paths: Vec<String>) {
         if let Some(entry) = self.submodules.as_mut().and_then(|m| m.get_mut(name)) {
-            if paths.is_empty() {
-                entry.sparse_paths = None;
-                if let Some(sparse_map) = self.sparse_checkouts.as_mut() {
-                    sparse_map.remove(name);
-                }
-            } else {
-                entry.sparse_paths = Some(paths.clone());
-                let sparse_map = self.sparse_checkouts.get_or_insert_with(HashMap::new);
-                sparse_map.insert(name.to_string(), paths);
-            }
+            entry.sparse_paths = if paths.is_empty() { None } else { Some(paths) };
         }
     }
 }
@@ -958,7 +908,7 @@ impl IntoIterator for SubmoduleEntries {
 }
 
 /// Main configuration structure for the submod tool
-#[derive(Debug, Default, Clone, Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, Serialize)]
 pub struct Config {
     /// Global default settings that apply to all submodules
     #[serde(default)]
@@ -968,8 +918,227 @@ pub struct Config {
     pub submodules: SubmoduleEntries,
 }
 
+impl<'de> Deserialize<'de> for Config {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let table = toml::Table::deserialize(deserializer)?;
+        Self::from_table(table, None)
+            .map_err(|error| serde::de::Error::custom(format!("{error:#}")))
+    }
+}
+
 #[allow(dead_code)]
 impl Config {
+    /// Parse and validate raw declarations, without resolving inherited fields.
+    pub fn parse(source: &str) -> Result<Self> {
+        let document = toml_edit::ImDocument::parse(source)?;
+        Self::from_table(toml::from_str(source)?, Some(&document))
+    }
+
+    fn from_table(
+        mut table: toml::Table,
+        document: Option<&toml_edit::ImDocument<&str>>,
+    ) -> Result<Self> {
+        let location = |section: &str, field: &str| {
+            let label = match (section.is_empty(), field.is_empty()) {
+                (true, _) => field.to_string(),
+                (_, true) => format!("[{section}]"),
+                _ => format!("[{section}].{field}"),
+            };
+            let Some(document) = document else {
+                return label;
+            };
+            let section_item = if section.is_empty() {
+                Some(document.as_item())
+            } else {
+                document.get(section)
+            };
+            let span = section_item.and_then(|item| {
+                item.as_table_like()
+                    .and_then(|table| {
+                        table
+                            .get_key_value(field)
+                            .or_else(|| {
+                                (field == "fetchRecurse")
+                                    .then(|| {
+                                        table
+                                            .get_key_value("fetch")
+                                            .or_else(|| table.get_key_value("fetch_recurse"))
+                                    })
+                                    .flatten()
+                            })
+                            .and_then(|(key, value)| key.span().or_else(|| value.span()))
+                    })
+                    .or_else(|| item.span())
+            });
+            span.map_or_else(
+                || label.clone(),
+                |span| {
+                    let line = document.raw()[..span.start]
+                        .bytes()
+                        .filter(|byte| *byte == b'\n')
+                        .count()
+                        + 1;
+                    format!("{label} (line {line})")
+                },
+            )
+        };
+        if let Some(version) = table.remove("schema_version") {
+            anyhow::ensure!(
+                matches!(version.as_str(), Some("1.0.0" | "1.1.0")),
+                "{}: unsupported version {version}; expected 1.0.0 or 1.1.0",
+                location("", "schema_version")
+            );
+        }
+        let mut defaults = SubmoduleDefaults::default();
+        let mut entries = SubmoduleEntries::default();
+        for (name, value) in table {
+            let mut fields = value
+                .as_table()
+                .cloned()
+                .with_context(|| format!("{}: expected a table", location(&name, "")))?;
+            let global = name == "defaults";
+            for key in fields.keys() {
+                let common = matches!(
+                    key.as_str(),
+                    "branch"
+                        | "ignore"
+                        | "update"
+                        | "fetchRecurse"
+                        | "fetch"
+                        | "fetch_recurse"
+                        | "use_git_default_sparse_checkout"
+                );
+                anyhow::ensure!(
+                    common
+                        || (!global
+                            && matches!(
+                                key.as_str(),
+                                "url" | "path" | "branch" | "active" | "shallow" | "sparse_paths"
+                            )),
+                    "{}: unknown field",
+                    location(&name, key)
+                );
+            }
+            let spellings: Vec<_> = ["fetchRecurse", "fetch", "fetch_recurse"]
+                .into_iter()
+                .filter(|key| fields.contains_key(*key))
+                .collect();
+            anyhow::ensure!(
+                spellings.len() <= 1,
+                "{}: conflicting aliases {spellings:?}",
+                location(&name, "fetchRecurse")
+            );
+            if let Some(alias) = spellings.first().filter(|alias| **alias != "fetchRecurse") {
+                let value = fields.remove(*alias).expect("present alias");
+                fields.insert("fetchRecurse".into(), value);
+                eprintln!(
+                    "warning: [{}].{alias} is legacy; use fetchRecurse",
+                    crate::utilities::safe_human_text(&name)
+                );
+            }
+            if matches!(
+                fields.get("fetchRecurse").and_then(toml::Value::as_str),
+                Some("true" | "false")
+            ) {
+                eprintln!(
+                    "warning: [{}].fetchRecurse uses a legacy value; use always/never",
+                    crate::utilities::safe_human_text(&name)
+                );
+            }
+            if fields.get("branch").and_then(toml::Value::as_str) == Some("HEAD") {
+                eprintln!(
+                    "warning: [{}].branch=HEAD is legacy remote-default tracking and explicitly overrides any global branch",
+                    crate::utilities::safe_human_text(&name)
+                );
+            }
+            for (key, value) in &fields {
+                let valid = match key.as_str() {
+                    "active" | "shallow" | "use_git_default_sparse_checkout" => value.is_bool(),
+                    "url" | "path" | "branch" => value.is_str(),
+                    "sparse_paths" => value
+                        .as_array()
+                        .is_some_and(|paths| paths.iter().all(toml::Value::is_str)),
+                    "ignore" => value.clone().try_into::<SerializableIgnore>().is_ok(),
+                    "update" => value.clone().try_into::<SerializableUpdate>().is_ok(),
+                    "fetchRecurse" => value.clone().try_into::<SerializableFetchRecurse>().is_ok(),
+                    _ => true,
+                };
+                anyhow::ensure!(
+                    valid,
+                    "{}: invalid value or type {value}",
+                    location(&name, key)
+                );
+                if key == "branch" {
+                    anyhow::ensure!(
+                        value.clone().try_into::<SerializableBranch>().is_ok(),
+                        "{}: invalid branch {value}",
+                        location(&name, "branch")
+                    );
+                }
+            }
+            if global {
+                defaults = toml::Value::Table(fields)
+                    .try_into()
+                    .with_context(|| location("defaults", ""))?;
+            } else {
+                let entry: SubmoduleEntry = toml::Value::Table(fields)
+                    .try_into()
+                    .with_context(|| location(&name, ""))?;
+                anyhow::ensure!(
+                    entry.url.as_deref().is_some_and(
+                        |url| !url.trim().is_empty() && !url.contains(['\0', '\n', '\r'])
+                    ),
+                    "{}: required nonempty URL without NUL/newlines",
+                    location(&name, "url")
+                );
+                let path = entry.path.as_deref().unwrap_or(&name);
+                anyhow::ensure!(
+                    !path.trim().is_empty() && !path.contains(['\0', '\n', '\r']),
+                    "{}: invalid path characters",
+                    location(&name, "path")
+                );
+                crate::utilities::normalize_submodule_path(Path::new(path))
+                    .with_context(|| location(&name, "path"))?;
+                if let Some(patterns) = &entry.sparse_paths {
+                    anyhow::ensure!(
+                        patterns.iter().all(|p| !p.contains(['\0', '\n', '\r'])),
+                        "{}: patterns cannot contain NUL or newlines",
+                        location(&name, "sparse_paths")
+                    );
+                }
+                entries.update_entry(name, entry);
+            }
+        }
+        Ok(Self::new(defaults, entries))
+    }
+
+    /// Resolve one entry without changing its raw declaration.
+    #[must_use]
+    pub fn effective_entry(&self, name: &str) -> Option<SubmoduleEntry> {
+        let mut entry = self.submodules.get(name)?.clone();
+        entry.path.get_or_insert_with(|| name.to_string());
+        entry.branch = entry.branch.or_else(|| self.defaults.branch.clone());
+        entry.ignore = entry
+            .ignore
+            .or(self.defaults.ignore)
+            .or(Some(SerializableIgnore::default()));
+        entry.update = entry
+            .update
+            .or_else(|| self.defaults.update.clone())
+            .or(Some(SerializableUpdate::default()));
+        entry.fetch_recurse = entry
+            .fetch_recurse
+            .or(self.defaults.fetch_recurse)
+            .or(Some(SerializableFetchRecurse::default()));
+        entry.use_git_default_sparse_checkout = entry
+            .use_git_default_sparse_checkout
+            .or(self.defaults.use_git_default_sparse_checkout)
+            .or(Some(false));
+        entry.active = Some(entry.active.unwrap_or(true));
+        entry.shallow = Some(entry.shallow.unwrap_or(false));
+        Some(entry)
+    }
+
     /// Create a new configuration with the given defaults and submodules
     #[must_use]
     pub const fn new(defaults: SubmoduleDefaults, submodules: SubmoduleEntries) -> Self {
@@ -998,32 +1167,22 @@ impl Config {
     /// Create a new configuration, resolving defaults
     #[must_use]
     pub fn apply_defaults(mut self) -> Self {
-        if let Some(submodules) = self.submodules.submodules.as_mut() {
-            for sub in submodules.values_mut() {
-                Self::apply_option_default(
-                    &mut sub.ignore,
-                    self.defaults.ignore.as_ref(),
-                    SerializableIgnore::Unspecified,
-                );
-                Self::apply_option_default(
-                    &mut sub.fetch_recurse,
-                    self.defaults.fetch_recurse.as_ref(),
-                    SerializableFetchRecurse::Unspecified,
-                );
-                Self::apply_option_default(
-                    &mut sub.update,
-                    self.defaults.update.as_ref(),
-                    SerializableUpdate::Unspecified,
-                );
-                // active is just a bool, no default logic needed
-            }
+        let resolved: Vec<_> = self
+            .get_submodules()
+            .filter_map(|(name, _)| {
+                self.effective_entry(name)
+                    .map(|entry| (name.clone(), entry))
+            })
+            .collect();
+        for (name, entry) in resolved {
+            self.submodules.update_entry(name, entry);
         }
         self
     }
 
     /// Add a submodule configuration
     pub fn add_submodule(&mut self, name: String, submodule: SubmoduleEntry) {
-        self.submodules = self.submodules.clone().add_submodule(name, submodule);
+        self.submodules.update_entry(name, submodule);
     }
 
     /// Get an iterator over all submodule configurations
@@ -1037,9 +1196,7 @@ impl Config {
     }
 
     /// Get an iterator that returns a tuple of submodule and sparse checkout
-    pub fn entries(
-        &self,
-    ) -> impl Iterator<Item = (&SubmoduleName, (&SubmoduleEntry, Vec<String>))> {
+    pub fn entries(&self) -> impl Iterator<Item = (&SubmoduleName, (&SubmoduleEntry, &[String]))> {
         self.submodules.iter()
     }
 
@@ -1048,33 +1205,6 @@ impl Config {
     #[must_use]
     pub fn get_submodule(&self, name: &str) -> Option<&SubmoduleEntry> {
         self.submodules.get(name)
-    }
-
-    /// Ensure submod.toml and .gitmodules stay in sync
-    pub fn sync_with_git_config(&self, git_ops: &mut dyn GitOperations) -> Result<()> {
-        // 1. Read current .gitmodules
-        let current_gitmodules = git_ops.read_gitmodules()?;
-
-        // 2. Apply our global defaults logic
-        let target_gitmodules = self.submodules.clone();
-
-        // 3. Write updated .gitmodules if different
-        if current_gitmodules != target_gitmodules {
-            git_ops.write_gitmodules(&target_gitmodules)?;
-        }
-
-        // 4. Update any git config values that need to be set
-        for (name, entry) in target_gitmodules.submodule_iter() {
-            if let Some(branch) = &entry.branch {
-                git_ops.set_config_value(
-                    &format!("submodule.{name}.branch"),
-                    branch.to_string().as_str(),
-                    ConfigLevel::Local,
-                )?;
-            }
-        }
-
-        Ok(())
     }
 
     /// Overlay CLI-supplied options onto this configuration.
@@ -1087,6 +1217,9 @@ impl Config {
     /// file's values (#62 P1).
     fn merge_cli_overrides(&mut self, cli: Self) {
         let cli_defaults = cli.defaults;
+        if cli_defaults.branch.is_some() {
+            self.defaults.branch = cli_defaults.branch;
+        }
         if cli_defaults.ignore.is_some() {
             self.defaults.ignore = cli_defaults.ignore;
         }
@@ -1109,48 +1242,21 @@ impl Config {
     /// Load configuration from a file, merging with CLI options
     #[allow(clippy::unused_self)]
     pub fn load(&self, path: impl AsRef<Path>, cli_options: Self) -> anyhow::Result<Self> {
-        // 1) Read the file's values. NOTE: layering an empty `Config::default()`
-        //    provider beneath the file (the previous approach) actively *erased*
-        //    the file's `[defaults]` — that provider emits all-`None` defaults
-        //    under its own figment profile (`REPO`), which then overrode the
-        //    file's values. Rust-side defaults are filled by `apply_defaults()`
-        //    below, not by a figment base layer (#62 P1).
-        let mut cfg: Self = Figment::from(Toml::file(path)).extract()?;
-
-        // 2) CLI overrides the file, but only where the CLI actually set a value
-        //    (None-aware — see `merge_cli_overrides`).
+        let path = path.as_ref();
+        let mut cfg = Self::parse(&std::fs::read_to_string(path)?).map_err(|error| {
+            anyhow::anyhow!("Invalid configuration {}: {error:#}", path.display())
+        })?;
         cfg.merge_cli_overrides(cli_options);
-
-        // 3) post-process submodules
-        Ok(cfg.apply_defaults())
-    }
-
-    /// load configuration from a file without CLI options
-    #[allow(clippy::unused_self, clippy::needless_pass_by_value)]
-    pub fn load_from_file(&self, path: Option<impl AsRef<Path>>) -> anyhow::Result<Self> {
-        let p: &dyn AsRef<Path> = match path {
-            Some(ref p) => p,
-            None => &".",
-        };
-        // See `load`: an empty `Config::default()` base layer erases the file's
-        // `[defaults]`, so read the file directly and let `apply_defaults()`
-        // supply Rust-side defaults (#62 P1).
-        let cfg: Self = Figment::from(Toml::file(p)).extract()?;
-        Ok(cfg.apply_defaults())
-    }
-
-    /// Load configuration from config and merge with existing gitmodules options
-    #[allow(clippy::unused_self)]
-    pub fn load_with_git_sync(
-        &self,
-        path: impl AsRef<Path>,
-        git_ops: &mut dyn GitOperations,
-        cli_options: Self,
-    ) -> anyhow::Result<Self> {
-        let cfg = self.load(path, cli_options)?;
-        // Sync with git config
-        cfg.sync_with_git_config(git_ops)?;
         Ok(cfg)
+    }
+
+    /// Load raw declarations from a file.
+    pub fn load_from_file(&self, path: Option<impl AsRef<Path>>) -> anyhow::Result<Self> {
+        self.load(
+            path.as_ref()
+                .map_or(Path::new("submod.toml"), AsRef::as_ref),
+            Self::default(),
+        )
     }
 }
 
@@ -1205,14 +1311,216 @@ mod tests {
     // ================================================================
 
     #[test]
+    fn semantic_errors_identify_original_source_lines() {
+        for (source, field, line) in [
+            (
+                "# metadata\n\nschema_version = '9.0.0'\n",
+                "schema_version",
+                3,
+            ),
+            (
+                "# module\n[module]\nurl = 'repo'\n\nunknown = true\n",
+                "[module].unknown",
+                5,
+            ),
+            (
+                "[module]\nurl = 'repo'\n# policy\nactive = 'false'\n",
+                "[module].active",
+                4,
+            ),
+            (
+                "[defaults]\n# historical spelling\nfetch = true\n",
+                "[defaults].fetchRecurse",
+                3,
+            ),
+            (
+                "# quoted names and keys\n['a.b']\nurl = 'repo'\n'active' = 'false'\n",
+                "[a.b].active",
+                4,
+            ),
+            (
+                "# inline table\nmodule = { url = 'repo', active = 'false' }\n",
+                "[module].active",
+                2,
+            ),
+        ] {
+            let error = Config::parse(source).unwrap_err().to_string();
+            assert!(error.contains(field), "{error}");
+            assert!(error.contains(&format!("line {line}")), "{error}");
+        }
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("submod.toml");
+        std::fs::write(&path, "# metadata\nschema_version='9.0.0'\n").unwrap();
+        let error = Config::default()
+            .load(&path, Config::default())
+            .unwrap_err()
+            .to_string();
+        assert!(error.contains("schema_version (line 2)"), "{error}");
+        assert!(error.contains(&path.display().to_string()), "{error}");
+    }
+
+    #[test]
+    fn global_branch_is_inherited_without_pinning_or_overriding_head() {
+        let mut config = Config::parse("[defaults]\nbranch='main'\n[inherited]\nurl='repo'\n[explicit]\nurl='repo'\nbranch='HEAD'\n").unwrap();
+        assert_eq!(
+            config.defaults.branch,
+            Some(SerializableBranch::Name("main".into()))
+        );
+        assert_eq!(config.get_submodule("inherited").unwrap().branch, None);
+        assert_eq!(
+            config.effective_entry("inherited").unwrap().branch,
+            config.defaults.branch
+        );
+        assert_eq!(
+            config.effective_entry("explicit").unwrap().branch,
+            Some(SerializableBranch::Name("HEAD".into()))
+        );
+        config.defaults.branch = Some(SerializableBranch::CurrentInSuperproject);
+        let saved = toml::to_string(&config).unwrap();
+        let reloaded = Config::parse(&saved).unwrap();
+        assert_eq!(reloaded.get_submodule("inherited").unwrap().branch, None);
+        assert_eq!(
+            reloaded.effective_entry("inherited").unwrap().branch,
+            Some(SerializableBranch::CurrentInSuperproject)
+        );
+        assert_eq!(
+            reloaded.effective_entry("explicit").unwrap().branch,
+            Some(SerializableBranch::Name("HEAD".into()))
+        );
+        for value in ["''", "'bad..branch'", "true", "1"] {
+            assert!(
+                Config::parse(&format!("[defaults]\nbranch={value}"))
+                    .unwrap_err()
+                    .to_string()
+                    .contains("[defaults].branch")
+            );
+        }
+        let merged = SubmoduleDefaults::default().merge_from(config.defaults.clone());
+        assert_eq!(merged.branch, config.defaults.branch);
+        let mut cli = Config::default();
+        cli.defaults.branch = Some(SerializableBranch::Name("develop".into()));
+        config.merge_cli_overrides(cli);
+        assert_eq!(
+            config.defaults.branch,
+            Some(SerializableBranch::Name("develop".into()))
+        );
+    }
+
+    #[test]
+    fn raw_defaults_survive_resolution_and_serialization() {
+        let mut config = Config::parse("[defaults]\nignore='dirty'\nuse_git_default_sparse_checkout=true\n[inherited]\nurl='repo'\n[explicit]\nurl='repo'\nignore='none'\nuse_git_default_sparse_checkout=false\n").unwrap();
+        config.defaults.ignore = Some(SerializableIgnore::All);
+        assert_eq!(config.get_submodule("inherited").unwrap().ignore, None);
+        assert_eq!(
+            config.effective_entry("inherited").unwrap().ignore,
+            Some(SerializableIgnore::All)
+        );
+        assert_eq!(
+            config.effective_entry("inherited").unwrap().path.as_deref(),
+            Some("inherited")
+        );
+        assert_eq!(config.effective_entry("inherited").unwrap().branch, None);
+        assert_eq!(
+            config.effective_entry("explicit").unwrap().ignore,
+            Some(SerializableIgnore::None)
+        );
+        assert_eq!(
+            config
+                .effective_entry("explicit")
+                .unwrap()
+                .use_git_default_sparse_checkout,
+            Some(false)
+        );
+        let reloaded = Config::parse(&toml::to_string(&config).unwrap()).unwrap();
+        assert_eq!(reloaded.get_submodule("inherited").unwrap().ignore, None);
+        assert_eq!(
+            reloaded.effective_entry("inherited").unwrap().ignore,
+            Some(SerializableIgnore::All)
+        );
+    }
+
+    #[test]
+    fn config_schema_aliases_and_legacy_values() {
+        for version in ["", "schema_version='1.0.0'\n", "schema_version='1.1.0'\n"] {
+            for key in ["fetchRecurse", "fetch", "fetch_recurse"] {
+                let source =
+                    format!("{version}[module]\nurl='repo'\n{key}='true'\nbranch='HEAD'\n");
+                let config: Config = toml::from_str(&source).unwrap();
+                assert_eq!(
+                    config.get_submodule("module").unwrap().fetch_recurse,
+                    Some(SerializableFetchRecurse::Always)
+                );
+                assert_eq!(
+                    config.effective_entry("module").unwrap().branch,
+                    Some(SerializableBranch::Name("HEAD".into()))
+                );
+            }
+        }
+        Config::parse(include_str!("../sample_config/submod.toml")).unwrap();
+    }
+
+    #[test]
+    fn config_rejects_invalid_fields_before_actions() {
+        for (source, context) in [
+            ("schema_version='9.0.0'", "schema_version"),
+            ("schema_version=1", "schema_version"),
+            (
+                "[module]\nurl='repo'\nfetch='always'\nfetchRecurse='never'",
+                "conflicting aliases",
+            ),
+            ("[defaults]\nignroe='all'", "ignroe"),
+            ("[module]\nurl='repo'\nunknown=true", "unknown"),
+            ("[module]\npath='child'", "url"),
+            ("[module]\nurl='  '", "url"),
+            ("[module]\nurl='repo'\npath='../outside'", "path"),
+            ("[module]\nurl='repo'\npath='.'", "path"),
+            ("[module]\nurl='repo'\npath='.git/config'", "path"),
+            ("[module]\nurl='repo'\nactive='false'", "module"),
+            ("[module]\nurl='repo'\nupdate='!evil'", "module"),
+            (
+                "[module]\nurl='repo'\nsparse_paths=[\"a\\nb\"]",
+                "sparse_paths",
+            ),
+            ("[module]\nurl='repo'\nsparse_paths=[true]", "module"),
+            ("module=true", "module"),
+        ] {
+            let error = Config::parse(source).unwrap_err();
+            assert!(
+                format!("{error:#}").contains(context),
+                "{source}: {error:#}"
+            );
+        }
+    }
+
+    #[test]
+    fn sparse_patterns_have_one_authority() {
+        let mut config = Config::parse("[module]\nurl='repo'\nsparse_paths=['src/']").unwrap();
+        config
+            .submodules
+            .add_sparse_path("module".into(), "docs/".into());
+        let mut entry = config.get_submodule("module").unwrap().clone();
+        assert_eq!(entry.sparse_paths.as_ref().unwrap().len(), 2);
+        entry.sparse_paths = Some(vec!["lib/".into()]);
+        config.submodules = config.submodules.add_submodule("module".into(), entry);
+        assert_eq!(
+            config.get_sparse_checkouts().next().unwrap().1,
+            &vec!["lib/".to_string()]
+        );
+        let _ = config.submodules.remove_submodule("module");
+        assert!(config.get_sparse_checkouts().next().is_none());
+    }
+
+    #[test]
     fn test_defaults_merge_from_both_set() {
         let base = SubmoduleDefaults {
+            branch: None,
             ignore: Some(SerializableIgnore::All),
             fetch_recurse: Some(SerializableFetchRecurse::Always),
             update: Some(SerializableUpdate::Rebase),
             use_git_default_sparse_checkout: None,
         };
         let other = SubmoduleDefaults {
+            branch: None,
             ignore: Some(SerializableIgnore::Dirty),
             fetch_recurse: None,
             update: Some(SerializableUpdate::Merge),
@@ -1230,6 +1538,7 @@ mod tests {
     #[test]
     fn test_defaults_merge_from_empty_other() {
         let base = SubmoduleDefaults {
+            branch: None,
             ignore: Some(SerializableIgnore::All),
             fetch_recurse: Some(SerializableFetchRecurse::Never),
             update: Some(SerializableUpdate::Checkout),
@@ -1247,6 +1556,7 @@ mod tests {
     fn test_defaults_merge_from_empty_base() {
         let base = SubmoduleDefaults::default();
         let other = SubmoduleDefaults {
+            branch: None,
             ignore: Some(SerializableIgnore::Dirty),
             fetch_recurse: Some(SerializableFetchRecurse::Always),
             update: Some(SerializableUpdate::Merge),
@@ -1276,12 +1586,14 @@ mod tests {
     fn test_defaults_merge_from_carries_other_sparse_default() {
         // Regression (#62 P2): merge_from dropped other.use_git_default_sparse_checkout.
         let base = SubmoduleDefaults {
+            branch: None,
             ignore: None,
             fetch_recurse: None,
             update: None,
             use_git_default_sparse_checkout: None,
         };
         let other = SubmoduleDefaults {
+            branch: None,
             ignore: None,
             fetch_recurse: None,
             update: None,
@@ -1299,12 +1611,14 @@ mod tests {
     fn test_defaults_merge_from_other_sparse_default_overrides_base() {
         // The override must win even when base already holds a value.
         let base = SubmoduleDefaults {
+            branch: None,
             ignore: None,
             fetch_recurse: None,
             update: None,
             use_git_default_sparse_checkout: Some(true),
         };
         let other = SubmoduleDefaults {
+            branch: None,
             ignore: None,
             fetch_recurse: None,
             update: None,
@@ -1322,6 +1636,7 @@ mod tests {
     fn test_defaults_merge_from_unset_other_sparse_default_preserves_base() {
         // When other leaves it unset, base's value must survive.
         let base = SubmoduleDefaults {
+            branch: None,
             ignore: None,
             fetch_recurse: None,
             update: None,
@@ -1592,6 +1907,20 @@ mod tests {
     #[test]
     fn test_entries_add_checkout_replace() {
         let mut entries = SubmoduleEntries::default();
+        entries.update_entry(
+            "mod1".into(),
+            SubmoduleEntry::new(
+                Some("repo".into()),
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+            ),
+        );
         entries.add_checkout("mod1".to_string(), &["src/".to_string()], false);
         assert_eq!(
             entries.sparse_checkouts().unwrap().get("mod1").unwrap(),
@@ -1617,8 +1946,21 @@ mod tests {
     fn test_entries_add_checkout_when_none() {
         let mut entries = SubmoduleEntries {
             submodules: Some(HashMap::new()),
-            sparse_checkouts: None,
         };
+        entries.update_entry(
+            "mod1".into(),
+            SubmoduleEntry::new(
+                Some("repo".into()),
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+            ),
+        );
         entries.add_checkout("mod1".to_string(), &["src/".to_string()], false);
         assert!(entries.sparse_checkouts().is_some());
         assert_eq!(
@@ -1630,6 +1972,20 @@ mod tests {
     #[test]
     fn test_entries_remove_sparse_path() {
         let mut entries = SubmoduleEntries::default();
+        entries.update_entry(
+            "mod1".into(),
+            SubmoduleEntry::new(
+                Some("repo".into()),
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+            ),
+        );
         entries.add_checkout(
             "mod1".to_string(),
             &["src/".to_string(), "docs/".to_string()],
@@ -1650,6 +2006,20 @@ mod tests {
     #[test]
     fn test_entries_add_sparse_path() {
         let mut entries = SubmoduleEntries::default();
+        entries.update_entry(
+            "mod1".into(),
+            SubmoduleEntry::new(
+                Some("repo".into()),
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+            ),
+        );
         entries.add_sparse_path("mod1".to_string(), "src/".to_string());
         assert_eq!(
             entries.sparse_checkouts().unwrap().get("mod1").unwrap(),
@@ -1666,8 +2036,21 @@ mod tests {
     fn test_entries_add_sparse_path_when_none() {
         let mut entries = SubmoduleEntries {
             submodules: Some(HashMap::new()),
-            sparse_checkouts: None,
         };
+        entries.update_entry(
+            "mod1".into(),
+            SubmoduleEntry::new(
+                Some("repo".into()),
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+            ),
+        );
         entries.add_sparse_path("mod1".to_string(), "src/".to_string());
         assert!(entries.sparse_checkouts().is_some());
     }
@@ -1675,6 +2058,20 @@ mod tests {
     #[test]
     fn test_entries_delete_checkout() {
         let mut entries = SubmoduleEntries::default();
+        entries.update_entry(
+            "mod1".into(),
+            SubmoduleEntry::new(
+                Some("repo".into()),
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+            ),
+        );
         entries.add_checkout("mod1".to_string(), &["src/".to_string()], false);
         entries.delete_checkout("mod1");
         assert!(!entries.sparse_checkouts().unwrap().contains_key("mod1"));
@@ -1905,6 +2302,7 @@ mod tests {
     #[test]
     fn test_config_apply_defaults() {
         let defaults = SubmoduleDefaults {
+            branch: None,
             ignore: Some(SerializableIgnore::Dirty),
             fetch_recurse: Some(SerializableFetchRecurse::Always),
             update: Some(SerializableUpdate::Rebase),
@@ -1935,6 +2333,7 @@ mod tests {
     #[test]
     fn test_config_apply_defaults_entry_overrides() {
         let defaults = SubmoduleDefaults {
+            branch: None,
             ignore: Some(SerializableIgnore::Dirty),
             fetch_recurse: Some(SerializableFetchRecurse::Always),
             update: Some(SerializableUpdate::Rebase),
@@ -2503,19 +2902,24 @@ update = "rebase"
     }
 
     #[test]
-    fn test_update_options_from_options_recursive_only_when_fetch_always() {
-        // fetchRecurse = always is the one value that flips `recursive` on.
+    fn test_update_options_from_options_never_selects_recursive_materialization() {
+        // fetchRecurse controls fetching nested history. Recursive checkout is
+        // an explicit lifecycle-command selection and remains off here.
         let always = SubmoduleUpdateOptions::from_options(SubmoduleGitOptions::new(
             None,
             Some(SerializableFetchRecurse::Always),
             None,
             Some(SerializableUpdate::Merge),
         ));
-        assert!(always.recursive, "fetchRecurse=always must set recursive");
+        assert!(
+            !always.recursive,
+            "fetchRecurse=always must not select recursive materialization"
+        );
         assert_eq!(always.strategy, SerializableUpdate::Merge);
         assert!(!always.force, "from_options never forces");
+        assert!(!always.remote, "from_options never selects remote tracking");
 
-        // Every other fetch_recurse value (incl. None) leaves recursive off.
+        // Every other fetch_recurse value (including None) also leaves it off.
         for fr in [
             None,
             Some(SerializableFetchRecurse::OnDemand),
@@ -2526,7 +2930,7 @@ update = "rebase"
             ));
             assert!(
                 !opts.recursive,
-                "only fetchRecurse=always should set recursive, got {fr:?}"
+                "fetchRecurse must stay independent of recursive checkout, got {fr:?}"
             );
             // An absent update strategy falls back to the Checkout default.
             assert_eq!(opts.strategy, SerializableUpdate::Checkout);

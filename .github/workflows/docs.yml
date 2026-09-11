@@ -2,6 +2,14 @@
 #
 # SPDX-License-Identifier: LicenseRef-PlainMIT OR MIT
 
+# Third-party actions are pinned to immutable commit SHAs (reviewed
+# 2026-09-11; version comments record the moving ref each SHA was taken
+# from). See .github/workflows/ci.yml for the update procedure.
+#
+# These jobs validate documentation builds only. API-doc success does not
+# prove schema delivery or CLI example behavior; those are covered by the
+# package job in ci.yml and the R27 integration tests.
+
 name: Documentation
 
 on:
@@ -17,45 +25,53 @@ jobs:
     docs:
         name: Build and Deploy Documentation
         runs-on: ubuntu-latest
+        permissions:
+            contents: read
         steps:
-            - uses: actions/checkout@v7
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
               with:
                   submodules: recursive
 
             - name: Install Rust
-              uses: dtolnay/rust-toolchain@stable
+              uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87 # stable
+              with:
+                  toolchain: stable
 
             - name: Cache cargo registry
-              uses: actions/cache@v6
+              uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
               with:
                   path: ~/.cargo/registry
                   key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
 
             - name: Cache cargo index
-              uses: actions/cache@v6
+              uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
               with:
                   path: ~/.cargo/git
                   key: ${{ runner.os }}-cargo-index-${{ hashFiles('**/Cargo.lock') }}
 
             - name: Cache cargo build
-              uses: actions/cache@v6
+              uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
               with:
                   path: target
                   key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
 
             - name: Build documentation
-              run: cargo doc --all-features --no-deps
+              run: cargo doc --locked --all-features --no-deps
 
     docs_rs_check:
         name: Check docs.rs compatibility
         runs-on: ubuntu-latest
+        permissions:
+            contents: read
         steps:
-            - uses: actions/checkout@v7
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
               with:
                   submodules: recursive
 
             - name: Install Rust nightly
-              uses: dtolnay/rust-toolchain@nightly
+              uses: dtolnay/rust-toolchain@be39649afda95dbf70f87cce95f68b8d5797b296 # nightly
+              with:
+                  toolchain: nightly
 
             - name: Install cargo-docs-rs
               run: cargo install cargo-docs-rs

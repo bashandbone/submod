@@ -2,8 +2,15 @@
 #
 # SPDX-License-Identifier: LicenseRef-PlainMIT OR MIT
 
+# Canonical advisory policy lives in deny.toml. This file mirrors its empty
+# exception list so `cargo audit` (which reads audit.toml) and
+# `cargo deny check advisories` enforce the same policy.
 [advisories]
 ignore = [
-    "RUSTSEC-2024-0364", # gitoxide-core does not neutralize special characters for terminals. No patched version available.
-    "RUSTSEC-2024-0436" # No patched version available.
+    # Retired, kept as documentation so a re-entry fails loudly:
+    # - RUSTSEC-2024-0364 (gitoxide-core): dependency removed in Phase 7,
+    #   no longer in the graph.
+    # - RUSTSEC-2024-0436 (paste, unmaintained): arrived via the old rustls
+    #   TLS stack; that stack is gone, paste is not in the graph. The ignore
+    #   was stale (it named a crate absent from Cargo.lock).
 ]

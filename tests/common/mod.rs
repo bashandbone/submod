@@ -7,6 +7,24 @@
 use std::fs;
 use std::path::PathBuf;
 use std::process::Command;
+
+trait CheckedOutput {
+    fn checked_output(&mut self) -> std::io::Result<std::process::Output>;
+}
+impl CheckedOutput for Command {
+    fn checked_output(&mut self) -> std::io::Result<std::process::Output> {
+        let output = self.output()?;
+        if !output.status.success() {
+            return Err(std::io::Error::other(format!(
+                "{self:?} exited {}\nstdout: {}\nstderr: {}",
+                output.status,
+                String::from_utf8_lossy(&output.stdout),
+                String::from_utf8_lossy(&output.stderr)
+            )));
+        }
+        Ok(output)
+    }
+}
 use tempfile::TempDir;
 
 /// Helper struct for test paths that formats display paths with forward slashes on Windows
@@ -37,11 +55,7 @@ pub struct TestPathDisplay<'a>(pub &'a std::path::Path);
 impl std::fmt::Display for TestPathDisplay<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let s = self.0.to_string_lossy().replace('\\', "/");
-        if s.starts_with('/') {
-            write!(f, "{s}")
-        } else {
-            write!(f, "/{s}")
-        }
+        write!(f, "{s}")
     }
 }
 
@@ -76,7 +90,7 @@ impl TestHarness {
         let git_config_global = temp_dir.path().join("gitconfig");
         fs::write(
             &git_config_global,
-            "[protocol \"file\"]\n\tallow = always\n[core]\n\tautocrlf = false\n\tfilemode = false\n[user]\n\tname = Test User\n\temail = test@example.com\n",
+            "[protocol \"file\"]\n\tallow = always\n[core]\n\tautocrlf = false\n\tfilemode = false\n[commit]\n\tgpgsign = false\n[tag]\n\tgpgsign = false\n[user]\n\tname = Test User\n\temail = test@example.com\n",
         )?;
 
         Ok(Self {
@@ -89,34 +103,22 @@ impl TestHarness {
 
     /// Return a `Command` for git with per-test config isolation.
     ///
-    /// Sets `GIT_CONFIG_GLOBAL` to a test-local file and `GIT_CONFIG_SYSTEM` to
-    /// `/dev/null` so that tests never read or write the real user/system config.
-    fn git_cmd(&self) -> Command {
+    /// Uses fixture-local identity, signing and transport settings, with system config disabled.
+    pub fn git_cmd(&self) -> Command {
         let mut cmd = Command::new("git");
         cmd.env("GIT_CONFIG_GLOBAL", &self.git_config_global);
-        cmd.env("GIT_CONFIG_SYSTEM", "/dev/null");
+        cmd.env("GIT_CONFIG_NOSYSTEM", "1");
+        cmd.env("GIT_TERMINAL_PROMPT", "0");
         cmd
     }
 
     /// Initialize a git repository in the working directory
     pub fn init_git_repo(&self) -> Result<(), Box<dyn std::error::Error>> {
-        // Use git commands for cleanup instead of direct filesystem operations
-        let _ = self
-            .git_cmd()
-            .args(["submodule", "deinit", "--all", "-f"])
-            .current_dir(&self.work_dir)
-            .output();
-
-        let _ = self
-            .git_cmd()
-            .args(["clean", "-fdx"])
-            .current_dir(&self.work_dir)
-            .output();
         let output = self
             .git_cmd()
             .args(["init"])
             .current_dir(&self.work_dir)
-            .output()?;
+            .checked_output()?;
 
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
@@ -127,25 +129,25 @@ impl TestHarness {
         self.git_cmd()
             .args(["checkout", "-b", "main"])
             .current_dir(&self.work_dir)
-            .output()?;
+            .checked_output()?;
 
         // Configure git user for tests
         self.git_cmd()
             .args(["config", "user.name", "Test User"])
             .current_dir(&self.work_dir)
-            .output()?;
+            .checked_output()?;
 
         self.git_cmd()
             .args(["config", "user.email", "test@example.com"])
             .current_dir(&self.work_dir)
-            .output()?;
+            .checked_output()?;
 
         // protocol.file.allow=always is set in the per-test global gitconfig
         // (created in TestHarness::new), so no --global write needed here.
         self.git_cmd()
             .args(["config", "protocol.file.allow", "always"])
             .current_dir(&self.work_dir)
-            .output()?;
+            .checked_output()?;
 
         // Create initial commit
         fs::write(self.work_dir.join("README.md"), "# Test Repository\n")?;
@@ -153,12 +155,12 @@ impl TestHarness {
         self.git_cmd()
             .args(["add", "README.md"])
             .current_dir(&self.work_dir)
-            .output()?;
+            .checked_output()?;
 
         self.git_cmd()
             .args(["commit", "-m", "Initial commit"])
             .current_dir(&self.work_dir)
-            .output()?;
+            .checked_output()?;
 
         Ok(())
     }
@@ -171,29 +173,32 @@ impl TestHarness {
         self.git_cmd()
             .args(["init", "--bare"])
             .arg(&remote_dir)
-            .output()?;
+            .checked_output()?;
 
         // Set the default branch to main for the bare repository
         self.git_cmd()
             .args(["symbolic-ref", "HEAD", "refs/heads/main"])
             .current_dir(&remote_dir)
-            .output()?;
+            .checked_output()?;
 
         // Create a working copy to add content
         let work_copy = self.temp_dir.path().join(format!("{name}_work"));
-        self.git_cmd().args(["init"]).arg(&work_copy).output()?;
+        self.git_cmd()
+            .args(["init"])
+            .arg(&work_copy)
+            .checked_output()?;
 
         // Set the default branch to main for the working copy
         self.git_cmd()
             .args(["checkout", "-b", "main"])
             .current_dir(&work_copy)
-            .output()?;
+            .checked_output()?;
 
         // Set up remote
         self.git_cmd()
             .args(["remote", "add", "origin", remote_dir.to_str().unwrap()])
             .current_dir(&work_copy)
-            .output()?;
+            .checked_output()?;
 
         // Add some content
         fs::create_dir_all(work_copy.join("src"))?;
@@ -219,28 +224,40 @@ impl TestHarness {
         self.git_cmd()
             .args(["config", "user.name", "Test User"])
             .current_dir(&work_copy)
-            .output()?;
+            .checked_output()?;
 
         self.git_cmd()
             .args(["config", "user.email", "test@example.com"])
             .current_dir(&work_copy)
-            .output()?;
+            .checked_output()?;
 
         self.git_cmd()
             .args(["add", "."])
             .current_dir(&work_copy)
-            .output()?;
+            .checked_output()?;
 
         self.git_cmd()
             .args(["commit", "-m", "Add test content"])
             .current_dir(&work_copy)
-            .output()?;
+            .checked_output()?;
+
+        self.git_at(
+            &work_copy,
+            &["commit", "--allow-empty", "-m", "Second main commit"],
+        );
+        self.git_at(&work_copy, &["checkout", "-b", "feature"]);
+        self.git_at(
+            &work_copy,
+            &["commit", "--allow-empty", "-m", "Distinct feature commit"],
+        );
+        self.git_at(&work_copy, &["push", "origin", "feature"]);
+        self.git_at(&work_copy, &["checkout", "main"]);
 
         let push_output = self
             .git_cmd()
             .args(["push", "--no-verify", "origin", "main"])
             .current_dir(&work_copy)
-            .output()?;
+            .checked_output()?;
 
         // Check if push was successful
         if !push_output.status.success() {
@@ -259,17 +276,17 @@ impl TestHarness {
         self.git_cmd()
             .args(["add", "."])
             .current_dir(&work_copy)
-            .output()?;
+            .checked_output()?;
         self.git_cmd()
             .args(["commit", "-m", "Advance remote"])
             .current_dir(&work_copy)
-            .output()?;
+            .checked_output()?;
 
         let push_output = self
             .git_cmd()
             .args(["push", "--no-verify", "origin", "main"])
             .current_dir(&work_copy)
-            .output()?;
+            .checked_output()?;
         if !push_output.status.success() {
             let stderr = String::from_utf8_lossy(&push_output.stderr);
             return Err(format!("Failed to push advance to remote: {stderr}").into());
@@ -279,7 +296,7 @@ impl TestHarness {
             .git_cmd()
             .args(["rev-parse", "HEAD"])
             .current_dir(&work_copy)
-            .output()?;
+            .checked_output()?;
         Ok(String::from_utf8_lossy(&rev.stdout).trim().to_string())
     }
 
@@ -288,15 +305,25 @@ impl TestHarness {
         &self,
         args: &[&str],
     ) -> Result<std::process::Output, Box<dyn std::error::Error>> {
+        self.run_submod_at(&self.work_dir, args)
+    }
+
+    #[allow(dead_code)]
+    pub fn run_submod_at(
+        &self,
+        cwd: &std::path::Path,
+        args: &[&str],
+    ) -> Result<std::process::Output, Box<dyn std::error::Error>> {
         // NOTE: arguments containing an interior NUL byte cannot be passed to a
         // process at all — std's Command rejects them before spawn, so `.output()`
         // below returns an Err. We deliberately do NOT fabricate a fake failure
         // here; tests assert the real process-boundary rejection.
         let output = Command::new(&self.submod_bin)
             .args(args)
-            .current_dir(&self.work_dir)
+            .current_dir(cwd)
             .env("GIT_CONFIG_GLOBAL", &self.git_config_global)
-            .env("GIT_CONFIG_SYSTEM", "/dev/null")
+            .env("GIT_CONFIG_NOSYSTEM", "1")
+            .env("GIT_TERMINAL_PROMPT", "0")
             .output()?;
 
         Ok(output)
@@ -346,7 +373,7 @@ impl TestHarness {
     }
 
     /// Run a git command in the work directory (with per-test config isolation) and
-    /// return its stdout, trimmed. Panics if git cannot be spawned. Intended for
+    /// return its stdout, trimmed. Panics on spawn or exit failure. Intended for
     /// asserting on real git state rather than on printed output or `submod.toml` text.
     #[allow(dead_code)] // Used by integration tests; required for test harness
     pub fn git_stdout(&self, args: &[&str]) -> String {
@@ -354,9 +381,60 @@ impl TestHarness {
             .git_cmd()
             .args(args)
             .current_dir(&self.work_dir)
-            .output()
+            .checked_output()
             .expect("failed to run git command");
         String::from_utf8_lossy(&output.stdout).trim().to_string()
+    }
+
+    fn git_config_matches(&self, args: &[&str]) -> String {
+        let output = self
+            .git_cmd()
+            .args(args)
+            .current_dir(&self.work_dir)
+            .output()
+            .expect("git config");
+        assert!(
+            output.status.success()
+                || (output.status.code() == Some(1)
+                    && output.stdout.is_empty()
+                    && output.stderr.is_empty()),
+            "git config failed: {output:?}"
+        );
+        String::from_utf8(output.stdout)
+            .expect("UTF-8 config")
+            .trim()
+            .to_owned()
+    }
+
+    #[allow(dead_code)]
+    pub fn git_at(&self, path: &std::path::Path, args: &[&str]) -> String {
+        let output = self
+            .git_cmd()
+            .args(args)
+            .current_dir(path)
+            .checked_output()
+            .expect("fixture git command");
+        String::from_utf8(output.stdout)
+            .expect("UTF-8 git output")
+            .trim()
+            .to_owned()
+    }
+
+    /// Metadata and exact index modes/OIDs for preservation checks.
+    #[allow(dead_code)]
+    pub fn preservation_snapshot(&self) -> (String, String, Vec<Option<Vec<u8>>>) {
+        (
+            self.git_stdout(&["ls-files", "--stage"]),
+            self.git_stdout(&["show-ref"]),
+            ["submod.toml", ".gitmodules", ".git/config"]
+                .iter()
+                .map(|path| match fs::read(self.work_dir.join(path)) {
+                    Ok(bytes) => Some(bytes),
+                    Err(error) if error.kind() == std::io::ErrorKind::NotFound => None,
+                    Err(error) => panic!("snapshot {path}: {error}"),
+                })
+                .collect(),
+        )
     }
 
     /// Return the index gitlink mode for `path` (e.g. `"160000"`), or `None` if the
@@ -374,7 +452,7 @@ impl TestHarness {
     /// (`git config --get-regexp ^submodule\.`), or an empty string if there are none.
     #[allow(dead_code)] // Used by integration tests; required for test harness
     pub fn submodule_config_entries(&self) -> String {
-        self.git_stdout(&["config", "--get-regexp", r"^submodule\."])
+        self.git_config_matches(&["config", "--get-regexp", r"^submodule\."])
     }
 
     /// Return all `submodule.*` entries from the `.gitmodules` file, or an empty string
@@ -385,7 +463,7 @@ impl TestHarness {
         if !self.work_dir.join(".gitmodules").exists() {
             return String::new();
         }
-        self.git_stdout(&[
+        self.git_config_matches(&[
             "config",
             "--file",
             ".gitmodules",
@@ -454,39 +532,42 @@ impl TestHarness {
         self.git_cmd()
             .args(["init", "--bare"])
             .arg(&remote_dir)
-            .output()?;
+            .checked_output()?;
 
         // Set the default branch to main for the bare repository
         self.git_cmd()
             .args(["symbolic-ref", "HEAD", "refs/heads/main"])
             .current_dir(&remote_dir)
-            .output()?;
+            .checked_output()?;
 
         // Create a working copy to add content
         let work_copy = self.temp_dir.path().join(format!("{name}_work"));
-        self.git_cmd().args(["init"]).arg(&work_copy).output()?;
+        self.git_cmd()
+            .args(["init"])
+            .arg(&work_copy)
+            .checked_output()?;
 
         // Set up the main branch and remote
         self.git_cmd()
             .args(["checkout", "-b", "main"])
             .current_dir(&work_copy)
-            .output()?;
+            .checked_output()?;
 
         self.git_cmd()
             .args(["remote", "add", "origin", remote_dir.to_str().unwrap()])
             .current_dir(&work_copy)
-            .output()?;
+            .checked_output()?;
 
         // Configure git
         self.git_cmd()
             .args(["config", "user.name", "Test User"])
             .current_dir(&work_copy)
-            .output()?;
+            .checked_output()?;
 
         self.git_cmd()
             .args(["config", "user.email", "test@example.com"])
             .current_dir(&work_copy)
-            .output()?;
+            .checked_output()?;
 
         // Create main branch content
         fs::create_dir_all(work_copy.join("src"))?;
@@ -520,18 +601,18 @@ impl TestHarness {
         self.git_cmd()
             .args(["add", "."])
             .current_dir(&work_copy)
-            .output()?;
+            .checked_output()?;
 
         self.git_cmd()
             .args(["commit", "-m", "Initial commit"])
             .current_dir(&work_copy)
-            .output()?;
+            .checked_output()?;
 
         // Create a development branch
         self.git_cmd()
             .args(["checkout", "-b", "develop"])
             .current_dir(&work_copy)
-            .output()?;
+            .checked_output()?;
 
         fs::write(
             work_copy.join("src").join("dev.rs"),
@@ -541,25 +622,25 @@ impl TestHarness {
         self.git_cmd()
             .args(["add", "."])
             .current_dir(&work_copy)
-            .output()?;
+            .checked_output()?;
 
         self.git_cmd()
             .args(["commit", "-m", "Add dev features"])
             .current_dir(&work_copy)
-            .output()?;
+            .checked_output()?;
 
         // Create a tag
         self.git_cmd()
             .args(["tag", "v0.1.0"])
             .current_dir(&work_copy)
-            .output()?;
+            .checked_output()?;
 
         // Push everything with error checking
         let push_main = self
             .git_cmd()
             .args(["push", "origin", "main"])
             .current_dir(&work_copy)
-            .output()?;
+            .checked_output()?;
 
         if !push_main.status.success() {
             let stderr = String::from_utf8_lossy(&push_main.stderr);
@@ -570,7 +651,7 @@ impl TestHarness {
             .git_cmd()
             .args(["push", "origin", "develop"])
             .current_dir(&work_copy)
-            .output()?;
+            .checked_output()?;
 
         if !push_develop.status.success() {
             let stderr = String::from_utf8_lossy(&push_develop.stderr);
@@ -581,7 +662,7 @@ impl TestHarness {
             .git_cmd()
             .args(["push", "origin", "--tags"])
             .current_dir(&work_copy)
-            .output()?;
+            .checked_output()?;
 
         if !push_tags.status.success() {
             let stderr = String::from_utf8_lossy(&push_tags.stderr);

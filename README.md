@@ -11,23 +11,22 @@ SPDX-License-Identifier: LicenseRef-PlainMIT OR MIT
 [![Crates.io](https://img.shields.io/crates/v/submod.svg)](https://crates.io/crates/submod)
 [![Documentation](https://docs.rs/submod/badge.svg)](https://docs.rs/submod)
 [![Static Badge](https://img.shields.io/badge/Plain-MIT-15db95?style=flat-square&labelColor=0d19a3&cacheSeconds=86400&link=https%3A%2F%2Fplainlicense.org%2Flicenses%2Fpermissive%2Fmit%2Fmit%2F)](https://plainlicense.org/licenses/permissive/mit/)
-[![Rust](https://img.shields.io/badge/rust-1.87%2B-blue.svg)](https://www.rust-lang.org)
+[![Rust](https://img.shields.io/badge/rust-1.89%2B-blue.svg)](https://www.rust-lang.org)
 [![codecov](https://codecov.io/gh/bashandbone/submod/branch/main/graph/badge.svg?token=MOW92KKK0G)](https://codecov.io/gh/bashandbone/submod)
 ![Crates.io Downloads (latest version)](https://img.shields.io/crates/dv/submod)
 
 Git submodules solve a real problem. **Managing submodules is a pain.** You use them infrequently enough that you always forget which command does what — and when something breaks, the recovery steps are a small nightmare. New contributors hit this especially hard: onboarding onto a project that uses submodules is its own obstacle course.
 
-`submod` wraps the whole lifecycle in one consistent CLI. Sixteen commands, including nuke-it-from-orbit for when you're done being reasonable. Built on gitoxide and git2, with automatic fallback so operations don't fail silently.[^1] It's actively used across @knitli and @plainlicense, where submodules handle shared functionality between repos.
+`submod` manages Git submodules from a TOML configuration. Lifecycle mutations use native Git, with repository and path validation before changes. Read operations also use gitoxide and git2. Git must be installed and available on `PATH`.
 
 ## :rocket: Features
 
 - **TOML config** — define submodules, sparse-checkout paths, and defaults in one file
-- **Sparse checkout** — clone only the parts of a submodule you actually need
+- **Sparse checkout** — check out only the files and directories you need
 - **Global defaults with per-submodule overrides** — set it once, customize where it matters
-- **Fallback chain** — tries gitoxide first, falls back to git2, then CLI
+- **Native Git lifecycle** — preserve Git registration, parent pins, and recoverable module history
 - **Clear status and errors** — you'll know what broke and why
 
-[^1]: The fallback architecture is more a reflection of the status of `gitoxide` and `git2` submodule support than a stability concern. Their features do not consistently provide the full lifecycle of submodule operations. Together they cover >90%, but sometimes immaturely. The fallbacks architecture handles that gracefully and lets native operations grow with those libraries. 
 
 ## 📋 Table of Contents
 
@@ -70,6 +69,10 @@ cargo install --path .
 
 ## 🚀 Quick Start
 
+The `example` and `company` repository URLs below are placeholders. Replace them with repositories you can access; valid TOML does not guarantee that a remote exists. Git credential helpers, SSH agents, and transport restrictions still apply.
+
+For an existing Git submodule setup, start with `submod generate-config --from-setup`, inspect the imported TOML, then run `submod check` and `submod sync`. Import reads the discovered repository; `--from-setup` is a boolean flag, not a path argument. Use `--output` to select the generated file and `--force` only to replace an existing output.
+
 1. **Initialize a config file** in your git repository:
 
     ```bash
@@ -99,7 +102,11 @@ cargo install --path .
 
 ## ⚙️ Configuration
 
-Create a `submod.toml` file in your repository root:
+Create a `submod.toml` file in your repository root. Commands discover the enclosing worktree, so invoking them from a nested directory uses that same root and default config. A relative explicit `--config` path is resolved from the invocation directory; a missing explicit config is an error. Checkout paths are relative to the worktree root, must remain inside it, and cannot overlap Git administrative storage or other managed paths.
+
+The TOML table name is the logical module name; `path` is its checkout location and defaults to that name. Submodules registered in Git but absent from TOML are unmanaged: submod reports and preserves them rather than adopting or deleting them automatically.
+
+Example:
 
 ```toml
 # Global defaults applied to all submodules
@@ -128,23 +135,31 @@ branch = "develop"       # track specific branch
 #### Global Defaults
 
 - `ignore`: How to handle dirty submodules (`all`, `dirty`, `untracked`, `none`)
-- `update`: Update strategy (`checkout`, `rebase`, `merge`, `none`, `!command`)
+- `update`: Update strategy (`checkout`, `rebase`, `merge`, `none`); custom executable update commands are rejected
 - `branch`: Default branch to track (`.` for current superproject branch)
 - `fetchRecurse`: Fetch recursion (`always`, `on-demand`, `never`)
+- `use_git_default_sparse_checkout`: Use Git's unprefixed sparse patterns (`false` by default)
+
+An explicit per-module value overrides `[defaults]`; omitted fields inherit without being copied into the raw entry. Built-in defaults are `ignore = "none"`, `update = "checkout"`, `fetchRecurse = "on-demand"`, and no explicit branch. Use `submod change NAME --unset FIELD` to restore inheritance, or `submod change-global --unset FIELD` to remove a global default. `fetch` and `fetch_recurse` are accepted legacy aliases for canonical `fetchRecurse`; do not supply multiple spellings in one table.
 
 #### Per-Submodule Settings
 
 - `path`: Local path where submodule should be placed
-- `url`: Git repository URL
-- `sparse_paths`: Array of paths to include in sparse checkout
-- `active`: Whether the submodule is active (default: `true`)
+- `url`: Required nonempty Git repository URL or local remote path
+- `sparse_paths`: Ordered non-cone sparse patterns; absent or empty disables sparse checkout
+- `active`: Whether automatic lifecycle work is enabled (default: `true`)
+- `shallow`: Request shallow history (default: `false`)
 - All global defaults can be overridden per submodule
+
+Sparse checkout controls files in the working tree; it is not partial clone and does not by itself reduce downloaded objects or history. By default submod prepends `!/*` to the ordered patterns. Set `use_git_default_sparse_checkout = true` globally or per module to use the patterns without that prefix. `active` and sparse patterns stay in TOML/local configuration rather than portable `.gitmodules` fields.
+
+The [sample configuration](sample_config/submod.toml) and [current JSON schema](schemas/current/submod_config.json) describe the current format. Historical versioned schemas remain available for their original contracts.
 
 ## 📖 Commands
 
 ### `submod add`
 
-Add a new submodule to your configuration and repository:
+Add a new submodule to your configuration and repository. Existing declarations and occupied destinations are refused without replacing their contents; use init/sync for an existing managed module:
 
 ```bash
 # Basic add
@@ -172,7 +187,7 @@ submod add https://github.com/example/my-lib.git \
 | `--sparse-paths` | `-x` | Comma-separated sparse checkout paths or globs |
 | `--fetch` | `-f` | Recursive fetch behavior (`always`, `on-demand`, `never`) |
 | `--update` | `-u` | Update strategy (`checkout`, `rebase`, `merge`, `none`) |
-| `--shallow` | `-s` | Shallow clone (last commit only) |
+| `--shallow` | `-s` | Request shallow clone history |
 | `--no-init` | | Add to config only; do not clone/initialize |
 
 ### `submod check`
@@ -193,20 +208,26 @@ Initialize all missing submodules:
 submod init
 ```
 
-*alias*: `submid i`
+*alias*: `submod i`
 
 ### `submod update`
 
-Update all submodules to their latest commits:
+Materialize the commit recorded by the parent gitlink. Remote advancement is explicit:
 
 ```bash
+# Parent-pin update (default)
 submod update
+
+# Fetch and apply the configured remote branch/default
+submod update --remote
 ```
+
+`--branch` selects the tracking branch; it does not make ordinary updates remote-tracking updates. Checkout, merge, and rebase follow the configured strategy; `update = "none"` skips automatic checkout. Review and stage changed parent gitlinks when adopting a remote update. Use `--recursive` on init/update/sync for nested submodules.
 *alias*: `submod u`
 
 ### `submod reset`
 
-Hard reset submodules (stash changes, reset --hard, clean):
+Stash tracked and untracked changes, then reset to the parent gitlink commit. If stash preservation fails, reset refuses before discarding work. Ignored files and nested repositories are preserved; collisions with files required by the target commit cause refusal. A successful stash reports its identity and a recovery command; apply that stash in the child repository to recover the saved work:
 
 ```bash
 # Reset all submodules
@@ -219,7 +240,7 @@ submod reset my-lib,vendor-utils
 
 ### `submod sync`
 
-Run a complete sync (check + init + update):
+Reconcile managed declarations, registration, missing checkouts, settings, and parent-pin checkout state. Disabled and update-none entries skip automatic materialization. Repeated sync with no drift avoids unnecessary cloning/fetching. Explicit sync makes the managed TOML URL authoritative: it can overwrite local parent/child URL overrides for that module. Keep machine-specific authentication in Git credential helpers instead of relying on an overridden managed URL:
 
 ```bash
 submod sync
@@ -228,7 +249,7 @@ submod sync
 
 ### `submod change`
 
-Change the configuration of an existing submodule:
+Change selected fields while preserving omitted settings. Metadata-only changes retain HEAD; a path change moves the verified checkout and preserves its repository identity/history. `--shallow false` clears shallow preference, and `--unset branch` restores branch inheritance:
 
 ```bash
 submod change my-lib --branch main --sparse-paths "src/,include/" --fetch always
@@ -239,7 +260,7 @@ submod change my-lib --branch main --sparse-paths "src/,include/" --fetch always
 Change global defaults for all submodules:
 
 ```bash
-submod change-global --ignore dirty --update checkout
+submod change-global --ignore dirty --update checkout --branch main
 ```
 *aliases*: `submod cg`, `submod chgl`, `submod global`
 
@@ -256,7 +277,7 @@ submod list --recursive
 
 ### `submod delete`
 
-Delete a submodule from configuration and filesystem:
+Remove the exact managed registration and checkout while retaining the module repository for recovery. Dirty, untracked, or ignored checkout contents require `--force` to discard; force is limited to that verified checkout and never authorizes deleting unrelated storage:
 
 ```bash
 submod delete my-lib
@@ -266,28 +287,28 @@ submod delete my-lib
 
 ### `submod disable`
 
-Disable a submodule without deleting files (sets `active = false`):
+Disable automatic lifecycle work without deleting files or history (sets TOML and managed local activation to false):
 
 ```bash
 submod disable my-lib
 ```
 
-*alias*: `submod del`
+*alias*: `submod d`
 
 ### `submod nuke-it-from-orbit`
 
-Delete all or specific submodules from config and filesystem, with optional reinit:
+Rebuild selected verified checkouts, retaining recoverable repositories and local refs. `--kill` removes their declarations/checkouts without reinitializing; it does not purge retained history:
 
 ```bash
 # Nuke all submodules (re-initializes by default)
 submod nuke-it-from-orbit --all
 
-# Nuke specific submodules permanently
+# Remove specific checkouts without reinitializing
 submod nuke-it-from-orbit --kill my-lib,old-dep
 ```
 *aliases*: `submod nuke-em`, `submod nuke-it`, `submod nuke-them`
 
-Use `nuke-it-from-orbit` was created because sometimes submodule just... don't cooperate. You're done being nice and just want to get back to work. Nuke it.
+A failed rebuild leaves the intended declaration available for recovery. Inspect the reported failure before retrying; `--force` only authorizes discarding local content inside the verified checkout.
 
 ### `submod generate-config`
 
@@ -295,7 +316,7 @@ Generate a new configuration file:
 
 ```bash
 # From current git submodule setup
-submod generate-config --from-setup .
+submod generate-config --from-setup
 
 # As a template with defaults
 submod generate-config --template --output my-config.toml
@@ -323,7 +344,7 @@ submod completeme bash > ~/.bash_completion.d/submod
 # zsh has an fpath array with possible function directories. You can
 # put your completions in any of these; we use the first one here:
 ZSH_DEFAULT="${XDG_DATA_HOME:-~/.local/share}/zsh/site-functions"
-ZFUNCDIR=""${fpath[1]:-$ZSH_DEFAULT}"
+ZFUNCDIR="${fpath[1]:-$ZSH_DEFAULT}"
 mkdir -p "$ZFUNCDIR"
 submod completeme zsh > "${ZFUNCDIR}/_submod"
 ```
@@ -331,8 +352,8 @@ submod completeme zsh > "${ZFUNCDIR}/_submod"
 #### fish
 
 ```fish
-mkdir -p "${XDG_CONFIG_HOME:-~/.config}/fish/completions"
-submod completeme fish > "{XDG_CONFIG_HOME:-~/.config}/fish/completions/submod.fish
+mkdir -p ~/.config/fish/completions
+submod completeme fish > ~/.config/fish/completions/submod.fish
 ```
 
 #### powershell
@@ -352,9 +373,10 @@ submod completeme elvish > ~/.config/elvish/completions/submod.elv
 #### nushell
 
 ```nushell
-submod completeme nu > "$NUSHELL_CONFIG_DIR/scripts/completions/submod.nu"
-echo 'use completions/submod.nu' >> "$NU_CONFIG_PATH"
+submod completeme nu
 ```
+
+Save the Nushell output as `submod.nu` and load it from your Nushell configuration. Completion scripts are generated from the installed binary's command model; regenerate them after upgrading.
 
 </details>
 
@@ -369,7 +391,7 @@ submod check
 # Initialize any missing submodules
 submod init
 
-# Update everything to latest
+# Materialize the recorded parent commits
 submod update
 
 # Or do it all at once
@@ -409,13 +431,13 @@ submod check
 submod sync
 ```
 
-If that doesn't work, try [nuke-it-from-orbit](https://github.com/bashandbone/submod/edit/main/README.md#submod-nuke-it-from-orbit)
+If recovery is still needed, inspect the error and retained repository before choosing a [rebuild](#submod-nuke-it-from-orbit). Rebuilds retain Git history but can discard local checkout contents when explicitly forced.
 
 ## 🛠️ Development
 
 ### Prerequisites
 
-- Rust 1.87 or later
+- Rust 1.89 or later
 - Git
 - [Mise](https://mise.jdx.dev/) (recommended) - for tool management and task running
 
@@ -548,8 +570,8 @@ submod/
 │   ├── config.rs            # TOML configuration handling
 │   ├── git_manager.rs       # High-level submodule operations
 │   └── git_ops/             # Git backend abstraction
-│       ├── mod.rs           # GitOpsManager (gix→git2→CLI fallback)
-│       ├── gix_ops.rs       # gitoxide backend
+│       ├── mod.rs           # GitOpsManager (native Git mutation boundary)
+│       ├── gix_ops.rs       # gitoxide read backend
 │       └── git2_ops.rs      # libgit2 backend
 ├── tests/                   # Integration tests
 ├── sample_config/           # Example configurations
@@ -615,7 +637,7 @@ This tool was created to:
 - **Reduce barriers to contribution** - Make it easier for new developers to work with projects using submodules
 - **Simplify complex workflows** - Handle initialization, updates, and sparse checkout configuration automatically
 - **Provide better tooling** - Clear status reporting and error messages
-- **Leverage modern Git libraries** - Use `gitoxide` for better performance and reliability
+- **Use Git semantics** - Delegate lifecycle mutations to native Git and preserve recoverable history
 
 The tool is actively used in multiple projects at [@knitli](https://github.com/knitli) and [@plainlicense](https://github.com/plainlicense), where submodules are essential for sharing core functionality across repositories.
 

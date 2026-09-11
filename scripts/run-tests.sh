@@ -49,6 +49,22 @@ if ! command -v git &>/dev/null; then
     exit 1
 fi
 
+# Versions before 0.9.55 cannot enforce nextest-version and versions before
+# 0.9.48 ignore test groups. Refuse them explicitly so integration tests and
+# performance ceilings are not run concurrently by accident.
+if ! NEXTEST_VERSION_TEXT=$(cargo nextest --version 2>/dev/null); then
+    print_error "cargo-nextest 0.9.55 or newer is required"
+    exit 1
+fi
+NEXTEST_VERSION=${NEXTEST_VERSION_TEXT#cargo-nextest }
+NEXTEST_VERSION=${NEXTEST_VERSION%% *}
+IFS=. read -r NEXTEST_MAJOR NEXTEST_MINOR NEXTEST_PATCH <<<"$NEXTEST_VERSION"
+if [[ ! "$NEXTEST_MAJOR" =~ ^[0-9]+$ ]] || [[ ! "$NEXTEST_MINOR" =~ ^[0-9]+$ ]] || [[ ! "$NEXTEST_PATCH" =~ ^[0-9]+$ ]] ||
+    ((NEXTEST_MAJOR == 0 && (NEXTEST_MINOR < 9 || (NEXTEST_MINOR == 9 && NEXTEST_PATCH < 55)))); then
+    print_error "cargo-nextest 0.9.55 or newer is required; found $NEXTEST_VERSION"
+    exit 1
+fi
+
 # Parse command line arguments
 VERBOSE=false
 PERFORMANCE=false
@@ -105,15 +121,20 @@ print_success "Build completed successfully"
 NEXTEST_ARGS=(
     nextest --manifest-path ./Cargo.toml run
     --all-features
+    --cargo-profile "$PROFILE"
     --no-fail-fast
 )
 
 # Build the filterset expression
 FILTERSET=""
 
-# Exclude performance tests unless explicitly requested
+# Exclude performance tests unless explicitly requested. With --performance and
+# no filter, run only the performance binary: ceilings are controlled
+# single-workload measurements, not whole-suite runs.
 if [[ "$PERFORMANCE" != true ]]; then
-    FILTERSET="not binary_id(submod::performance_tests)"
+    FILTERSET="not binary(performance_tests)"
+elif [[ -z "$FILTER" ]]; then
+    FILTERSET="binary(performance_tests)"
 fi
 
 # Apply filter if provided

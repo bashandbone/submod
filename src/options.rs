@@ -281,8 +281,10 @@ pub enum SerializableFetchRecurse {
     #[default]
     OnDemand,
     /// Fetch all populated submodules, regardless of changes. In some cases, this can be faster because we don't have to check for changes; but more fetches can also mean more data transfer.
+    #[serde(alias = "true")]
     Always,
     /// Submodules are never fetched. This is useful if you want to manage submodules manually or if you don't want to fetch them at all.
+    #[serde(alias = "false")]
     Never,
     /// Used as a sentinel value internally; do not use in a submod.toml or submod CLI command.
     #[serde(skip)]
@@ -414,7 +416,7 @@ pub enum SerializableBranch {
 
 impl Serialize for SerializableBranch {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        serializer.serialize_str(&self.to_gitmodules())
+        serializer.serialize_str(&self.as_config_value())
     }
 }
 
@@ -426,12 +428,6 @@ impl<'de> Deserialize<'de> for SerializableBranch {
     /// Empty or whitespace-only strings are rejected with a deserialization error.
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         let s = String::deserialize(deserializer)?;
-        // Backward compatibility: accept the previously-documented alias
-        // "current-in-superproject" in addition to the spellings handled
-        // by `from_gitmodules`.
-        if s == "current-in-superproject" {
-            return Ok(Self::CurrentInSuperproject);
-        }
         Self::from_gitmodules(&s).map_err(|()| {
             serde::de::Error::custom(format!(
                 "invalid branch value: {s:?}; expected \".\", \"current\", \"current-in-super-project\", \"superproject\", \"super\", or a non-empty, non-whitespace branch name"
@@ -441,6 +437,46 @@ impl<'de> Deserialize<'de> for SerializableBranch {
 }
 
 impl SerializableBranch {
+    /// TOML spelling escapes literal branch names that coincide with user aliases.
+    pub fn as_config_value(&self) -> String {
+        match self {
+            Self::Name(name)
+                if matches!(
+                    name.as_str(),
+                    "current"
+                        | "current-in-super-project"
+                        | "current-in-superproject"
+                        | "superproject"
+                        | "super"
+                ) =>
+            {
+                format!("refs/heads/{name}")
+            }
+            Self::Name(name) => name.clone(),
+            Self::CurrentInSuperproject => ".".into(),
+        }
+    }
+
+    /// Import Git's branch setting: only `.` is special; aliases are literal names.
+    pub fn from_git_branch(value: &str) -> Result<Self, ()> {
+        if value == "." {
+            return Ok(Self::CurrentInSuperproject);
+        }
+        let name = value.trim();
+        if name.is_empty() || name.starts_with('-') {
+            return Err(());
+        }
+        let reference = if name.starts_with("refs/heads/") {
+            name.to_string()
+        } else {
+            format!("refs/heads/{name}")
+        };
+        if name != "HEAD" && !git2::Reference::is_valid_name(&reference) {
+            return Err(());
+        }
+        Ok(Self::Name(name.to_string()))
+    }
+
     /// Get the current branch name from the superproject repository.
     pub fn current_in_superproject() -> Result<String, anyhow::Error> {
         get_current_repository()
@@ -462,25 +498,24 @@ impl GitmodulesConvert for SerializableBranch {
     fn to_gitmodules(&self) -> String {
         match self {
             Self::CurrentInSuperproject => ".".to_string(),
-            Self::Name(name) => name.clone(),
+            Self::Name(name) => name.strip_prefix("refs/heads/").unwrap_or(name).to_string(),
         }
     }
 
     /// Convert from gitmodules string (what you would get from the .gitmodules or .git/config)
     fn from_gitmodules(options: &str) -> Result<Self, ()> {
-        if options == "."
-            || options == "current"
-            || options == "current-in-super-project"
-            || options == "superproject"
-            || options == "super"
-        {
+        let value = options.trim();
+        if matches!(
+            value,
+            "." | "current"
+                | "current-in-super-project"
+                | "current-in-superproject"
+                | "superproject"
+                | "super"
+        ) {
             return Ok(Self::CurrentInSuperproject);
         }
-        let trimmed = options.trim();
-        if trimmed.is_empty() {
-            return Err(());
-        }
-        Ok(Self::Name(trimmed.to_string()))
+        Self::from_git_branch(value)
     }
 
     /// Convert from gitmodules bytes (what you would get from the .gitmodules or .git/config)
@@ -496,7 +531,7 @@ impl TryFrom<Branch> for SerializableBranch {
     fn try_from(value: Branch) -> Result<Self, Self::Error> {
         Ok(match value {
             Branch::CurrentInSuperproject => Self::CurrentInSuperproject,
-            Branch::Name(name) => Self::Name(name.to_string()),
+            Branch::Name(name) => Self::from_git_branch(&name.to_string())?,
             _ => return Err(()), // Handle unsupported variants
         })
     }
@@ -508,7 +543,12 @@ impl TryFrom<SerializableBranch> for Branch {
     fn try_from(value: SerializableBranch) -> Result<Self, Self::Error> {
         Ok(match value {
             SerializableBranch::CurrentInSuperproject => Self::CurrentInSuperproject,
-            SerializableBranch::Name(name) => Self::Name(name.as_bytes().into()),
+            SerializableBranch::Name(name) => Self::Name(
+                name.strip_prefix("refs/heads/")
+                    .unwrap_or(&name)
+                    .as_bytes()
+                    .into(),
+            ),
             _ => return Err(()), // Handle unsupported variants
         })
     }
@@ -516,10 +556,7 @@ impl TryFrom<SerializableBranch> for Branch {
 
 impl std::fmt::Display for SerializableBranch {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::CurrentInSuperproject => write!(f, "."),
-            Self::Name(name) => write!(f, "{name}"),
-        }
+        f.write_str(&self.as_config_value())
     }
 }
 
@@ -527,15 +564,7 @@ impl FromStr for SerializableBranch {
     type Err = ();
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        if s == "."
-            || s == "current"
-            || s == "current-in-super-project"
-            || s == "superproject"
-            || s == "super"
-        {
-            return Ok(Self::CurrentInSuperproject);
-        }
-        Ok(Self::Name(s.to_string()))
+        Self::from_gitmodules(s)
     }
 }
 
@@ -548,18 +577,10 @@ impl Default for SerializableBranch {
 
 #[allow(dead_code)]
 impl SerializableBranch {
-    /// Parse an optional branch string into a `SerializableBranch`, defaulting to the repo's current branch.
+    /// Parse an explicitly supplied branch; callers retain `None` for omission.
     pub fn set_branch(branch: Option<String>) -> Result<Self, anyhow::Error> {
-        branch.map_or_else(
-            || Ok(Self::default()),
-            |b| {
-                if b.is_empty() {
-                    Ok(Self::default())
-                } else {
-                    Self::from_str(b.trim()).map_err(|()| anyhow::anyhow!("Invalid branch string"))
-                }
-            },
-        )
+        let value = branch.ok_or_else(|| anyhow::anyhow!("Branch is absent; retain None"))?;
+        Self::from_str(&value).map_err(|()| anyhow::anyhow!("Invalid branch string: {value:?}"))
     }
 }
 
@@ -568,7 +589,7 @@ impl GixGit2Convert for SerializableBranch {
     type GixType = gix_submodule::config::Branch;
     /// Convert from a `git2` type to a `gix_submodule` type
     fn from_git2(git2: Self::Git2Type) -> Result<Self, ()> {
-        Self::from_gitmodules(git2.as_str()) // Handle unsupported variants
+        Self::from_git_branch(git2.as_str()) // Handle unsupported variants
     }
 
     /// Convert from a `gix_submodule` type to a `submod` type
@@ -726,6 +747,98 @@ impl GixGit2Convert for SerializableUpdate {
 #[cfg_attr(coverage_nightly, coverage(off))]
 mod tests {
     use super::*;
+
+    #[test]
+    fn literal_alias_uses_config_escape_and_native_git_branch() {
+        for name in [
+            "current",
+            "super",
+            "superproject",
+            "current-in-superproject",
+            "current-in-super-project",
+        ] {
+            let imported = SerializableBranch::from_git_branch(name).unwrap();
+            let escaped = SerializableBranch::from_str(&format!("refs/heads/{name}")).unwrap();
+            for branch in [imported, escaped] {
+                assert_eq!(branch.as_config_value(), format!("refs/heads/{name}"));
+                assert_eq!(branch.to_gitmodules(), name);
+                let native: Branch = branch.try_into().unwrap();
+                assert!(matches!(native, Branch::Name(value) if value.to_string() == name));
+            }
+        }
+    }
+
+    #[test]
+    fn literal_git_alias_roundtrips_as_full_ref() {
+        #[derive(Serialize, Deserialize)]
+        struct Value {
+            branch: SerializableBranch,
+        }
+        let branch = SerializableBranch::from_git_branch("current").unwrap();
+        assert_eq!(branch, SerializableBranch::Name("current".into()));
+        let serialized = toml::to_string(&Value { branch }).unwrap();
+        assert!(serialized.contains("refs/heads/current"));
+        let decoded: Value = toml::from_str(&serialized).unwrap();
+        assert_eq!(
+            decoded.branch,
+            SerializableBranch::Name("refs/heads/current".into())
+        );
+    }
+
+    #[test]
+    fn branch_parsers_share_validation_and_literal_alias_escape() {
+        #[derive(Deserialize)]
+        struct Value {
+            branch: SerializableBranch,
+        }
+        for name in [
+            ".",
+            "current",
+            "current-in-super-project",
+            "current-in-superproject",
+            "superproject",
+            "super",
+            "main",
+            "feature/topic",
+            "refs/heads/super",
+            "HEAD",
+        ] {
+            let parsed = SerializableBranch::from_str(name).unwrap();
+            let serde: Value = toml::from_str(&format!("branch={name:?}")).unwrap();
+            assert_eq!(serde.branch, parsed);
+            assert_eq!(SerializableBranch::from_gitmodules(name).unwrap(), parsed);
+            assert_eq!(
+                SerializableBranch::set_branch(Some(name.into())).unwrap(),
+                parsed
+            );
+        }
+        assert_eq!(
+            SerializableBranch::from_str("refs/heads/super").unwrap(),
+            SerializableBranch::Name("refs/heads/super".into())
+        );
+        for name in [
+            "",
+            "  ",
+            "feature..topic",
+            "bad name",
+            "a@{b",
+            "-topic",
+            "topic.lock",
+            "refs/heads/",
+            "a\\b",
+            "a\nb",
+        ] {
+            assert!(SerializableBranch::from_str(name).is_err(), "{name:?}");
+            assert!(
+                SerializableBranch::from_gitmodules(name).is_err(),
+                "{name:?}"
+            );
+            assert!(
+                toml::from_str::<Value>(&format!("branch={name:?}")).is_err(),
+                "{name:?}"
+            );
+        }
+    }
 
     #[test]
     fn test_branch_deserialize_from_toml_rejects_empty_and_whitespace() {
@@ -1234,16 +1347,13 @@ mod tests {
     }
 
     #[test]
-    fn test_branch_set_branch_empty_returns_default() {
-        let result = SerializableBranch::set_branch(Some(String::new())).unwrap();
-        // Empty string → default
-        assert_eq!(result, SerializableBranch::default());
+    fn test_branch_set_branch_empty_is_rejected() {
+        assert!(SerializableBranch::set_branch(Some(String::new())).is_err());
     }
 
     #[test]
-    fn test_branch_set_branch_none_returns_default() {
-        let result = SerializableBranch::set_branch(None).unwrap();
-        assert_eq!(result, SerializableBranch::default());
+    fn test_branch_set_branch_none_is_not_defaulted() {
+        assert!(SerializableBranch::set_branch(None).is_err());
     }
 
     #[test]

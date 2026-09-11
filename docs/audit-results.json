@@ -1,0 +1,706 @@
+{
+  "audit_date": "2026-09-10",
+  "commit": "31c5e373bfd29162f86675fa60ed4af0adf8df97",
+  "scope": "Disposable local fixtures; original application unchanged",
+  "config_reproductions": {
+    "fixture_root": "/private/tmp/submod-config-audit-mi7l0orx",
+    "results": [
+      {
+        "case": "missing config list",
+        "result": {
+          "code": 0,
+          "stdout": "No submodules configured.\n",
+          "stderr": ""
+        }
+      },
+      {
+        "case": "missing explicit config list",
+        "result": {
+          "code": 0,
+          "stdout": "No submodules configured.\n",
+          "stderr": ""
+        }
+      },
+      {
+        "case": "README from-setup with dot",
+        "result": {
+          "code": 2,
+          "stdout": "",
+          "stderr": "error: unexpected argument '.' found\n\nUsage: submod generate-config [OPTIONS]\n\nFor more information, try '--help'.\n"
+        }
+      },
+      {
+        "case": "documented nu completion alias",
+        "result": {
+          "code": 2,
+          "stdout": "",
+          "stderr": "error: invalid value 'nu' for '<SHELL>'\n  [possible values: bash, elvish, fish, powershell, zsh, nushell]\n\n  tip: a similar value exists: 'nushell'\n\nFor more information, try '--help'.\n"
+        }
+      },
+      {
+        "case": "generate template",
+        "result": {
+          "code": 0,
+          "stdout": "Generated template config at 'submod.toml'.\n",
+          "stderr": ""
+        }
+      },
+      {
+        "case": "generated template load",
+        "result": {
+          "code": 1,
+          "stdout": "",
+          "stderr": "Error: Failed to create manager: Configuration error: Failed to load config: invalid type: found string \"1.1.0\", expected struct SubmoduleEntry\n"
+        }
+      },
+      {
+        "case": "change inherited default",
+        "result": {
+          "code": 0,
+          "stdout": "",
+          "stderr": ""
+        },
+        "config": "[defaults]\nignore = \"all\"\n[m]\npath = \"vendor/m\"\nurl = \"/absent\"\nignore = \"dirty\"\n"
+      },
+      {
+        "case": "change sparse mode and omitted shallow",
+        "result": {
+          "code": 0,
+          "stdout": "Updated submodule 'm'.\n",
+          "stderr": ""
+        },
+        "config": "[defaults]\n[m]\npath = \"vendor/m\"\nurl = \"/absent\"\n"
+      },
+      {
+        "case": "multiline edit",
+        "result": {
+          "code": 0,
+          "stdout": "Updated submodule 'm'.\n",
+          "stderr": ""
+        },
+        "config": "[defaults]\n[m]\npath = \"vendor/m\"\nurl = \"/absent\"\nsparse_paths = [\"src/\", \"docs/\"]\n  \"src/\",\n  \"docs/\",\n]\nignore = \"all\"\n",
+        "valid_toml": "Expected '=' after a key in a key/value pair (at line 6, column 9)"
+      },
+      {
+        "case": "commented_header edit",
+        "result": {
+          "code": 0,
+          "stdout": "Updated submodule 'm'.\n",
+          "stderr": ""
+        },
+        "config": "[defaults]\n[m] # hello\npath = \"vendor/m\"\nurl = \"/absent\"\n[m]\npath = \"vendor/m\"\nurl = \"/absent\"\nignore = \"all\"\n\n",
+        "valid_toml": "Cannot declare ('m',) twice (at line 5, column 3)"
+      },
+      {
+        "case": "literal_header edit",
+        "result": {
+          "code": 0,
+          "stdout": "Updated submodule 'm'.\n",
+          "stderr": ""
+        },
+        "config": "[defaults]\n[m]\npath = \"vendor/m\"\nurl = \"/absent\"\nignore = \"all\"\n\n",
+        "valid_toml": true
+      },
+      {
+        "case": "documented path default omitted",
+        "result": {
+          "code": 1,
+          "stdout": "",
+          "stderr": "Error: Failed to init submodule m: Configuration error: No path configured for submodule\n"
+        }
+      },
+      {
+        "case": "fresh TOML-only init",
+        "result": {
+          "code": 0,
+          "stdout": "",
+          "stderr": ""
+        },
+        "modules": "[submodule \"vendor/m\"]\n\tpath = vendor/m\n\turl = /private/tmp/submod-config-audit-mi7l0orx/remote\n"
+      },
+      {
+        "case": "initial .gitmodules",
+        "result": {
+          "code": 0,
+          "stdout": "submodule.vendor/m.path=vendor/m\nsubmodule.vendor/m.url=/private/tmp/submod-config-audit-mi7l0orx/remote\n",
+          "stderr": ""
+        }
+      },
+      {
+        "case": "change URL",
+        "result": {
+          "code": 0,
+          "stdout": "Updated submodule 'm'.\n",
+          "stderr": ""
+        }
+      },
+      {
+        "case": "sync URL drift",
+        "result": {
+          "code": 0,
+          "stdout": "Syncing submodules: m\n\u2705 Updated m\n\u2705 Sync complete (0.0s)\n",
+          "stderr": "\u001b[2K\n"
+        },
+        "config": "[m]\npath = \"vendor/m\"\nurl = \"/private/tmp/submod-config-audit-mi7l0orx/other_remote\"\n",
+        "modules": "[submodule \"vendor/m\"]\n\tpath = vendor/m\n\turl = /private/tmp/submod-config-audit-mi7l0orx/remote\n",
+        "origin": {
+          "code": 0,
+          "stdout": "/private/tmp/submod-config-audit-mi7l0orx/remote\n",
+          "stderr": ""
+        }
+      },
+      {
+        "case": "nested cwd default config",
+        "result": {
+          "code": 1,
+          "stdout": "",
+          "stderr": "Error: Failed to create manager: Repository not found or invalid\n"
+        }
+      },
+      {
+        "case": "nested cwd explicit root config check",
+        "result": {
+          "code": 1,
+          "stdout": "",
+          "stderr": "Error: Failed to create manager: Repository not found or invalid\n"
+        }
+      },
+      {
+        "case": "inactive init",
+        "result": {
+          "code": 0,
+          "stdout": "",
+          "stderr": ""
+        },
+        "exists": true
+      },
+      {
+        "case": "check absent checkout exit",
+        "result": {
+          "code": 0,
+          "stdout": "  \u274c m: Folder missing (vendor/m)\n",
+          "stderr": ""
+        }
+      },
+      {
+        "case": "no-init active state",
+        "result": {
+          "code": 0,
+          "stdout": "",
+          "stderr": ""
+        },
+        "config": "[defaults]\n[m]\npath = \"vendor/m\"\nurl = \"/private/tmp/submod-config-audit-mi7l0orx/remote\"\nbranch = \"HEAD\"\nactive = false\n\n"
+      }
+    ]
+  },
+  "preservation_reproductions": {
+    "fixture_root": "/private/tmp/submod-preservation-audit-lsp8gn5_",
+    "results": [
+      {
+        "case": "failed add over ordinary existing directory",
+        "result": {
+          "code": 1,
+          "stdout": "",
+          "stderr": "Warning: failed to deinit submodule at 'occupied': Submodule not found: occupied\n\nCaused by:\n    no submodule named 'occupied'; class=Submodule (17); code=NotFound (-3)\nWarning: failed to delete submodule at 'occupied': Submodule not found: occupied\n\nCaused by:\n    no submodule named 'occupied'; class=Submodule (17); code=NotFound (-3)\nError: Failed to add submodule: Configuration error: Git operation failed: Failed to add submodule (git2 failed with: Failed to clone submodule 'm' from '/private/tmp/submod-preservation-audit-lsp8gn5_/missing-remote'). CLI output: fatal: repository '/private/tmp/submod-preservation-audit-lsp8gn5_/missing-remote' does not exist\nfatal: clone of '/private/tmp/submod-preservation-audit-lsp8gn5_/missing-remote' into submodule path '/private/tmp/submod-preservation-audit-lsp8gn5_/occupied_add/occupied' failed\n"
+        },
+        "sentinel_survives": false
+      },
+      {
+        "case": "disable clean module with local history and stash",
+        "result": {
+          "code": 0,
+          "stdout": "Disabled submodule 'm'.\n",
+          "stderr": ""
+        },
+        "worktree_survives": true,
+        "object_database_survives": false,
+        "config": "[defaults]\n[m]\npath = \"module\"\nurl = \"/private/tmp/submod-preservation-audit-lsp8gn5_/remote\"\nbranch = \"HEAD\"\nactive = false\n\n"
+      },
+      {
+        "case": "delete lib preserves prefix siblings",
+        "result": {
+          "code": 0,
+          "stdout": "Deleted submodule 'm'.\n",
+          "stderr": ""
+        },
+        "index_before": "100644 39bc1480ad2edf9e2ee0c4c3bb6adf82bc26532b 0\t.gitmodules\n100644 0d4e77fbe77b5a30eb9c50ebe677f6a7f664bd5b 0\tREADME.md\n160000 e9e8e1a85308905269dcf3ef106140d061c5b68a 0\tlib\n100644 e620d96ddbb46fde6b49052f50ab204df88d2b1c 0\tlib-extra/file\n100644 e620d96ddbb46fde6b49052f50ab204df88d2b1c 0\tlibrary.txt\n",
+        "index_after": "100644 39bc1480ad2edf9e2ee0c4c3bb6adf82bc26532b 0\t.gitmodules\n100644 0d4e77fbe77b5a30eb9c50ebe677f6a7f664bd5b 0\tREADME.md\n",
+        "sibling_file_survives": true
+      }
+    ]
+  },
+  "lifecycle_reproductions": {
+    "root": "/private/tmp/submod-audit/state-lifecycle-lxfadanf",
+    "old": "429228da34552e887c1d607f3069c91d60868631",
+    "new": "5be521c46899a8853323db11a4207a33ca528fd4",
+    "feature": "a5f52a6165112f2079e649a3fcb2523cf816f34f",
+    "fresh_init_head": "MISSING CHECKOUT",
+    "fresh_init_content": "MISSING",
+    "native_init_head": "429228da34552e887c1d607f3069c91d60868631",
+    "native_init_content": "old",
+    "update_head": "429228da34552e887c1d607f3069c91d60868631",
+    "update_content": "old",
+    "add_branch_head": "5be521c46899a8853323db11a4207a33ca528fd4",
+    "add_branch_feature_file": false,
+    "add_branch_gitmodules": "[submodule \"mod\"]\n\tpath = mod\n\turl = /private/tmp/submod-audit/state-lifecycle-lxfadanf/remote\n",
+    "sparse_before_drop_exists": false,
+    "sparse_after_drop_exists": false,
+    "sparse_after_enabled": "true"
+  },
+  "lifecycle_commands": [
+    {
+      "cwd": "/private/tmp/submod-audit/state-lifecycle-lxfadanf/remote",
+      "args": [
+        "git",
+        "init",
+        "-b",
+        "main"
+      ],
+      "exit": 0,
+      "stdout": "Initialized empty Git repository in /private/tmp/submod-audit/state-lifecycle-lxfadanf/remote/.git/\n",
+      "stderr": ""
+    },
+    {
+      "cwd": "/private/tmp/submod-audit/state-lifecycle-lxfadanf/remote",
+      "args": [
+        "git",
+        "add",
+        "."
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "cwd": "/private/tmp/submod-audit/state-lifecycle-lxfadanf/remote",
+      "args": [
+        "git",
+        "-c",
+        "commit.gpgsign=false",
+        "commit",
+        "-m",
+        "old"
+      ],
+      "exit": 0,
+      "stdout": "[main (root-commit) 429228d] old\n 2 files changed, 2 insertions(+)\n create mode 100644 drop/hidden\n create mode 100644 keep/version\n",
+      "stderr": ""
+    },
+    {
+      "cwd": "/private/tmp/submod-audit/state-lifecycle-lxfadanf/remote",
+      "args": [
+        "git",
+        "rev-parse",
+        "HEAD"
+      ],
+      "exit": 0,
+      "stdout": "429228da34552e887c1d607f3069c91d60868631\n",
+      "stderr": ""
+    },
+    {
+      "cwd": "/private/tmp/submod-audit/state-lifecycle-lxfadanf/parent",
+      "args": [
+        "git",
+        "init",
+        "-b",
+        "main"
+      ],
+      "exit": 0,
+      "stdout": "Initialized empty Git repository in /private/tmp/submod-audit/state-lifecycle-lxfadanf/parent/.git/\n",
+      "stderr": ""
+    },
+    {
+      "cwd": "/private/tmp/submod-audit/state-lifecycle-lxfadanf/parent",
+      "args": [
+        "git",
+        "submodule",
+        "add",
+        "/private/tmp/submod-audit/state-lifecycle-lxfadanf/remote",
+        "mod"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": "Cloning into '/private/tmp/submod-audit/state-lifecycle-lxfadanf/parent/mod'...\ndone.\n"
+    },
+    {
+      "cwd": "/private/tmp/submod-audit/state-lifecycle-lxfadanf/parent",
+      "args": [
+        "git",
+        "add",
+        "."
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "cwd": "/private/tmp/submod-audit/state-lifecycle-lxfadanf/parent",
+      "args": [
+        "git",
+        "-c",
+        "commit.gpgsign=false",
+        "commit",
+        "-m",
+        "pin old"
+      ],
+      "exit": 0,
+      "stdout": "[main (root-commit) 7378f8d] pin old\n 3 files changed, 7 insertions(+)\n create mode 100644 .gitmodules\n create mode 160000 mod\n create mode 100644 submod.toml\n",
+      "stderr": ""
+    },
+    {
+      "cwd": "/private/tmp/submod-audit/state-lifecycle-lxfadanf/parent",
+      "args": [
+        "git",
+        "rev-parse",
+        "HEAD"
+      ],
+      "exit": 0,
+      "stdout": "7378f8dc58424728051286188e7cae4791d8ebd3\n",
+      "stderr": ""
+    },
+    {
+      "cwd": "/private/tmp/submod-audit/state-lifecycle-lxfadanf/remote",
+      "args": [
+        "git",
+        "add",
+        "."
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "cwd": "/private/tmp/submod-audit/state-lifecycle-lxfadanf/remote",
+      "args": [
+        "git",
+        "-c",
+        "commit.gpgsign=false",
+        "commit",
+        "-m",
+        "new"
+      ],
+      "exit": 0,
+      "stdout": "[main 5be521c] new\n 1 file changed, 1 insertion(+), 1 deletion(-)\n",
+      "stderr": ""
+    },
+    {
+      "cwd": "/private/tmp/submod-audit/state-lifecycle-lxfadanf/remote",
+      "args": [
+        "git",
+        "rev-parse",
+        "HEAD"
+      ],
+      "exit": 0,
+      "stdout": "5be521c46899a8853323db11a4207a33ca528fd4\n",
+      "stderr": ""
+    },
+    {
+      "cwd": "/private/tmp/submod-audit/state-lifecycle-lxfadanf/remote",
+      "args": [
+        "git",
+        "switch",
+        "-c",
+        "feature"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": "Switched to a new branch 'feature'\n"
+    },
+    {
+      "cwd": "/private/tmp/submod-audit/state-lifecycle-lxfadanf/remote",
+      "args": [
+        "git",
+        "add",
+        "."
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "cwd": "/private/tmp/submod-audit/state-lifecycle-lxfadanf/remote",
+      "args": [
+        "git",
+        "-c",
+        "commit.gpgsign=false",
+        "commit",
+        "-m",
+        "feature"
+      ],
+      "exit": 0,
+      "stdout": "[feature a5f52a6] feature\n 1 file changed, 1 insertion(+)\n create mode 100644 feature-only\n",
+      "stderr": ""
+    },
+    {
+      "cwd": "/private/tmp/submod-audit/state-lifecycle-lxfadanf/remote",
+      "args": [
+        "git",
+        "rev-parse",
+        "HEAD"
+      ],
+      "exit": 0,
+      "stdout": "a5f52a6165112f2079e649a3fcb2523cf816f34f\n",
+      "stderr": ""
+    },
+    {
+      "cwd": "/private/tmp/submod-audit/state-lifecycle-lxfadanf/remote",
+      "args": [
+        "git",
+        "switch",
+        "main"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": "Switched to branch 'main'\n"
+    },
+    {
+      "cwd": "/private/tmp/submod-audit/state-lifecycle-lxfadanf",
+      "args": [
+        "git",
+        "clone",
+        "/private/tmp/submod-audit/state-lifecycle-lxfadanf/parent",
+        "/private/tmp/submod-audit/state-lifecycle-lxfadanf/fresh"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": "Cloning into '/private/tmp/submod-audit/state-lifecycle-lxfadanf/fresh'...\ndone.\n"
+    },
+    {
+      "cwd": "/private/tmp/submod-audit/state-lifecycle-lxfadanf/fresh",
+      "args": [
+        "/private/tmp/submod-audit-target/debug/submod",
+        "init"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "cwd": "/private/tmp/submod-audit/state-lifecycle-lxfadanf/fresh",
+      "args": [
+        "git",
+        "submodule",
+        "update",
+        "--init"
+      ],
+      "exit": 0,
+      "stdout": "Submodule path 'mod': checked out '429228da34552e887c1d607f3069c91d60868631'\n",
+      "stderr": "Submodule 'mod' (/private/tmp/submod-audit/state-lifecycle-lxfadanf/remote) registered for path 'mod'\nCloning into '/private/tmp/submod-audit/state-lifecycle-lxfadanf/fresh/mod'...\ndone.\n"
+    },
+    {
+      "cwd": "/private/tmp/submod-audit/state-lifecycle-lxfadanf/fresh/mod",
+      "args": [
+        "git",
+        "rev-parse",
+        "HEAD"
+      ],
+      "exit": 0,
+      "stdout": "429228da34552e887c1d607f3069c91d60868631\n",
+      "stderr": ""
+    },
+    {
+      "cwd": "/private/tmp/submod-audit/state-lifecycle-lxfadanf/fresh",
+      "args": [
+        "/private/tmp/submod-audit-target/debug/submod",
+        "update"
+      ],
+      "exit": 0,
+      "stdout": "\u2705 Updated mod\nUpdated 1 submodule(s)\n",
+      "stderr": "\u001b[2K\n"
+    },
+    {
+      "cwd": "/private/tmp/submod-audit/state-lifecycle-lxfadanf/fresh/mod",
+      "args": [
+        "git",
+        "rev-parse",
+        "HEAD"
+      ],
+      "exit": 0,
+      "stdout": "429228da34552e887c1d607f3069c91d60868631\n",
+      "stderr": ""
+    },
+    {
+      "cwd": "/private/tmp/submod-audit/state-lifecycle-lxfadanf/branchrepo",
+      "args": [
+        "git",
+        "init",
+        "-b",
+        "main"
+      ],
+      "exit": 0,
+      "stdout": "Initialized empty Git repository in /private/tmp/submod-audit/state-lifecycle-lxfadanf/branchrepo/.git/\n",
+      "stderr": ""
+    },
+    {
+      "cwd": "/private/tmp/submod-audit/state-lifecycle-lxfadanf/branchrepo",
+      "args": [
+        "git",
+        "add",
+        "."
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "cwd": "/private/tmp/submod-audit/state-lifecycle-lxfadanf/branchrepo",
+      "args": [
+        "git",
+        "-c",
+        "commit.gpgsign=false",
+        "commit",
+        "-m",
+        "seed"
+      ],
+      "exit": 0,
+      "stdout": "[main (root-commit) ebe30e2] seed\n 2 files changed, 2 insertions(+)\n create mode 100644 seed\n create mode 100644 submod.toml\n",
+      "stderr": ""
+    },
+    {
+      "cwd": "/private/tmp/submod-audit/state-lifecycle-lxfadanf/branchrepo",
+      "args": [
+        "git",
+        "rev-parse",
+        "HEAD"
+      ],
+      "exit": 0,
+      "stdout": "ebe30e23ad88c6dc31a4d6cdab4f91bd60058860\n",
+      "stderr": ""
+    },
+    {
+      "cwd": "/private/tmp/submod-audit/state-lifecycle-lxfadanf/branchrepo",
+      "args": [
+        "/private/tmp/submod-audit-target/debug/submod",
+        "add",
+        "/private/tmp/submod-audit/state-lifecycle-lxfadanf/remote",
+        "--name",
+        "mod",
+        "--path",
+        "mod",
+        "--branch",
+        "feature"
+      ],
+      "exit": 0,
+      "stdout": "Added submodule mod\n",
+      "stderr": "Warning: failed to deinit submodule at 'mod': Submodule not found: mod\n\nCaused by:\n    no submodule named 'mod'; class=Submodule (17); code=NotFound (-3)\nWarning: failed to delete submodule at 'mod': Submodule not found: mod\n\nCaused by:\n    no submodule named 'mod'; class=Submodule (17); code=NotFound (-3)\n"
+    },
+    {
+      "cwd": "/private/tmp/submod-audit/state-lifecycle-lxfadanf/branchrepo/mod",
+      "args": [
+        "git",
+        "rev-parse",
+        "HEAD"
+      ],
+      "exit": 0,
+      "stdout": "5be521c46899a8853323db11a4207a33ca528fd4\n",
+      "stderr": ""
+    },
+    {
+      "cwd": "/private/tmp/submod-audit/state-lifecycle-lxfadanf",
+      "args": [
+        "git",
+        "clone",
+        "/private/tmp/submod-audit/state-lifecycle-lxfadanf/parent",
+        "/private/tmp/submod-audit/state-lifecycle-lxfadanf/sparse"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": "Cloning into '/private/tmp/submod-audit/state-lifecycle-lxfadanf/sparse'...\ndone.\n"
+    },
+    {
+      "cwd": "/private/tmp/submod-audit/state-lifecycle-lxfadanf/sparse",
+      "args": [
+        "git",
+        "submodule",
+        "update",
+        "--init"
+      ],
+      "exit": 0,
+      "stdout": "Submodule path 'mod': checked out '429228da34552e887c1d607f3069c91d60868631'\n",
+      "stderr": "Submodule 'mod' (/private/tmp/submod-audit/state-lifecycle-lxfadanf/remote) registered for path 'mod'\nCloning into '/private/tmp/submod-audit/state-lifecycle-lxfadanf/sparse/mod'...\ndone.\n"
+    },
+    {
+      "cwd": "/private/tmp/submod-audit/state-lifecycle-lxfadanf/sparse",
+      "args": [
+        "/private/tmp/submod-audit-target/debug/submod",
+        "init"
+      ],
+      "exit": 0,
+      "stdout": "Configured sparse checkout\n",
+      "stderr": "\u2139\ufe0f  submod uses a deny-all-by-default sparse-checkout model: `!/*` is automatically prepended so only the paths you list are checked out.\nTo use git's default behavior instead, set `use_git_default_sparse_checkout = true` in your submod.toml (globally under `[defaults]` or per submodule) or pass `--use-git-default-sparse-checkout`.\n"
+    },
+    {
+      "cwd": "/private/tmp/submod-audit/state-lifecycle-lxfadanf/sparse",
+      "args": [
+        "/private/tmp/submod-audit-target/debug/submod",
+        "sync"
+      ],
+      "exit": 0,
+      "stdout": "Syncing submodules: mod\n\u2705 Updated mod\n\u2705 Sync complete (0.0s)\n",
+      "stderr": "\u001b[2K\n"
+    },
+    {
+      "cwd": "/private/tmp/submod-audit/state-lifecycle-lxfadanf/sparse/mod",
+      "args": [
+        "git",
+        "config",
+        "--get",
+        "core.sparseCheckout"
+      ],
+      "exit": 0,
+      "stdout": "true\n",
+      "stderr": ""
+    }
+  ],
+  "dependency_audit": {
+    "database": {
+      "advisory-count": 1243,
+      "last-commit": "b50980aad8b8f14f77e25a97b32dd94bf008b0af",
+      "last-updated": "2026-09-09T12:49:52+02:00"
+    },
+    "lockfile": {
+      "dependency-count": 274
+    },
+    "settings": {
+      "target_arch": [],
+      "target_os": [],
+      "severity": null,
+      "ignore": [
+        "RUSTSEC-2024-0364"
+      ],
+      "informational_warnings": [
+        "unmaintained",
+        "unsound",
+        "notice"
+      ]
+    },
+    "vulnerabilities": {
+      "found": false,
+      "count": 0,
+      "list": []
+    },
+    "warnings": {
+      "yanked": [
+        {
+          "kind": "yanked",
+          "package": {
+            "name": "bisync",
+            "version": "0.3.0",
+            "source": "registry+https://github.com/rust-lang/crates.io-index",
+            "checksum": "5020822f6d6f23196ccaf55e228db36f9de1cf788052b37992e17cbc96ec41a7",
+            "dependencies": [
+              {
+                "name": "bisync_macros",
+                "version": "0.2.3",
+                "source": "registry+https://github.com/rust-lang/crates.io-index"
+              }
+            ],
+            "replace": null
+          },
+          "advisory": null,
+          "affected": null,
+          "versions": null
+        }
+      ]
+    }
+  }
+}

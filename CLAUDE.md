@@ -53,22 +53,22 @@ Managed by `hk` (configured in `hk.pkl`). Pre-commit runs: cargo fmt, clippy, ch
 ### Layer Stack
 
 ```
-CLI (commands.rs + main.rs)
+CLI (commands.rs + main.rs, imports the library — no duplicated modules)
     ↓ clap parsing
-GitManager (git_manager.rs)          ← high-level submodule operations
+GitManager (git_manager.rs)          ← desired-state planning and reconciliation
     ↓ delegates to
-GitOpsManager (git_ops/mod.rs)       ← unified backend with automatic fallback
-    ├── GixOperations (git_ops/gix_ops.rs)     ← gitoxide (preferred)
-    ├── Git2Operations (git_ops/git2_ops.rs)   ← libgit2 (fallback)
-    └── Git CLI                               ← last resort (spawned via std::process)
-Config (config.rs)                   ← figment-based TOML config loading/saving
+GitOpsManager (git_ops/mod.rs)       ← native Git mutation boundary
+    ├── Native Git CLI (spawned via std::process) ← all mutations
+    ├── GixOperations (git_ops/gix_ops.rs)        ← gitoxide reads
+    └── Git2Operations (git_ops/git2_ops.rs)      ← libgit2 reads
+Config (config.rs)                   ← raw TOML declarations plus an effective-entry resolver
 ```
 
-### Fallback Architecture
+### Git operation design
 
-The core design is a **gix-first, git2-fallback, CLI-last-resort** strategy, driven by the immaturity of gitoxide's submodule support. `GitOpsManager` wraps both backends behind the `GitOperations` trait and calls `try_with_fallback()` / `try_with_fallback_mut()` for every operation. When gix fails, it logs a warning and transparently retries with git2; `add_submodule` has an additional CLI fallback that also cleans up any partial state from the prior attempt.
+All lifecycle mutations (add/init/update/move/deinit/delete/reset/stash/clean/sparse) run through **one native Git path** inside `GitOpsManager` (`std::process::Command` with argument arrays, rooted cwd, checked statuses). There are no competing backend mutation implementations and no cross-backend retry after a mutation failure; real errors are terminal with recoverable partial state left in place. Inspection reads use `try_with_fallback()` (gix first, git2 fallback); `GitOpsManager::without_gix` is the injection seam for exercising the git2 read path. `Config::add_submodule` and `remove_submodule` mutate in place (no whole-map clones); sparse patterns are borrowed (`&[String]`) through the read APIs.
 
-After destructive operations (delete, nuke), `GitOpsManager::reopen()` must be called to refresh the in-memory repository state. git2 reopen errors are fatal; gix reopen errors are warnings only.
+`GitOpsManager::reopen()` refreshes the in-memory repository handles after external changes; it is used by tests and explicit refresh flows, not by every lifecycle call.
 
 ### Configuration
 
@@ -85,7 +85,7 @@ After destructive operations (delete, nuke), `GitOpsManager::reopen()` must be c
 - `missing_docs` is warn — public items need doc comments
 - `module_name_repetitions` and `too_many_lines` are allowed
 - All error handling uses `anyhow` for propagation and `thiserror` for defining error types
-- `simple_gix.rs` contains lightweight gix helpers used in `gix_ops.rs`
+- Raw TOML declarations stay separate from effective settings: never persist inherited defaults into entries; `active`/`sparse` app-only state stays out of portable `.gitmodules` fields
 
 ### Testing Approach
 
@@ -95,9 +95,10 @@ Integration tests in `tests/` use a `TestHarness` (in `tests/common/mod.rs`) tha
 - `config_tests.rs` — configuration parsing/serialization
 - `sparse_checkout_tests.rs` — sparse checkout behavior
 - `error_handling_tests.rs` — error conditions and messages
-- `fallback_tests.rs` — the gix→git2→CLI fallback chain, via the `GitOpsManager::without_gix` and `::forcing_cli_add` injection seams
-- `git_ops_tests.rs` — the `GitOperations` backends directly
+- `fallback_tests.rs` — the retained gix→git2 read fallback and native CLI mutation state, via the `GitOpsManager::without_gix` injection seam
+- `git_ops_tests.rs` — `GitOpsManager` (native mutations) and the retained backend read APIs directly
 - `security_tests.rs` — path traversal, symlink escape, and command/flag injection containment
-- `performance_tests.rs` — timing and peak-allocation ceilings (plain `#[test]`s, not criterion)
+- `performance_tests.rs` — timing ceilings and Rust-allocator growth bounds (plain `#[test]`s, not criterion; the allocator measures test-process Rust allocations only, not process RSS)
+- `reconciliation_*_tests.rs`, `phase5_*_tests.rs`, `phase6_*_tests.rs` — the R01–R31 regression families from `docs/IMPROVEMENT_PLAN.md`
 
-Criterion benchmarks live separately in `benches/benchmark.rs` (`cargo bench`).
+Criterion benchmarks live separately in `benches/benchmark.rs` (`cargo bench`): real config parse/load/edit workloads at 1/10/100 modules, plus a `SUBMOD_MEASURE_CONFIG` mode driven by `scripts/measure-performance.py` for before/after comparisons with wall time, Git invocation counts, and no-op state identity.

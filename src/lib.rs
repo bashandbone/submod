@@ -16,9 +16,9 @@ pub mod options;
 pub mod shells;
 pub mod utilities;
 
-/// Gitoxide-based submodule management implementation
+/// Submodule reconciliation and lifecycle management
 pub mod git_manager;
-/// Git operations layer with gix-first, git2-fallback strategy
+/// Native Git mutations with gix and git2 repository reads
 pub mod git_ops;
 
 pub use config::{
