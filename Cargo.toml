@@ -11,7 +11,6 @@ rust-version = "1.89"
 description = "A headache-free git submodule management tool. Manage sparse checkouts, submodule updates, and adding/removing submodules with ease."
 documentation = "https://docs.rs/submod"
 readme = "README.md"
-homepage = "https://github.com/bashandbone/submod"
 repository = "https://github.com/bashandbone/submod"
 license = "LicenseRef-PlainMIT OR MIT"
 keywords = ["cli", "git", "gitoxide", "sparse-checkout", "submodule"]
@@ -83,14 +82,14 @@ features = ["cargo", "derive", "unicode", "wrap_help"]
 
 
 [dev-dependencies]
-figment = {
-  version = "0.10.0",
-default-features = false,
-
-}
 
 criterion = "0.8.2"
-features = ["test", "toml"]
+
+[dev-dependencies.figment]
+version = "0.10.0",
+default-features = false,
+features = ["toml", "test"]
+
 [lints.clippy]
 # Cargo-specific lints
 cargo = { level = "warn", priority = -1 }
@@ -117,12 +116,13 @@ too_many_lines = "allow"
 
 [lints.rust]
 # Warn about missing documentation
-missing_docs = "warn"
 unexpected_cfgs = {
   level = "warn",
-# Allow cfg(coverage) and cfg(coverage_nightly) set by cargo-llvm-cov
+missing_docs = "warn"
+
 
 }
+# Allow cfg(coverage) and cfg(coverage_nightly) set by cargo-llvm-cov
 check-cfg = [
   "cfg(coverage)",
   "cfg(coverage_nightly)",
