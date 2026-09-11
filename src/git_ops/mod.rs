@@ -2,10 +2,12 @@
 //
 // SPDX-License-Identifier: LicenseRef-PlainMIT OR MIT
 #![doc = r"
-This module is the native Git mutation boundary: every lifecycle mutation
-(add/init/update/move/deinit/delete/reset/stash/clean/sparse) runs through
-one checked `git` invocation path on `GitOpsManager`. There are no competing
-backend mutation implementations and no cross-backend retry after a failure.
+This module is the native Git mutation boundary.
+
+Every lifecycle mutation (add/init/update/move/deinit/delete/reset/stash/clean/sparse)
+runs through one checked `git` invocation path on `GitOpsManager`. There are
+no competing backend mutation implementations and no cross-backend retry
+after a failure.
 
 `gix` and `git2` survive only as read backends behind `try_with_fallback`
 (gix first, git2 fallback) for inspection reads: gitmodules, config, status,
