@@ -648,7 +648,7 @@ impl GitManager {
                 )));
             }
             Ok(_) => {}
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+            Err(error) if crate::utilities::is_absent_path(&error) => {}
             Err(error) => return Err(error.into()),
         }
         Ok(())
@@ -4007,7 +4007,7 @@ impl GitManager {
         };
         let existing = match fs::read(output) {
             Ok(bytes) => Some(bytes),
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => None,
+            Err(error) if crate::utilities::is_absent_path(&error) => None,
             Err(error) => return Err(error.into()),
         };
         if existing.is_some() && !force {

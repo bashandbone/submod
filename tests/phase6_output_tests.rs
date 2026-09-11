@@ -253,12 +253,25 @@ fn r26_completion_stdout_remains_shell_program() {
     // Shell parser validates literal newlines, quotes and backslashes survived.
     let path = h.work_dir.join("completion.bash");
     std::fs::write(&path, &out.stdout).unwrap();
-    let syntax = std::process::Command::new("bash")
+    // A POSIX `bash` is not guaranteed on every runner: the `bash` on some
+    // Windows images is a stub that fails every invocation. Gate the external
+    // syntax check on a bash that can validate an empty script; the textual
+    // shape asserts above still hold everywhere.
+    let empty = h.work_dir.join("empty.bash");
+    std::fs::write(&empty, "").unwrap();
+    let bash_works = std::process::Command::new("bash")
         .arg("-n")
-        .arg(path)
+        .arg(&empty)
         .output()
-        .unwrap();
-    assert!(syntax.status.success(), "completion corrupted: {syntax:?}");
+        .is_ok_and(|probe| probe.status.success());
+    if bash_works {
+        let syntax = std::process::Command::new("bash")
+            .arg("-n")
+            .arg(path)
+            .output()
+            .unwrap();
+        assert!(syntax.status.success(), "completion corrupted: {syntax:?}");
+    }
     assert!(!out.stdout.contains(&0x1b));
 }
 

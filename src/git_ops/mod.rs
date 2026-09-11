@@ -1833,6 +1833,24 @@ impl GitOpsManager {
         Ok(reported)
     }
 
+    /// Canonicalize a repository top-level reported by Git for identity
+    /// comparison against an already-canonical checkout root.
+    ///
+    /// Git spells the same directory differently per platform (forward
+    /// slashes on Windows, unresolved symlinks on macOS), while
+    /// `canonicalize` uses verbatim UNC paths there, so comparing the raw
+    /// report rejects every checkout. A missing report is fail-closed: the
+    /// top-level Git just named must exist.
+    fn canonical_worktree_root(reported: &Path, intended: &Path) -> Result<PathBuf> {
+        reported.canonicalize().with_context(|| {
+            format!(
+                "Submodule path {} resolves to unrelated worktree {}",
+                intended.display(),
+                reported.display()
+            )
+        })
+    }
+
     /// Canonicalize a submodule storage path for containment comparison,
     /// resolving through the nearest existing ancestor when the path itself
     /// does not exist yet (preflight runs before Git creates storage).
@@ -2096,7 +2114,7 @@ impl GitOpsManager {
             .with_context(|| format!("Submodule checkout is missing: {}", intended.display()))?;
         let worktree_root = crate::utilities::git_path(&intended_root, &["--show-toplevel"])
             .with_context(|| format!("Invalid submodule repository at {}", intended.display()))?;
-        if worktree_root != intended_root {
+        if Self::canonical_worktree_root(&worktree_root, &intended)? != intended_root {
             anyhow::bail!(
                 "Submodule path {} resolves to unrelated worktree {}",
                 intended.display(),
@@ -3152,6 +3170,48 @@ mod storage_path_tests {
                 .join("a")
                 .join("b")
                 .join("c")
+        );
+    }
+
+    #[test]
+    fn canonical_worktree_root_ignores_report_spelling() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let sub = dir.path().join("sub");
+        std::fs::create_dir(&sub).unwrap();
+        // A `.` segment spells the same directory differently on every
+        // platform, the way Git's forward slashes differ from verbatim UNC
+        // reports on Windows.
+        let dotted = dir.path().join(".").join("sub");
+        assert_ne!(dotted, std::fs::canonicalize(&sub).unwrap());
+        assert_eq!(
+            GitOpsManager::canonical_worktree_root(&dotted, &sub).unwrap(),
+            std::fs::canonicalize(&sub).unwrap()
+        );
+    }
+
+    #[test]
+    fn canonical_worktree_root_refuses_other_and_missing_reports() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let sub = dir.path().join("sub");
+        let other = dir.path().join("other");
+        std::fs::create_dir(&sub).unwrap();
+        std::fs::create_dir(&other).unwrap();
+        let reported = std::fs::canonicalize(&other).unwrap();
+        // An existing but different directory normalizes fine; the caller
+        // rejects the mismatch against the intended root.
+        assert_eq!(
+            GitOpsManager::canonical_worktree_root(&reported, &sub).unwrap(),
+            reported
+        );
+        assert_ne!(
+            GitOpsManager::canonical_worktree_root(&reported, &sub).unwrap(),
+            std::fs::canonicalize(&sub).unwrap()
+        );
+        assert!(
+            GitOpsManager::canonical_worktree_root(&dir.path().join("absent"), &sub)
+                .unwrap_err()
+                .to_string()
+                .contains("unrelated worktree")
         );
     }
 }
