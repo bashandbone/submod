@@ -759,7 +759,7 @@ impl SubmoduleEntries {
             submodules: Some(submodules.unwrap_or_default()),
         };
         for (name, paths) in sparse_checkouts.unwrap_or_default() {
-            entries.add_checkout(name, &paths, true);
+            entries.add_checkout(&name, &paths, true);
         }
         entries
     }
@@ -802,8 +802,8 @@ impl SubmoduleEntries {
     }
 
     /// Add or replace patterns on the authoritative entry.
-    pub fn add_checkout(&mut self, name: SubmoduleName, checkout: &[String], replace: bool) {
-        if let Some(entry) = self.submodules.as_mut().and_then(|m| m.get_mut(&name)) {
+    pub fn add_checkout(&mut self, name: &str, checkout: &[String], replace: bool) {
+        if let Some(entry) = self.submodules.as_mut().and_then(|m| m.get_mut(name)) {
             let paths = entry.sparse_paths.get_or_insert_with(Vec::new);
             if replace {
                 paths.clear();
@@ -827,7 +827,7 @@ impl SubmoduleEntries {
     }
 
     /// Append a sparse pattern.
-    pub fn add_sparse_path(&mut self, name: SubmoduleName, path: String) {
+    pub fn add_sparse_path(&mut self, name: &str, path: String) {
         self.add_checkout(name, &[path], false);
     }
 
@@ -1121,15 +1121,15 @@ impl Config {
         entry.ignore = entry
             .ignore
             .or(self.defaults.ignore)
-            .or(Some(SerializableIgnore::default()));
+            .or_else(|| Some(SerializableIgnore::default()));
         entry.update = entry
             .update
             .or_else(|| self.defaults.update.clone())
-            .or(Some(SerializableUpdate::default()));
+            .or_else(|| Some(SerializableUpdate::default()));
         entry.fetch_recurse = entry
             .fetch_recurse
             .or(self.defaults.fetch_recurse)
-            .or(Some(SerializableFetchRecurse::default()));
+            .or_else(|| Some(SerializableFetchRecurse::default()));
         entry.use_git_default_sparse_checkout = entry
             .use_git_default_sparse_checkout
             .or(self.defaults.use_git_default_sparse_checkout)
@@ -1251,10 +1251,16 @@ impl Config {
     }
 
     /// Load raw declarations from a file.
+    ///
+    /// The `Option<impl AsRef<Path>>` parameter is deliberate: call sites pass
+    /// owned paths, borrows, and `None` interchangeably.
+    #[allow(clippy::needless_pass_by_value)]
     pub fn load_from_file(&self, path: Option<impl AsRef<Path>>) -> anyhow::Result<Self> {
         self.load(
-            path.as_ref()
-                .map_or(Path::new("submod.toml"), AsRef::as_ref),
+            path.map_or_else(
+                || Path::new("submod.toml").to_path_buf(),
+                |path| path.as_ref().to_path_buf(),
+            ),
             Self::default(),
         )
     }
@@ -1303,6 +1309,9 @@ impl Provider for Config {
 
 #[cfg(test)]
 #[cfg_attr(coverage_nightly, coverage(off))]
+// `figment::Jail::expect_with` fixes the closure error type to the large
+// `figment::Error`; mapping it in every test would obscure the assertions.
+#[allow(clippy::result_large_err)]
 mod tests {
     use super::*;
 
@@ -1468,7 +1477,7 @@ mod tests {
                 "[module]\nurl='repo'\nfetch='always'\nfetchRecurse='never'",
                 "conflicting aliases",
             ),
-            ("[defaults]\nignroe='all'", "ignore"),
+            ("[defaults]\nignroe='all'", "ignroe"),
             ("[module]\nurl='repo'\nunknown=true", "unknown"),
             ("[module]\npath='child'", "url"),
             ("[module]\nurl='  '", "url"),
@@ -1495,9 +1504,7 @@ mod tests {
     #[test]
     fn sparse_patterns_have_one_authority() {
         let mut config = Config::parse("[module]\nurl='repo'\nsparse_paths=['src/']").unwrap();
-        config
-            .submodules
-            .add_sparse_path("module".into(), "docs/".into());
+        config.submodules.add_sparse_path("module", "docs/".into());
         let mut entry = config.get_submodule("module").unwrap().clone();
         assert_eq!(entry.sparse_paths.as_ref().unwrap().len(), 2);
         entry.sparse_paths = Some(vec!["lib/".into()]);
@@ -1921,21 +1928,21 @@ mod tests {
                 None,
             ),
         );
-        entries.add_checkout("mod1".to_string(), &["src/".to_string()], false);
+        entries.add_checkout("mod1", &["src/".to_string()], false);
         assert_eq!(
             entries.sparse_checkouts().unwrap().get("mod1").unwrap(),
             &vec!["src/".to_string()]
         );
 
         // Append
-        entries.add_checkout("mod1".to_string(), &["docs/".to_string()], false);
+        entries.add_checkout("mod1", &["docs/".to_string()], false);
         assert_eq!(
             entries.sparse_checkouts().unwrap().get("mod1").unwrap(),
             &vec!["src/".to_string(), "docs/".to_string()]
         );
 
         // Replace
-        entries.add_checkout("mod1".to_string(), &["lib/".to_string()], true);
+        entries.add_checkout("mod1", &["lib/".to_string()], true);
         assert_eq!(
             entries.sparse_checkouts().unwrap().get("mod1").unwrap(),
             &vec!["lib/".to_string()]
@@ -1961,7 +1968,7 @@ mod tests {
                 None,
             ),
         );
-        entries.add_checkout("mod1".to_string(), &["src/".to_string()], false);
+        entries.add_checkout("mod1", &["src/".to_string()], false);
         assert!(entries.sparse_checkouts().is_some());
         assert_eq!(
             entries.sparse_checkouts().unwrap().get("mod1").unwrap(),
@@ -1986,11 +1993,7 @@ mod tests {
                 None,
             ),
         );
-        entries.add_checkout(
-            "mod1".to_string(),
-            &["src/".to_string(), "docs/".to_string()],
-            false,
-        );
+        entries.add_checkout("mod1", &["src/".to_string(), "docs/".to_string()], false);
 
         entries.remove_sparse_path("mod1", "src/");
         assert_eq!(
@@ -2020,12 +2023,12 @@ mod tests {
                 None,
             ),
         );
-        entries.add_sparse_path("mod1".to_string(), "src/".to_string());
+        entries.add_sparse_path("mod1", "src/".to_string());
         assert_eq!(
             entries.sparse_checkouts().unwrap().get("mod1").unwrap(),
             &vec!["src/".to_string()]
         );
-        entries.add_sparse_path("mod1".to_string(), "docs/".to_string());
+        entries.add_sparse_path("mod1", "docs/".to_string());
         assert_eq!(
             entries.sparse_checkouts().unwrap().get("mod1").unwrap(),
             &vec!["src/".to_string(), "docs/".to_string()]
@@ -2051,7 +2054,7 @@ mod tests {
                 None,
             ),
         );
-        entries.add_sparse_path("mod1".to_string(), "src/".to_string());
+        entries.add_sparse_path("mod1", "src/".to_string());
         assert!(entries.sparse_checkouts().is_some());
     }
 
@@ -2072,7 +2075,7 @@ mod tests {
                 None,
             ),
         );
-        entries.add_checkout("mod1".to_string(), &["src/".to_string()], false);
+        entries.add_checkout("mod1", &["src/".to_string()], false);
         entries.delete_checkout("mod1");
         assert!(!entries.sparse_checkouts().unwrap().contains_key("mod1"));
     }
@@ -2228,7 +2231,7 @@ mod tests {
             None,
         );
         entries = entries.add_submodule("mod1".to_string(), entry);
-        entries.add_checkout("mod1".to_string(), &["src/".to_string()], false);
+        entries.add_checkout("mod1", &["src/".to_string()], false);
 
         let items: Vec<_> = entries.iter().collect();
         assert_eq!(items.len(), 1);

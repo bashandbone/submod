@@ -9,7 +9,7 @@ use std::{
     process::{Command, Output},
 };
 
-fn success(output: Output) -> String {
+fn success(output: &Output) -> String {
     let text = format!(
         "{}{}",
         String::from_utf8_lossy(&output.stdout),
@@ -62,7 +62,7 @@ fn unchanged(before: Vec<(String, Vec<u8>)>, root: &Path) {
 
 fn clone_parent(h: &TestHarness, source: &Path, destination: &Path) {
     success(
-        h.git_cmd()
+        &h.git_cmd()
             .arg("clone")
             .arg(source)
             .arg(destination)
@@ -74,7 +74,7 @@ fn clone_parent(h: &TestHarness, source: &Path, destination: &Path) {
 fn traced_sync(h: &TestHarness, cwd: &Path) {
     let trace = h.temp_dir.path().join("repeat-trace.jsonl");
     success(
-        Command::new(&h.submod_bin)
+        &Command::new(&h.submod_bin)
             .arg("sync")
             .current_dir(cwd)
             .env("GIT_CONFIG_GLOBAL", h.temp_dir.path().join("gitconfig"))
@@ -112,7 +112,7 @@ fn r20_phase5_relative_url_fresh_clone_preserves_pin_and_native_url_resolution()
     h.git_stdout(&["add", ".gitmodules", "library", "submod.toml"]);
     h.git_stdout(&["commit", "-m", "Record relative submodule pin"]);
     success(
-        h.git_cmd()
+        &h.git_cmd()
             .args(["clone", "--bare"])
             .arg(&h.work_dir)
             .arg(&parent_remote)
@@ -133,7 +133,7 @@ fn r20_phase5_relative_url_fresh_clone_preserves_pin_and_native_url_resolution()
     );
     let portable_before = fs::read(fresh.join(".gitmodules")).unwrap();
     let gitlinks_before = h.git_at(&fresh, &["ls-files", "--stage", "library"]);
-    success(h.run_submod_at(&fresh, &["sync"]).unwrap());
+    success(&h.run_submod_at(&fresh, &["sync"]).unwrap());
     assert_eq!(
         h.git_at(&fresh.join("library"), &["rev-parse", "HEAD"]),
         pin
@@ -300,7 +300,7 @@ fn shallow_pin(unavailable: bool) {
                 &format!("160000,{repair_pin},library"),
             ],
         );
-        success(h.run_submod_at(&fresh, &["init"]).unwrap());
+        success(&h.run_submod_at(&fresh, &["init"]).unwrap());
         assert_eq!(
             h.git_at(&fresh.join("library"), &["rev-parse", "HEAD"]),
             repair_pin

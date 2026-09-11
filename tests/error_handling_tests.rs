@@ -1405,7 +1405,7 @@ mod phase3_acceptance_persistence {
         } else {
             assert_eq!(first_common, second_common);
         }
-        let mut gates = vec![first_output.clone(), second_output.clone()];
+        let mut gates = vec![first_output, second_output];
         gates.sort();
         gates.dedup();
         for gate in &gates {

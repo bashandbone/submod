@@ -16,9 +16,9 @@ fn text(output: &Output) -> String {
         String::from_utf8_lossy(&output.stderr)
     )
 }
-fn success(output: Output) -> String {
-    assert!(output.status.success(), "{}", text(&output));
-    text(&output)
+fn success(output: &Output) -> String {
+    assert!(output.status.success(), "{}", text(output));
+    text(output)
 }
 fn snapshot(root: &Path) -> Vec<(PathBuf, Vec<u8>)> {
     fn visit(root: &Path, dir: &Path, entries: &mut Vec<(PathBuf, Vec<u8>)>) {
@@ -63,10 +63,10 @@ fn managed() -> TestHarness {
     let h = fixture();
     let remote = h.create_test_remote("library-remote").unwrap();
     success(
-        h.run_submod(&["add", remote.to_str().unwrap(), "--name", "library"])
+        &h.run_submod(&["add", remote.to_str().unwrap(), "--name", "library"])
             .unwrap(),
     );
-    success(h.run_submod(&["sync"]).unwrap());
+    success(&h.run_submod(&["sync"]).unwrap());
     h
 }
 fn locks(h: &TestHarness) -> [PathBuf; 2] {
@@ -133,7 +133,7 @@ fn r17_phase6_missing_implicit_config_explains_import_but_add_can_create_it() {
     }
     let remote = h.create_test_remote("new-default").unwrap();
     success(
-        h.run_submod(&[
+        &h.run_submod(&[
             "add",
             remote.to_str().unwrap(),
             "--name",
@@ -195,7 +195,7 @@ fn r17_r25_phase6_root_nested_custom_and_linked_inspection_preserve_all_state() 
         let output = traced(&h, cwd, &args);
         unchanged(before, &h.work_dir);
         unchanged(linked_before, &linked);
-        let message = success(output);
+        let message = success(&output);
         assert!(
             message.contains("library"),
             "inspection omitted managed module: {message}"
@@ -226,7 +226,7 @@ fn nested_fixture() -> TestHarness {
     h.git_at(&work, &["push", "origin", "main"]);
     h.create_config(&format!("[library]\nurl = {:?}\n", outer.to_str().unwrap()))
         .unwrap();
-    success(h.run_submod(&["init", "--recursive"]).unwrap());
+    success(&h.run_submod(&["init", "--recursive"]).unwrap());
     h
 }
 
@@ -237,7 +237,7 @@ fn r19_r25_phase6_recursive_list_reports_actual_nested_hierarchy_without_mutatio
     let before = snapshot(&h.work_dir);
     let output = traced(&h, &h.work_dir, &["list", "--recursive"]);
     unchanged(before, &h.work_dir);
-    let message = success(output);
+    let message = success(&output);
     assert!(
         message.contains("library") && message.contains("library/deps/leaf"),
         "real nested hierarchy missing: {message}"
@@ -278,7 +278,7 @@ fn r19_phase6_recursive_list_marks_uninitialized_checkout_without_guessing() {
     let before = snapshot(&h.work_dir);
     let output = traced(&h, &h.work_dir, &["list", "--recursive"]);
     unchanged(before, &h.work_dir);
-    let message = success(output);
+    let message = success(&output);
     assert!(message.contains("library"), "{message}");
     assert!(
         message.contains("not inspected") || message.contains("inspection skipped"),
@@ -341,7 +341,11 @@ fn r25_phase6_structural_dry_run_preserves_stale_index_stat_cache() {
     let index_before = fs::metadata(&index).unwrap();
     let before = snapshot(&h.work_dir);
 
-    success(traced(&h, &h.work_dir, &["delete", "library", "--dry-run"]));
+    success(&traced(
+        &h,
+        &h.work_dir,
+        &["delete", "library", "--dry-run"],
+    ));
 
     assert_eq!(index_bytes, fs::read(&index).unwrap());
     let index_after = fs::metadata(&index).unwrap();
@@ -406,7 +410,7 @@ fn dry_run(case: &str) {
     preview_args.push("--dry-run");
     let output = traced(&h, &h.work_dir, &preview_args);
     unchanged(before, &h.work_dir);
-    let preview = success(output).to_lowercase();
+    let preview = success(&output).to_lowercase();
     let target = match case {
         "add" | "no-init" => "new_module",
         "generate-config" => "generated.toml",
@@ -421,7 +425,7 @@ fn dry_run(case: &str) {
         fs::remove_file(path).unwrap();
     }
     let execution_before = snapshot(&h.work_dir);
-    let execution = success(h.run_submod(&args).unwrap()).to_lowercase();
+    let execution = success(&h.run_submod(&args).unwrap()).to_lowercase();
     let raw: toml::Value = toml::from_str(&h.read_config().unwrap()).unwrap();
     match case {
         "add" => {

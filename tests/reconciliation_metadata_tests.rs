@@ -6,7 +6,7 @@ use common::TestHarness;
 const NAME: &str = "logical.name";
 const CHILD: &str = "vendor/checkout";
 
-fn ok(output: Output) {
+fn ok(output: &Output) {
     assert!(output.status.success(), "CLI failed: {output:?}");
 }
 
@@ -148,23 +148,24 @@ fn r14_r16_change_sets_exact_managed_identity_without_checkout_or_staging() {
     let state = child_state(&h, &h.work_dir);
     let index = h.git_stdout(&["ls-files", "--stage"]);
     let new_url = h.temp_dir.path().join("unreachable-source");
-    ok(h.run_submod(&[
-        "change",
-        "alias",
-        "--url",
-        new_url.to_str().unwrap(),
-        "--branch",
-        "topic",
-        "--ignore",
-        "dirty",
-        "--update",
-        "merge",
-        "--fetch",
-        "on-demand",
-        "--shallow",
-        "true",
-    ])
-    .unwrap());
+    ok(&h
+        .run_submod(&[
+            "change",
+            "alias",
+            "--url",
+            new_url.to_str().unwrap(),
+            "--branch",
+            "topic",
+            "--ignore",
+            "dirty",
+            "--update",
+            "merge",
+            "--fetch",
+            "on-demand",
+            "--shallow",
+            "true",
+        ])
+        .unwrap());
     assert_eq!(
         child_state(&h, &h.work_dir),
         state,
@@ -192,23 +193,24 @@ fn r14_r16_change_sets_exact_managed_identity_without_checkout_or_staging() {
         Some(new_url.to_str().unwrap())
     );
     let before = h.preservation_snapshot();
-    ok(h.run_submod(&[
-        "change",
-        "alias",
-        "--url",
-        new_url.to_str().unwrap(),
-        "--branch",
-        "topic",
-        "--ignore",
-        "dirty",
-        "--update",
-        "merge",
-        "--fetch",
-        "on-demand",
-        "--shallow",
-        "true",
-    ])
-    .unwrap());
+    ok(&h
+        .run_submod(&[
+            "change",
+            "alias",
+            "--url",
+            new_url.to_str().unwrap(),
+            "--branch",
+            "topic",
+            "--ignore",
+            "dirty",
+            "--update",
+            "merge",
+            "--fetch",
+            "on-demand",
+            "--shallow",
+            "true",
+        ])
+        .unwrap());
     assert_eq!(
         h.preservation_snapshot(),
         before,
@@ -246,7 +248,7 @@ fn r14_unset_removes_stale_portable_and_local_overrides() {
         ] {
             h.git_stdout(
                 &[
-                    &["config"].as_slice(),
+                    ["config"].as_slice(),
                     scope,
                     &[&format!("submodule.{NAME}.{field}"), val],
                 ]
@@ -258,13 +260,14 @@ fn r14_unset_removes_stale_portable_and_local_overrides() {
     h.git_stdout(&["commit", "-m", "seed stale managed overrides"]);
     let index = h.git_stdout(&["ls-files", "--stage"]);
     let state = child_state(&h, &h.work_dir);
-    ok(h.run_submod(&[
-        "change",
-        "alias",
-        "--unset",
-        "branch,ignore,update,fetch,shallow",
-    ])
-    .unwrap());
+    ok(&h
+        .run_submod(&[
+            "change",
+            "alias",
+            "--unset",
+            "branch,ignore,update,fetch,shallow",
+        ])
+        .unwrap());
     assert_managed(&h, &h.work_dir, &[("branch", None)]);
     // Native defaults may be represented by absence or their explicit value.
     for scope in [&["-f", ".gitmodules"][..], &["--local"][..], &[][..]] {
@@ -324,16 +327,17 @@ fn r14_defaults_reconcile_metadata_without_materializing_missing_checkout() {
         "local-keep",
     ]);
     let index = h.git_stdout(&["ls-files", "--stage"]);
-    ok(h.run_submod(&[
-        "change-global",
-        "--ignore",
-        "all",
-        "--fetch",
-        "never",
-        "--update",
-        "none",
-    ])
-    .unwrap());
+    ok(&h
+        .run_submod(&[
+            "change-global",
+            "--ignore",
+            "all",
+            "--fetch",
+            "never",
+            "--update",
+            "none",
+        ])
+        .unwrap());
     assert!(!h.work_dir.join(CHILD).join(".git").exists());
     assert_eq!(h.git_stdout(&["ls-files", "--stage"]), index);
     assert_managed(
@@ -375,23 +379,24 @@ fn r14_worktree_overrides_cannot_mask_managed_changes() {
         "submodule.logical.name.url",
     )
     .unwrap();
-    ok(h.run_submod(&[
-        "change",
-        "alias",
-        "--url",
-        &remote,
-        "--branch",
-        "main",
-        "--ignore",
-        "dirty",
-        "--update",
-        "none",
-        "--fetch",
-        "never",
-        "--shallow",
-        "false",
-    ])
-    .unwrap());
+    ok(&h
+        .run_submod(&[
+            "change",
+            "alias",
+            "--url",
+            &remote,
+            "--branch",
+            "main",
+            "--ignore",
+            "dirty",
+            "--update",
+            "none",
+            "--fetch",
+            "never",
+            "--shallow",
+            "false",
+        ])
+        .unwrap());
     assert_managed(
         &h,
         &h.work_dir,
@@ -441,11 +446,12 @@ fn custom_config_invocation(linked: bool, nested: bool) {
     } else {
         "settings/modules.toml"
     };
-    ok(h.run_submod_at(
-        &cwd,
-        &["--config", config, "change", "alias", "--ignore", "dirty"],
-    )
-    .unwrap());
+    ok(&h
+        .run_submod_at(
+            &cwd,
+            &["--config", config, "change", "alias", "--ignore", "dirty"],
+        )
+        .unwrap());
     assert_eq!(
         value(
             &h,
@@ -561,7 +567,7 @@ fn r14_second_update_none_sync_is_exact_noop() {
     let mut config = h.read_config().unwrap();
     config.push_str("update = 'none'\n");
     h.create_config(&config).unwrap();
-    ok(h.run_submod(&["sync"]).unwrap());
+    ok(&h.run_submod(&["sync"]).unwrap());
     let before = h.preservation_snapshot();
     let child = child_state(&h, &h.work_dir);
     let child_common = h.git_at(
@@ -578,7 +584,7 @@ fn r14_second_update_none_sync_is_exact_noop() {
         .iter()
         .map(|p| fs::metadata(p).unwrap())
         .collect();
-    ok(h.run_submod(&["sync"]).unwrap());
+    ok(&h.run_submod(&["sync"]).unwrap());
     for (path, before) in config_paths.iter().zip(metadata) {
         let after = fs::metadata(path).unwrap();
         assert_eq!(
@@ -641,11 +647,12 @@ fn r14_linked_url_change_updates_selected_child_only() {
     let linked_state = child_state(&h, &linked);
     let index = h.git_at(&linked, &["ls-files", "--stage"]);
     let new_url = h.temp_dir.path().join("unreachable-replacement");
-    ok(h.run_submod_at(
-        &linked,
-        &["change", "alias", "--url", new_url.to_str().unwrap()],
-    )
-    .unwrap());
+    ok(&h
+        .run_submod_at(
+            &linked,
+            &["change", "alias", "--url", new_url.to_str().unwrap()],
+        )
+        .unwrap());
     for cwd in [&linked, &linked.join(CHILD)] {
         let key = if cwd == &linked {
             "submodule.logical.name.url"
@@ -804,10 +811,9 @@ fn r14_relative_url_remains_portable_and_resolves_selected_child_without_fetch()
     let index = h.git_at(&linked, &["ls-files", "--stage"]);
     let parent_head = h.git_at(&linked, &["rev-parse", "HEAD"]);
     let parent_refs = h.git_at(&linked, &["show-ref"]);
-    ok(
-        h.run_submod_at(&linked, &["change", "alias", "--url", "../replacement.git"])
-            .unwrap(),
-    );
+    ok(&h
+        .run_submod_at(&linked, &["change", "alias", "--url", "../replacement.git"])
+        .unwrap());
     assert_eq!(
         value(
             &h,
@@ -944,10 +950,9 @@ fn r14_child_branch_upstream_remote_selected_and_origin_preserved() {
     let expected = h.temp_dir.path().join("unreachable-upstream");
     let state = child_state(&h, &h.work_dir);
     let index = h.git_stdout(&["ls-files", "--stage"]);
-    ok(
-        h.run_submod(&["change", "alias", "--url", expected.to_str().unwrap()])
-            .unwrap(),
-    );
+    ok(&h
+        .run_submod(&["change", "alias", "--url", expected.to_str().unwrap()])
+        .unwrap());
     assert_eq!(
         value(&h, &child, &[], "remote.upstream.url").as_deref(),
         Some(expected.to_str().unwrap())
@@ -1005,10 +1010,9 @@ fn r14_relative_parent_remote_resolves_distinct_nested_child_url() {
     }
     let state = child_state(&h, &h.work_dir);
     let index = h.git_stdout(&["ls-files", "--stage"]);
-    ok(
-        h.run_submod(&["change", "alias", "--url", "../replacement.git"])
-            .unwrap(),
-    );
+    ok(&h
+        .run_submod(&["change", "alias", "--url", "../replacement.git"])
+        .unwrap());
     assert_eq!(
         value(
             &h,

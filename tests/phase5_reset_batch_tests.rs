@@ -1,6 +1,8 @@
 // SPDX-FileCopyrightText: 2026 Adam Poulemanos and contributors
 // SPDX-License-Identifier: LicenseRef-PlainMIT OR MIT
 
+//! Reset/batch regression tests
+
 mod common;
 use common::TestHarness;
 use std::{
@@ -30,7 +32,7 @@ fn bytes(root: &Path) -> BTreeMap<PathBuf, Vec<u8>> {
 }
 
 fn assert_tree_eq(
-    actual: BTreeMap<PathBuf, Vec<u8>>,
+    actual: &BTreeMap<PathBuf, Vec<u8>>,
     expected: &BTreeMap<PathBuf, Vec<u8>>,
     context: &str,
 ) {
@@ -49,10 +51,12 @@ fn fixture(initialized: bool) -> TestHarness {
     let mut config = String::new();
     // Deliberately declare out of order: application order must be sorted.
     for name in ["gamma", "beta", "alpha"] {
-        config.push_str(&format!(
-            "[{name}]\npath = {name:?}\nurl = {:?}\n",
+        use std::fmt::Write as _;
+        let _ = writeln!(
+            config,
+            "[{name}]\npath = {name:?}\nurl = {:?}",
             remote.to_str().unwrap()
-        ));
+        );
         if initialized {
             h.git_stdout(&[
                 "submodule",
@@ -234,7 +238,7 @@ fn reset_batch_refuses_later(kind: &str) {
     let output = h.run_submod(&["reset", "alpha", "beta", "gamma"]).unwrap();
     assert!(!output.status.success(), "{}", text(&output));
     assert_tree_eq(
-        bytes(&h.work_dir),
+        &bytes(&h.work_dir),
         &before,
         &format!(
             "later {kind} must prevent first stash/reset: {}",
@@ -265,7 +269,7 @@ fn nuke_all_preflights_later_dirty_target_before_any_removal() {
     let output = h.run_submod(&["nuke-it-from-orbit", "--all"]).unwrap();
     assert!(!output.status.success(), "{}", text(&output));
     assert_tree_eq(
-        bytes(&h.work_dir),
+        &bytes(&h.work_dir),
         &before,
         &format!(
             "nuke preflight must preserve every target: {}",
@@ -285,7 +289,7 @@ fn wrapper(h: &TestHarness, mode: &str, args: &[&str]) -> Command {
     fs::create_dir_all(&bin).unwrap();
     fs::write(
         bin.join("git"),
-        r#"#!/usr/bin/env python3
+        r"#!/usr/bin/env python3
 import os,sys,subprocess,time
 args=sys.argv[1:]
 root=os.environ['FIXTURE_CONTROL']
@@ -307,7 +311,7 @@ if mode=='pause' and is_add and is_beta and result.returncode==0:
     with open(root+'/wrapper-finished','w') as marker: marker.write('done')
     if os.getppid()!=parent: sys.exit(143)
 sys.exit(result.returncode)
-"#,
+",
     )
     .unwrap();
     fs::set_permissions(bin.join("git"), fs::Permissions::from_mode(0o755)).unwrap();
@@ -355,7 +359,7 @@ fn nuke_runtime_failure(args: &[&str]) {
         gamma_index
     );
     assert_tree_eq(
-        bytes(&h.work_dir.join("alpha")),
+        &bytes(&h.work_dir.join("alpha")),
         &alpha_bytes,
         "completed alpha must be rebuilt at its original pin",
     );
@@ -491,7 +495,7 @@ fn interrupted_init_retains_partial_state_and_owned_lock_recovery_converges() {
     let blocked = h.run_submod(&["init"]).unwrap();
     assert!(!blocked.status.success());
     assert_tree_eq(
-        bytes(&h.work_dir),
+        &bytes(&h.work_dir),
         &partial,
         "blocked retry must preserve partial state",
     );
@@ -548,7 +552,7 @@ fn duplicate_reset_names_refuse_before_cli_or_manager_mutation() {
     let output = h.run_submod(&["reset", "alpha", "alpha"]).unwrap();
     assert!(!output.status.success(), "{}", text(&output));
     assert_tree_eq(
-        bytes(&h.work_dir),
+        &bytes(&h.work_dir),
         &before,
         "duplicate CLI names must not mutate",
     );
@@ -579,7 +583,7 @@ fn duplicate_reset_names_refuse_before_cli_or_manager_mutation() {
         text(&output)
     );
     assert_tree_eq(
-        bytes(&h.work_dir),
+        &bytes(&h.work_dir),
         &before,
         "duplicate manager names must not mutate",
     );
@@ -708,7 +712,7 @@ fn reset_unmerged_gitlink_refuses_before_stashing_dirty_child() {
         text(&output)
     );
     assert_tree_eq(
-        bytes(&h.work_dir),
+        &bytes(&h.work_dir),
         &before,
         "unmerged reset must preserve raw parent/child index, config, files, refs, and stash",
     );
