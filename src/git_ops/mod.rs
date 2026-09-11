@@ -475,6 +475,66 @@ impl GitOpsManager {
         }
     }
 
+    /// Mirror native `git submodule sync` remote selection.
+    ///
+    /// Prefer the child remote whose fetch URL already matches the resolved
+    /// URL (native sync looks the remote up by URL first since Git 2.51),
+    /// falling back to the checked-out branch's remote or `origin`, which is
+    /// what every Git version uses when no remote URL matches.
+    fn synced_child_remote(child: &Path, expected_url: &str) -> Result<String> {
+        if let Some(remote) = Self::child_remote_with_url(child, expected_url)? {
+            return Ok(remote);
+        }
+        Self::default_remote_in(child)
+    }
+
+    /// First child remote (in `git remote` order) with a fetch URL exactly
+    /// equal to `expected_url`, mirroring `remote_has_url` in native sync.
+    fn child_remote_with_url(child: &Path, expected_url: &str) -> Result<Option<String>> {
+        let output = Command::new("git")
+            .args(["remote"])
+            .current_dir(child)
+            .env("GIT_OPTIONAL_LOCKS", "0")
+            .output()
+            .with_context(|| format!("Failed to list remotes in {}", child.display()))?;
+        anyhow::ensure!(
+            output.status.success(),
+            "Could not list remotes in {}: {}",
+            child.display(),
+            String::from_utf8_lossy(&output.stderr).trim()
+        );
+        let remotes = String::from_utf8(output.stdout)?;
+        for name in remotes
+            .lines()
+            .map(str::trim)
+            .filter(|name| !name.is_empty())
+        {
+            let values = Command::new("git")
+                .args(["config", "--get-all", &format!("remote.{name}.url")])
+                .current_dir(child)
+                .env("GIT_OPTIONAL_LOCKS", "0")
+                .output()
+                .with_context(|| {
+                    format!("Failed to inspect remote {name:?} in {}", child.display())
+                })?;
+            match values.status.code() {
+                Some(0) => {
+                    let urls = String::from_utf8(values.stdout)?;
+                    if urls.lines().any(|url| url == expected_url) {
+                        return Ok(Some(name.to_string()));
+                    }
+                }
+                Some(1) => {}
+                _ => anyhow::bail!(
+                    "Could not inspect remote {name:?} in {}: {}",
+                    child.display(),
+                    String::from_utf8_lossy(&values.stderr).trim()
+                ),
+            }
+        }
+        Ok(None)
+    }
+
     fn starts_dot_component(value: &str, parent: bool) -> bool {
         let prefix = if parent { ".." } else { "." };
         value
@@ -560,15 +620,12 @@ impl GitOpsManager {
     ) -> Result<(String, Option<(String, String)>)> {
         if !Self::starts_dot_component(url, false) && !Self::starts_dot_component(url, true) {
             let child = self.worktree.join(path);
-            let selected = child
-                .join(".git")
-                .exists()
-                .then(|| Self::default_remote_in(&child))
-                .transpose()?;
-            return Ok((
-                url.to_string(),
-                selected.map(|remote| (remote, url.to_string())),
-            ));
+            let selected = if child.join(".git").exists() {
+                Some((Self::synced_child_remote(&child, url)?, url.to_string()))
+            } else {
+                None
+            };
+            return Ok((url.to_string(), selected));
         }
 
         let parent_remote = Self::default_remote_in(&self.worktree)?;
@@ -578,12 +635,9 @@ impl GitOpsManager {
         let parent_url = Self::resolve_relative_submodule_url(&parent_base, url, None)?;
         let child = self.worktree.join(path);
         let child_expected = if child.join(".git").exists() {
-            let child_remote = Self::default_remote_in(&child)?;
             let up_path = "../".repeat(path.components().count());
-            Some((
-                child_remote,
-                Self::resolve_relative_submodule_url(&parent_base, url, Some(&up_path))?,
-            ))
+            let expected = Self::resolve_relative_submodule_url(&parent_base, url, Some(&up_path))?;
+            Some((Self::synced_child_remote(&child, &expected)?, expected))
         } else {
             None
         };
@@ -1550,10 +1604,10 @@ impl GitOpsManager {
                 );
                 if let Some((remote, expected)) = expected_child {
                     let child = self.worktree.join(&path);
+                    let actual = Self::config_value_in(&child, &format!("remote.{remote}.url"))?;
                     anyhow::ensure!(
-                        Self::config_value_in(&child, &format!("remote.{remote}.url"))?.as_deref()
-                            == Some(expected.as_str()),
-                        "Git did not synchronize the selected child URL for {key}"
+                        actual.as_deref() == Some(expected.as_str()),
+                        "Git did not synchronize the selected child URL for {key}: expected remote.{remote}.url {expected:?}, found {actual:?}"
                     );
                 }
             } else {
