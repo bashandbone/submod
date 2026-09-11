@@ -45,28 +45,7 @@ harness = false
 name = "benchmark"
 
 [dependencies]
-# Gitoxide ops
-gix = {
-  version = "^0.87.1",
-  default-features = false,
-  features = [
-    "max-performance-safe",
-    "sha1",
-    "status",
-  ]
-}
-gix-submodule = { version = "^0.34.0", features = ["sha1"] }
 
-# CLI
-clap = {
-  version = ">=4.0.0",
-  features = [
-    "cargo",
-    "derive",
-    "unicode",
-    "wrap_help",
-  ]
-}
 clap_complete = ">=4.0.0"
 clap_complete_nushell = ">=4.0.0"
 
@@ -87,18 +66,31 @@ git2 = { version = "0.21.0" }
 tempfile = "3.27.0"
 toml = ">=0.8.0"
 toml_edit = ">=0.16.0"
+gix-submodule = { version = "^0.34.0", features = ["sha1"] }
+
+
+[dependencies.gix]
+# Gitoxide ops
+version = "^0.87.1"
+default-features = false
+features = ["max-performance-safe", "sha1", "status"]
+
+
+# CLI
+[dependencies.clap]
+version = ">=4.0.0"
+features = ["cargo", "derive", "unicode", "wrap_help"]
+
 
 [dev-dependencies]
-criterion = "0.8.2"
 figment = {
   version = "0.10.0",
-  default-features = false,
-  features = [
-    "test",
-    "toml",
-  ]
+default-features = false,
+
 }
 
+criterion = "0.8.2"
+features = ["test", "toml"]
 [lints.clippy]
 # Cargo-specific lints
 cargo = { level = "warn", priority = -1 }
@@ -126,15 +118,16 @@ too_many_lines = "allow"
 [lints.rust]
 # Warn about missing documentation
 missing_docs = "warn"
-# Allow cfg(coverage) and cfg(coverage_nightly) set by cargo-llvm-cov
 unexpected_cfgs = {
   level = "warn",
-  check-cfg = [
-    "cfg(coverage)",
-    "cfg(coverage_nightly)",
-    "cfg(coverage_attribute)",
-  ]
+# Allow cfg(coverage) and cfg(coverage_nightly) set by cargo-llvm-cov
+
 }
+check-cfg = [
+  "cfg(coverage)",
+  "cfg(coverage_nightly)",
+  "cfg(coverage_attribute)",
+]
 # Warn about unreachable code
 unreachable_code = "warn"
 # Deny unsafe code unless explicitly allowed
