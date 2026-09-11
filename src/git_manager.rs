@@ -128,6 +128,7 @@ pub enum SubmoduleError {
 
 impl SubmoduleError {
     /// Return the documented process status for this error category.
+    #[must_use]
     pub const fn exit_code(&self) -> u8 {
         match self {
             Self::ConfigError(_) | Self::InvalidPath(_) | Self::SubmoduleNotFound { .. } => 2,
@@ -567,7 +568,7 @@ impl GitManager {
         let mut targets = Vec::new();
         for name in names {
             let settings = Self::managed_settings(&self.config, name)?;
-            let path = settings.path.clone().unwrap_or_else(|| name.to_string());
+            let path = settings.path.clone().unwrap_or_else(|| name.clone());
             if self.registration_for_path(&path)?.is_some() {
                 targets.push((name.clone(), path, settings));
             }
@@ -1889,7 +1890,7 @@ impl GitManager {
                 effective
                     .branch
                     .as_ref()
-                    .map_or_else(|| "<remote-default>".to_string(), |branch| branch.as_config_value()),
+                    .map_or_else(|| "<remote-default>".to_string(), super::options::SerializableBranch::as_config_value),
                 effective.update,
                 effective.ignore,
                 effective.active.unwrap_or(true),
@@ -2080,7 +2081,7 @@ impl GitManager {
         }
 
         let expected_sparse = if effective.use_git_default_sparse_checkout.unwrap_or(false) {
-            effective.sparse_paths.clone().unwrap_or_default()
+            effective.sparse_paths.unwrap_or_default()
         } else {
             Self::build_deny_all_sparse_patterns(effective.sparse_paths.as_deref().unwrap_or(&[]))
         };

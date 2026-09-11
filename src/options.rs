@@ -438,6 +438,7 @@ impl<'de> Deserialize<'de> for SerializableBranch {
 
 impl SerializableBranch {
     /// TOML spelling escapes literal branch names that coincide with user aliases.
+    #[must_use]
     pub fn as_config_value(&self) -> String {
         match self {
             Self::Name(name)

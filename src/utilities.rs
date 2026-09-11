@@ -61,7 +61,7 @@ pub fn safe_human_text(input: &str) -> String {
             && (!looks_like_host_port(ordinary_authority) || malformed_authority_delimiter)
         {
             let extended_end = remaining
-                .find(|c: char| matches!(c, '/' | '?' | '#' | ',' | ')' | ']'))
+                .find(['/', '?', '#', ',', ')', ']'])
                 .unwrap_or(remaining.len());
             if remaining[..extended_end].contains('@') {
                 authority_end = extended_end;

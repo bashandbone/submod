@@ -14,13 +14,7 @@ repository = "https://github.com/bashandbone/submod"
 homepage = "https://github.com/bashandbone/submod"
 documentation = "https://docs.rs/submod"
 readme = "README.md"
-keywords = [
-  "git",
-  "submodule",
-  "gitoxide",
-  "cli",
-  "sparse-checkout",
-]
+keywords = ["git", "submodule", "gitoxide", "cli", "sparse-checkout"]
 categories = ["command-line-utilities", "development-tools"]
 
 resolver = "3"
@@ -41,22 +35,22 @@ rustdoc-args = ["--cfg", "docsrs"]
 
 [dependencies]
 # Gitoxide ops
-gix = { version = "^0.86.0", default-features = false, features = [
+gix = { version = "^0.87.1", default-features = false, features = [
   "max-performance-safe",
   "status",
-  "sha1"
+  "sha1",
 ] }
-gix-submodule = { version = "^0.33.0", features = ["sha1"]}
+gix-submodule = { version = "^0.34.0", features = ["sha1"] }
 
 # CLI
-clap = { version = "4.6.4", features = [
+clap = { version = "4.6.6", features = [
   "derive",
   "cargo",
   "unicode",
   "wrap_help",
 ] }
-clap_complete = "4.6.7"
-clap_complete_nushell = "4.6.1"
+clap_complete = "4.6.9"
+clap_complete_nushell = "4.6.2"
 
 serde = { version = "1.0.229", features = ["derive"] }
 # TOML config
@@ -64,16 +58,16 @@ figment = { version = "0.10.19", default-features = false, features = ["toml"] }
 
 # errors
 anyhow = "1.0.104"
-thiserror = "2.0.19"
+thiserror = "2.0.20"
 
 # bitflags for status flags
-bitflags = "2.13.1"
+bitflags = "2.13.2"
 
 # As of submod v0.2.0, git2 no longer optional
 # gix_submodule just isn't mature enough to realistically provide our functionality without falling back to git2
 git2 = { version = "0.21.0" }
-toml = "1.1.3"
-toml_edit = "0.22.27"
+toml = "1.1.6"
+toml_edit = "0.25.15"
 tempfile = "3.27.0"
 
 [lib]
@@ -90,7 +84,6 @@ figment = { version = "0.10.19", default-features = false, features = [
   "toml",
 ] }
 criterion = "0.8.2"
-toml = "1.1.3"
 
 [lints.rust]
 # Deny unsafe code unless explicitly allowed
@@ -102,7 +95,11 @@ missing_docs = "warn"
 # Warn about unreachable code
 unreachable_code = "warn"
 # Allow cfg(coverage) and cfg(coverage_nightly) set by cargo-llvm-cov
-unexpected_cfgs = { level = "warn", check-cfg = ['cfg(coverage)', 'cfg(coverage_nightly)', 'cfg(coverage_attribute)'] }
+unexpected_cfgs = { level = "warn", check-cfg = [
+  'cfg(coverage)',
+  'cfg(coverage_nightly)',
+  'cfg(coverage_attribute)',
+] }
 
 [lints.clippy]
 # Cargo-specific lints

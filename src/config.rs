@@ -819,10 +819,10 @@ impl SubmoduleEntries {
 
     /// Remove a sparse pattern.
     pub fn remove_sparse_path(&mut self, name: &str, path: &str) {
-        if let Some(entry) = self.submodules.as_mut().and_then(|m| m.get_mut(name)) {
-            if let Some(paths) = &mut entry.sparse_paths {
-                paths.retain(|p| p != path);
-            }
+        if let Some(entry) = self.submodules.as_mut().and_then(|m| m.get_mut(name))
+            && let Some(paths) = &mut entry.sparse_paths
+        {
+            paths.retain(|p| p != path);
         }
     }
 
