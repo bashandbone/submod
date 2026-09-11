@@ -990,10 +990,11 @@ impl GitManager {
                 "submodule {name:?} is already declared"
             )));
         }
-        let path = self
-            .validate_requested_path(&name, Path::new(&path), None)?
-            .to_string_lossy()
-            .into_owned();
+        let path = crate::config::stored_submodule_path(&self.validate_requested_path(
+            &name,
+            Path::new(&path),
+            None,
+        )?);
         let raw_entry = SubmoduleEntry {
             path: Some(path.clone()),
             url: Some(url.clone()),

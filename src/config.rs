@@ -238,7 +238,7 @@ impl SubmoduleDefaults {
 /// keep that spelling where the OS separates with backslashes. A Unix
 /// backslash is a filename character rather than a separator and stays
 /// verbatim, so the fold is Windows-only.
-fn stored_submodule_path(path: &Path) -> String {
+pub(crate) fn stored_submodule_path(path: &Path) -> String {
     let text = path.to_string_lossy();
     #[cfg(windows)]
     {
