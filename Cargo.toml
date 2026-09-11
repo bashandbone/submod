@@ -43,18 +43,18 @@ gix = { version = "^0.87.1", default-features = false, features = [
 gix-submodule = { version = "^0.34.0", features = ["sha1"] }
 
 # CLI
-clap = { version = "4.6.6", features = [
+clap = { version = ">=4.0.0", features = [
   "derive",
   "cargo",
   "unicode",
   "wrap_help",
 ] }
-clap_complete = "4.6.9"
-clap_complete_nushell = "4.6.2"
+clap_complete = ">=4.0.0"
+clap_complete_nushell = ">=4.0.0"
 
-serde = { version = "1.0.229", features = ["derive"] }
+serde = { version = "1.0.220", features = ["derive"] }
 # TOML config
-figment = { version = "0.10.19", default-features = false, features = ["toml"] }
+figment = { version = "^0.10.0", default-features = false, features = ["toml"] }
 
 # errors
 anyhow = "1.0.104"
@@ -66,8 +66,8 @@ bitflags = "2.13.2"
 # As of submod v0.2.0, git2 no longer optional
 # gix_submodule just isn't mature enough to realistically provide our functionality without falling back to git2
 git2 = { version = "0.21.0" }
-toml = "1.1.6"
-toml_edit = "0.25.15"
+toml = ">=0.8.0"
+toml_edit = ">=0.16.0"
 tempfile = "3.27.0"
 
 [lib]
@@ -79,7 +79,7 @@ name = "submod"
 path = "src/main.rs"
 
 [dev-dependencies]
-figment = { version = "0.10.19", default-features = false, features = [
+figment = { version = "0.10.0", default-features = false, features = [
   "test",
   "toml",
 ] }

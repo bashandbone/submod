@@ -42,7 +42,7 @@ language_servers:
 # For a list of possible encodings, see https://docs.python.org/3.11/library/codecs.html#standard-encodings
 encoding: "utf-8"
 
-# optional shell command to run before the language backend (LSP or JetBrains) is initialised.
+# optional shell command to run before the language backend (LSP or JetBrains) is initialized.
 # the command runs in the project root directory and is only executed if the project is trusted
 # (see trusted_project_path_patterns in the global configuration).
 # serena waits for the command to exit: a non-zero exit code is logged as an error but does not

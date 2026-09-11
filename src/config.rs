@@ -930,13 +930,13 @@ impl<'de> Deserialize<'de> for Config {
 impl Config {
     /// Parse and validate raw declarations, without resolving inherited fields.
     pub fn parse(source: &str) -> Result<Self> {
-        let document = toml_edit::ImDocument::parse(source)?;
+        let document = toml_edit::Document::parse(source)?;
         Self::from_table(toml::from_str(source)?, Some(&document))
     }
 
     fn from_table(
         mut table: toml::Table,
-        document: Option<&toml_edit::ImDocument<&str>>,
+        document: Option<&toml_edit::Document<&str>>,
     ) -> Result<Self> {
         let location = |section: &str, field: &str| {
             let label = match (section.is_empty(), field.is_empty()) {
@@ -1468,7 +1468,7 @@ mod tests {
                 "[module]\nurl='repo'\nfetch='always'\nfetchRecurse='never'",
                 "conflicting aliases",
             ),
-            ("[defaults]\nignroe='all'", "ignroe"),
+            ("[defaults]\nignroe='all'", "ignore"),
             ("[module]\nurl='repo'\nunknown=true", "unknown"),
             ("[module]\npath='child'", "url"),
             ("[module]\nurl='  '", "url"),

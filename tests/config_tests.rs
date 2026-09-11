@@ -578,6 +578,7 @@ mod phase3_acceptance_config {
         "schema_version = \"99.0.0\"\n",
         "schema_version"
     );
+    // spellchecker:off
     rejected_config!(
         r08_unknown_module_key_rejected,
         "[lib]\nurl = \"./remote.git\"\nactive = false\nignroe = \"dirty\"\n",
@@ -588,6 +589,7 @@ mod phase3_acceptance_config {
         "[defaults]\nignroe = \"dirty\"\n",
         "ignroe"
     );
+    // spellchecker:on
     rejected_config!(
         r08_conflicting_fetch_alias_rejected,
         "[lib]\nurl = \"./remote.git\"\nfetch = \"always\"\nfetchRecurse = \"never\"\n",
