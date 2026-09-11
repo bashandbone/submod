@@ -1469,6 +1469,7 @@ mod tests {
     }
 
     #[test]
+    // spellchecker:off
     fn config_rejects_invalid_fields_before_actions() {
         for (source, context) in [
             ("schema_version='9.0.0'", "schema_version"),
@@ -1500,7 +1501,7 @@ mod tests {
             );
         }
     }
-
+    // spellchecker:on
     #[test]
     fn sparse_patterns_have_one_authority() {
         let mut config = Config::parse("[module]\nurl='repo'\nsparse_paths=['src/']").unwrap();
