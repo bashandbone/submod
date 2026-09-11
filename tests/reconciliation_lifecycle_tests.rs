@@ -1,10 +1,13 @@
 // SPDX-License-Identifier: LicenseRef-PlainMIT OR MIT
+
+//! Reconciliation lifecycle regression tests
+
 mod common;
 
 use common::TestHarness;
 use std::{fs, path::Path, process::Output};
 
-fn success(output: Output) -> String {
+fn success(output: &Output) -> String {
     let text = format!(
         "{}{}",
         String::from_utf8_lossy(&output.stdout),
@@ -40,18 +43,6 @@ fn declaration(name: &str, remote: &Path, extra: &str) -> String {
 }
 
 fn fingerprint(h: &TestHarness, root: &Path, module: &str) -> Vec<(String, Option<Vec<u8>>)> {
-    let mut paths = vec![
-        ".git/index".to_owned(),
-        ".git/config".into(),
-        ".git/HEAD".into(),
-        ".gitmodules".into(),
-        "submod.toml".into(),
-    ];
-    let child = root.join(module);
-    let gitdir = h.git_at(&child, &["rev-parse", "--absolute-git-dir"]);
-    for file in ["index", "config", "HEAD", "packed-refs", "FETCH_HEAD"] {
-        paths.push(Path::new(&gitdir).join(file).to_string_lossy().into_owned());
-    }
     fn files(dir: &Path, paths: &mut Vec<String>) {
         let mut entries: Vec<_> = fs::read_dir(dir)
             .unwrap()
@@ -65,6 +56,18 @@ fn fingerprint(h: &TestHarness, root: &Path, module: &str) -> Vec<(String, Optio
                 paths.push(path.to_string_lossy().into_owned());
             }
         }
+    }
+    let mut paths = vec![
+        ".git/index".to_owned(),
+        ".git/config".into(),
+        ".git/HEAD".into(),
+        ".gitmodules".into(),
+        "submod.toml".into(),
+    ];
+    let child = root.join(module);
+    let gitdir = h.git_at(&child, &["rev-parse", "--absolute-git-dir"]);
+    for file in ["index", "config", "HEAD", "packed-refs", "FETCH_HEAD"] {
+        paths.push(Path::new(&gitdir).join(file).to_string_lossy().into_owned());
     }
     files(&child, &mut paths);
     let mut result: Vec<_> = paths
@@ -84,7 +87,7 @@ fn fingerprint(h: &TestHarness, root: &Path, module: &str) -> Vec<(String, Optio
 fn sync_without_fetch(h: &TestHarness, cwd: &Path) {
     let trace = h.temp_dir.path().join("second-sync-trace.jsonl");
     success(
-        std::process::Command::new(&h.submod_bin)
+        &std::process::Command::new(&h.submod_bin)
             .arg("sync")
             .current_dir(cwd)
             .env("GIT_CONFIG_GLOBAL", h.temp_dir.path().join("gitconfig"))
@@ -116,7 +119,7 @@ fn r11_phase4_toml_only_sync_registers_omitted_path_and_is_exact_noop() {
     let remote = h.create_test_remote("toml").unwrap();
     h.create_config(&declaration("library", remote.as_ref(), ""))
         .unwrap();
-    success(h.run_submod(&["sync"]).unwrap());
+    success(&h.run_submod(&["sync"]).unwrap());
     assert_eq!(h.index_gitlink_mode("library").as_deref(), Some("160000"));
     assert_eq!(
         h.git_stdout(&["config", "-f", ".gitmodules", "submodule.library.path"]),
@@ -144,14 +147,14 @@ fn r12_phase4_fresh_clone_sync_materializes_parent_pin() {
     assert_ne!(h.advance_test_remote("fresh").unwrap(), pin);
     let fresh = h.temp_dir.path().join("fresh-parent");
     success(
-        h.git_cmd()
+        &h.git_cmd()
             .arg("clone")
             .arg(&h.work_dir)
             .arg(&fresh)
             .output()
             .unwrap(),
     );
-    success(h.run_submod_at(&fresh, &["sync"]).unwrap());
+    success(&h.run_submod_at(&fresh, &["sync"]).unwrap());
     assert_eq!(
         h.git_at(&fresh.join("library"), &["rev-parse", "HEAD"]),
         pin
@@ -183,7 +186,7 @@ fn r21_phase4_retained_gitdir_reattaches_and_preserves_refs_and_stash() {
     h.git_stdout(&["commit", "-m", "Record library"]);
     h.git_stdout(&["submodule", "deinit", "--", "library"]);
     assert!(!child.join(".git").exists());
-    success(h.run_submod(&["sync"]).unwrap());
+    success(&h.run_submod(&["sync"]).unwrap());
     assert_eq!(h.git_at(&child, &["rev-parse", "HEAD"]), pin);
     assert_eq!(
         h.git_at(&child, &["rev-parse", "refs/heads/precious-local"]),
@@ -207,7 +210,7 @@ fn r19_phase4_disabled_and_update_none_missing_modules_skip_unreachable_urls() {
     )
     .unwrap();
     let before = h.read_config().unwrap();
-    success(h.run_submod(&["sync"]).unwrap());
+    success(&h.run_submod(&["sync"]).unwrap());
     assert!(!h.work_dir.join("disabled").exists());
     assert!(!h.work_dir.join("none").exists());
     assert_eq!(h.index_gitlink_mode("disabled"), None);
@@ -230,7 +233,7 @@ fn r13_phase4_update_none_reconciles_safe_metadata_without_materialization() {
         "update = \"none\"\nignore = \"all\"",
     ))
     .unwrap();
-    success(h.run_submod(&["sync"]).unwrap());
+    success(&h.run_submod(&["sync"]).unwrap());
     assert!(!h.work_dir.join("library/.git").exists());
     assert_eq!(
         h.git_stdout(&["ls-files", "--stage", "library"]),
@@ -251,7 +254,7 @@ fn r19_phase4_no_init_is_transient_and_later_init_materializes() {
     let h = fixture();
     let remote = h.create_test_remote("deferred").unwrap();
     success(
-        h.run_submod(&[
+        &h.run_submod(&[
             "add",
             remote.to_str().unwrap(),
             "--name",
@@ -266,7 +269,7 @@ fn r19_phase4_no_init_is_transient_and_later_init_materializes() {
         raw["library"].get("active").and_then(toml::Value::as_bool),
         Some(false)
     );
-    success(h.run_submod(&["init"]).unwrap());
+    success(&h.run_submod(&["init"]).unwrap());
     assert_eq!(h.index_gitlink_mode("library").as_deref(), Some("160000"));
     assert!(h.work_dir.join("library/src/main.c").is_file());
 }
@@ -278,7 +281,7 @@ fn r19_phase4_unmanaged_module_is_preserved_and_reported() {
     register(&h, remote.as_ref(), "outsider");
     h.create_config("").unwrap();
     let before = fingerprint(&h, &h.work_dir, "outsider");
-    let text = success(h.run_submod(&["sync"]).unwrap()).to_lowercase();
+    let text = success(&h.run_submod(&["sync"]).unwrap()).to_lowercase();
     assert!(
         text.contains("unmanaged") && text.contains("outsider"),
         "{text}"
@@ -291,7 +294,7 @@ fn r13_phase4_explicit_add_none_keeps_initial_checkout_on_sync() {
     let h = fixture();
     let remote = h.create_test_remote("explicit-none").unwrap();
     success(
-        h.run_submod(&[
+        &h.run_submod(&[
             "add",
             remote.to_str().unwrap(),
             "--name",
@@ -304,7 +307,7 @@ fn r13_phase4_explicit_add_none_keeps_initial_checkout_on_sync() {
     assert_eq!(h.index_gitlink_mode("library").as_deref(), Some("160000"));
     assert!(h.work_dir.join("library/src/main.c").is_file());
     let pin = h.git_at(&h.work_dir.join("library"), &["rev-parse", "HEAD"]);
-    success(h.run_submod(&["sync"]).unwrap());
+    success(&h.run_submod(&["sync"]).unwrap());
     assert_eq!(
         h.git_at(&h.work_dir.join("library"), &["rev-parse", "HEAD"]),
         pin
@@ -383,14 +386,14 @@ fn r24_phase4_runtime_failure_reports_pending_and_retry_preserves_completed() {
         &["branch", "preserved-after-failure"],
     );
     success(
-        h.git_cmd()
+        &h.git_cmd()
             .args(["clone", "--bare"])
             .arg(remote.as_ref())
             .arg(&unavailable)
             .output()
             .unwrap(),
     );
-    success(h.run_submod(&["sync"]).unwrap());
+    success(&h.run_submod(&["sync"]).unwrap());
     for name in ["a_good", "b_failed", "c_pending"] {
         assert_eq!(h.index_gitlink_mode(name).as_deref(), Some("160000"));
         assert!(h.work_dir.join(name).join("src/main.c").is_file());
@@ -425,7 +428,7 @@ fn divergent_strategy(strategy: &str) {
         &format!("update = {strategy:?}"),
     ))
     .unwrap();
-    success(h.run_submod(&["sync"]).unwrap());
+    success(&h.run_submod(&["sync"]).unwrap());
     let result = h.git_at(&child, &["rev-parse", "HEAD"]);
     assert_eq!(
         h.git_stdout(&["ls-files", "--stage", "library"]),
@@ -447,7 +450,7 @@ fn divergent_strategy(strategy: &str) {
             assert_eq!(h.git_at(&child, &["merge-base", &local, "HEAD"]), local);
         }
     }
-    success(h.run_submod(&["check"]).unwrap());
+    success(&h.run_submod(&["check"]).unwrap());
     let before = fingerprint(&h, &h.work_dir, "library");
     sync_without_fetch(&h, &h.work_dir);
     unchanged(before, fingerprint(&h, &h.work_dir, "library"));
@@ -483,7 +486,7 @@ fn r13_phase4_metadata_change_never_moves_divergent_head() {
     h.create_config(&declaration("library", remote.as_ref(), ""))
         .unwrap();
     success(
-        h.run_submod(&[
+        &h.run_submod(&[
             "change", "library", "--branch", "feature", "--ignore", "all",
         ])
         .unwrap(),
@@ -515,7 +518,7 @@ fn r13_phase4_dot_branch_materializes_parent_symbolic_branch() {
     h.create_config(&declaration("library", remote.as_ref(), "branch = \".\""))
         .unwrap();
     let expected = h.git_at(remote.as_ref(), &["rev-parse", "refs/heads/feature"]);
-    success(h.run_submod(&["sync"]).unwrap());
+    success(&h.run_submod(&["sync"]).unwrap());
     assert_eq!(
         h.git_at(&h.work_dir.join("library"), &["rev-parse", "HEAD"]),
         expected
@@ -570,7 +573,7 @@ fn r21_phase4_missing_gitmodules_reconstructs_exact_managed_pin() {
     h.git_stdout(&["submodule", "deinit", "--", "library"]);
     h.git_stdout(&["rm", ".gitmodules"]);
     assert_ne!(h.advance_test_remote("missing-registration").unwrap(), pin);
-    success(h.run_submod(&["sync"]).unwrap());
+    success(&h.run_submod(&["sync"]).unwrap());
     assert_eq!(
         h.git_stdout(&[
             "config",
@@ -623,7 +626,7 @@ fn r21_phase4_registration_without_gitlink_completes_empty_destination() {
     h.create_config(&declaration("library", remote.as_ref(), "shallow = false"))
         .unwrap();
     fs::create_dir(h.work_dir.join("library")).unwrap();
-    success(h.run_submod(&["sync"]).unwrap());
+    success(&h.run_submod(&["sync"]).unwrap());
     let pin = h.git_at(remote.as_ref(), &["rev-parse", "HEAD"]);
     assert_eq!(
         h.git_stdout(&["ls-files", "--stage", "library"]),
@@ -796,12 +799,12 @@ fn remote_tracking_update(explicit_branch: bool) {
         let target = h.git_at(&remote_work, &["rev-parse", "HEAD"]);
         assert_ne!(pin, target);
 
-        success(h.run_submod(&["update"]).unwrap());
+        success(&h.run_submod(&["update"]).unwrap());
         let child = h.work_dir.join("library");
         assert_eq!(h.git_at(&child, &["rev-parse", "HEAD"]), pin);
         assert!(!child.join("TRACKING.txt").exists());
         let index_before = h.git_stdout(&["ls-files", "--stage"]);
-        success(h.run_submod(&["update", "--remote"]).unwrap());
+        success(&h.run_submod(&["update", "--remote"]).unwrap());
         assert_eq!(h.git_at(&child, &["rev-parse", "HEAD"]), target);
         assert_eq!(
             fs::read_to_string(child.join("TRACKING.txt")).unwrap(),
@@ -855,10 +858,10 @@ fn recursive_selection(command: &str) {
 
         // Fetch recursion policy alone must not opt into recursive materialization.
         if command == "update" {
-            success(h.run_submod(&["init"]).unwrap());
-            success(h.run_submod(&["update"]).unwrap());
+            success(&h.run_submod(&["init"]).unwrap());
+            success(&h.run_submod(&["update"]).unwrap());
         } else {
-            success(h.run_submod(&[command]).unwrap());
+            success(&h.run_submod(&[command]).unwrap());
         }
         let outer = h.work_dir.join("library");
         let leaf = outer.join("deps/leaf");
@@ -872,7 +875,7 @@ fn recursive_selection(command: &str) {
         let parent_index = h.git_stdout(&["ls-files", "--stage"]);
         let outer_index = h.git_at(&outer, &["ls-files", "--stage"]);
 
-        success(h.run_submod(&[command, "--recursive"]).unwrap());
+        success(&h.run_submod(&[command, "--recursive"]).unwrap());
         assert!(leaf.join(".git").is_file());
         assert_eq!(h.git_at(&leaf, &["rev-parse", "HEAD"]), leaf_pin);
         assert!(leaf.join("src/main.c").is_file());
@@ -966,7 +969,7 @@ fn init_wrong_pin(strategy: &str) {
     ))
     .unwrap();
     let parent_index = h.git_stdout(&["ls-files", "--stage", "library"]);
-    success(h.run_submod(&["init"]).unwrap());
+    success(&h.run_submod(&["init"]).unwrap());
     assert_eq!(h.git_at(&child, &["rev-parse", "HEAD"]), target);
     assert_eq!(
         fs::read_to_string(child.join("ADVANCE.txt")).unwrap(),
@@ -1030,7 +1033,7 @@ fn r21_phase4_unmerged_gitlink_stages_refuse_all_lifecycle_commands_unchanged() 
             .unwrap()
             .write_all(input.as_bytes())
             .unwrap();
-        success(index.wait_with_output().unwrap());
+        success(&index.wait_with_output().unwrap());
         let stages = format!(
             "160000 {base} 1\tlibrary\n160000 {ours} 2\tlibrary\n160000 {theirs} 3\tlibrary"
         );
@@ -1078,7 +1081,7 @@ fn r31_phase4_mixed_metadata_and_add_preserves_gitmodules_layers_and_retries() {
     let readme_index = h.git_stdout(&["ls-files", "--stage", "README.md"]);
     let expected_new_pin = h.git_at(remote.as_ref(), &["rev-parse", "HEAD"]);
 
-    success(h.run_submod(&["sync"]).unwrap());
+    success(&h.run_submod(&["sync"]).unwrap());
     for (name, pin) in [("a_existing", &existing_pin), ("b_new", &expected_new_pin)] {
         assert_eq!(
             h.git_stdout(&["ls-files", "--stage", name]),

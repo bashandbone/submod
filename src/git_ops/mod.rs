@@ -412,7 +412,7 @@ impl GitOpsManager {
         }
     }
 
-    fn config_value_in(&self, repository: &Path, key: &str) -> Result<Option<String>> {
+    fn config_value_in(repository: &Path, key: &str) -> Result<Option<String>> {
         let output = Command::new("git")
             .args(["config", "--get", key])
             .current_dir(repository)
@@ -432,8 +432,8 @@ impl GitOpsManager {
         }
     }
 
-    fn set_config_value_in(&self, repository: &Path, key: &str, value: &str) -> Result<()> {
-        if self.config_value_in(repository, key)?.as_deref() == Some(value) {
+    fn set_config_value_in(repository: &Path, key: &str, value: &str) -> Result<()> {
+        if Self::config_value_in(repository, key)?.as_deref() == Some(value) {
             return Ok(());
         }
         let output = Command::new("git")
@@ -451,7 +451,7 @@ impl GitOpsManager {
         Ok(())
     }
 
-    fn default_remote_in(&self, repository: &Path) -> Result<String> {
+    fn default_remote_in(repository: &Path) -> Result<String> {
         let branch = Command::new("git")
             .args(["symbolic-ref", "--quiet", "--short", "HEAD"])
             .current_dir(repository)
@@ -461,9 +461,10 @@ impl GitOpsManager {
         match branch.status.code() {
             Some(0) => {
                 let branch = String::from_utf8(branch.stdout)?.trim_end().to_string();
-                Ok(self
-                    .config_value_in(repository, &format!("branch.{branch}.remote"))?
-                    .unwrap_or_else(|| "origin".to_string()))
+                Ok(
+                    Self::config_value_in(repository, &format!("branch.{branch}.remote"))?
+                        .unwrap_or_else(|| "origin".to_string()),
+                )
             }
             Some(1) => Ok("origin".to_string()),
             _ => anyhow::bail!(
@@ -489,10 +490,9 @@ impl GitOpsManager {
         {
             return false;
         }
-        match value.find(':') {
-            Some(colon) => value[..colon].contains(['/', '\\']),
-            None => true,
-        }
+        value
+            .find(':')
+            .is_none_or(|colon| value[..colon].contains(['/', '\\']))
     }
 
     /// Match Git's `relative_url()` for the two values written by `submodule sync`.
@@ -563,7 +563,7 @@ impl GitOpsManager {
             let selected = child
                 .join(".git")
                 .exists()
-                .then(|| self.default_remote_in(&child))
+                .then(|| Self::default_remote_in(&child))
                 .transpose()?;
             return Ok((
                 url.to_string(),
@@ -571,14 +571,14 @@ impl GitOpsManager {
             ));
         }
 
-        let parent_remote = self.default_remote_in(&self.worktree)?;
-        let parent_base = self
-            .config_value_in(&self.worktree, &format!("remote.{parent_remote}.url"))?
-            .unwrap_or_else(|| self.worktree.to_string_lossy().into_owned());
+        let parent_remote = Self::default_remote_in(&self.worktree)?;
+        let parent_base =
+            Self::config_value_in(&self.worktree, &format!("remote.{parent_remote}.url"))?
+                .unwrap_or_else(|| self.worktree.to_string_lossy().into_owned());
         let parent_url = Self::resolve_relative_submodule_url(&parent_base, url, None)?;
         let child = self.worktree.join(path);
         let child_expected = if child.join(".git").exists() {
-            let child_remote = self.default_remote_in(&child)?;
+            let child_remote = Self::default_remote_in(&child)?;
             let up_path = "../".repeat(path.components().count());
             Some((
                 child_remote,
@@ -599,7 +599,7 @@ impl GitOpsManager {
             return Ok(());
         };
         let child = self.worktree.join(path);
-        self.set_config_value_in(&child, &format!("remote.{remote}.url"), &expected)
+        Self::set_config_value_in(&child, &format!("remote.{remote}.url"), &expected)
     }
 
     fn preflight_portable_key(&self, key: &str, desired: Option<&str>) -> Result<Option<String>> {
@@ -617,9 +617,12 @@ impl GitOpsManager {
     /// Validate one existing registration and every metadata key before a batch writes.
     pub fn preflight_submodule_settings(&self, path: &str, entry: &SubmoduleEntry) -> Result<()> {
         let path = self.validated_path(Path::new(path))?;
-        let name = self
-            .registered_name_for_path(&path)?
-            .with_context(|| format!("No exact submodule registration exists for {path:?}"))?;
+        let name = self.registered_name_for_path(&path)?.with_context(|| {
+            format!(
+                "No exact submodule registration exists for {}",
+                path.display()
+            )
+        })?;
         Self::validate_name(&name)?;
         self.preflight_native_locks()?;
         self.preflight_native_metadata()?;
@@ -758,7 +761,7 @@ impl GitOpsManager {
             }
         } else {
             let storage = self.validated_module_storage(&name)?;
-            self.preflight_gitdir_locks(&storage, true)?;
+            Self::preflight_gitdir_locks(&storage, true)?;
         }
         Ok(())
     }
@@ -1113,7 +1116,7 @@ impl GitOpsManager {
             .registered_name_for_path(path)?
             .context("Remote update requires an exact submodule registration")?;
         let child = self.worktree.join(path);
-        let remote = self.default_remote_in(&child)?;
+        let remote = Self::default_remote_in(&child)?;
         let branch = match self.config_value("portable", &format!("submodule.{name}.branch"))? {
             Some(branch) if branch == "." => self.current_superproject_branch()?,
             Some(branch) => branch,
@@ -1293,9 +1296,7 @@ impl GitOpsManager {
                 }
                 if let Some((remote, expected)) = expected_child {
                     let child = self.worktree.join(&path);
-                    if self
-                        .config_value_in(&child, &format!("remote.{remote}.url"))?
-                        .as_deref()
+                    if Self::config_value_in(&child, &format!("remote.{remote}.url"))?.as_deref()
                         != Some(expected.as_str())
                     {
                         return Ok(false);
@@ -1351,11 +1352,9 @@ impl GitOpsManager {
     pub fn sparse_checkout_state(&self, path: &str) -> Result<(bool, bool, Vec<String>)> {
         let path = self.validated_child(Path::new(path))?;
         let child = self.worktree.join(&path);
-        let enabled = self
-            .config_value_in(&child, "core.sparseCheckout")?
+        let enabled = Self::config_value_in(&child, "core.sparseCheckout")?
             .is_some_and(|value| value.eq_ignore_ascii_case("true"));
-        let cone = self
-            .config_value_in(&child, "core.sparseCheckoutCone")?
+        let cone = Self::config_value_in(&child, "core.sparseCheckoutCone")?
             .is_some_and(|value| value.eq_ignore_ascii_case("true"));
         let output = self.child_git_output_at_validated(
             &path,
@@ -1460,9 +1459,12 @@ impl GitOpsManager {
     pub fn sync_submodule_settings(&self, path: &str, entry: &SubmoduleEntry) -> Result<()> {
         self.preflight_submodule_settings(path, entry)?;
         let path = self.validated_path(Path::new(path))?;
-        let name = self
-            .registered_name_for_path(&path)?
-            .with_context(|| format!("No exact submodule registration exists for {path:?}"))?;
+        let name = self.registered_name_for_path(&path)?.with_context(|| {
+            format!(
+                "No exact submodule registration exists for {}",
+                path.display()
+            )
+        })?;
         let prefix = format!("submodule.{name}");
         let fields = Self::managed_portable_fields(entry);
         let worktree_config = self.worktree_config_enabled()?;
@@ -1489,10 +1491,9 @@ impl GitOpsManager {
             url_requires_sync |= local_url.as_deref() != Some(expected_local_url.as_str());
             if let Some((remote, expected)) = &expected_child_url {
                 let child = self.worktree.join(&path);
-                url_requires_sync |= self
-                    .config_value_in(&child, &format!("remote.{remote}.url"))?
-                    .as_deref()
-                    != Some(expected.as_str());
+                url_requires_sync |=
+                    Self::config_value_in(&child, &format!("remote.{remote}.url"))?.as_deref()
+                        != Some(expected.as_str());
             }
             if url_requires_sync {
                 if self
@@ -1550,8 +1551,7 @@ impl GitOpsManager {
                 if let Some((remote, expected)) = expected_child {
                     let child = self.worktree.join(&path);
                     anyhow::ensure!(
-                        self.config_value_in(&child, &format!("remote.{remote}.url"))?
-                            .as_deref()
+                        Self::config_value_in(&child, &format!("remote.{remote}.url"))?.as_deref()
                             == Some(expected.as_str()),
                         "Git did not synchronize the selected child URL for {key}"
                     );
@@ -2296,7 +2296,7 @@ impl GitOpsManager {
         }
     }
 
-    fn preflight_gitdir_locks(&self, git_dir: &Path, include_stash: bool) -> Result<()> {
+    fn preflight_gitdir_locks(git_dir: &Path, include_stash: bool) -> Result<()> {
         let mut locks = vec![
             git_dir.join("index.lock"),
             git_dir.join("config.lock"),
@@ -2397,7 +2397,9 @@ impl GitOpsManager {
             if record.len() < 4 || (&record[..3] != b"!! " && &record[..3] != b"?? ") {
                 continue;
             }
-            let local = record[3..].strip_suffix(b"/").unwrap_or(&record[3..]);
+            let local = record[3..]
+                .strip_suffix(b"/")
+                .unwrap_or_else(|| &record[3..]);
             let is_ignored = &record[..3] == b"!! ";
             let is_nested_repo = if is_ignored {
                 true

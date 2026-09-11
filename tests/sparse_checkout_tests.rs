@@ -60,7 +60,7 @@ mod tests {
             .expect("Failed to run git config");
 
         let config_value = String::from_utf8_lossy(&git_config_output.stdout);
-        assert!(config_value.trim() == "true");
+        assert_eq!(config_value.trim(), "true");
 
         // Verify only specified directories exist in working tree
         assert!(harness.dir_exists("lib/sparse-basic/src"));

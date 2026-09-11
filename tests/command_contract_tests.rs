@@ -1824,10 +1824,10 @@ fn phase6_global_branch_set_unset_preserves_inheritance() {
     h.init_git_repo().unwrap();
     h.create_config("[lib]\nurl='./remote.git'\nactive=false\n[explicit]\nurl='./other.git'\nactive=false\nbranch='HEAD'\n").unwrap();
     for branch in [Some("main"), None] {
-        let args = match branch {
-            Some(value) => vec!["change-global", "--branch", value],
-            None => vec!["change-global", "--unset", "branch"],
-        };
+        let args = branch.map_or_else(
+            || vec!["change-global", "--unset", "branch"],
+            |value| vec!["change-global", "--branch", value],
+        );
         h.run_submod_success(&args).unwrap();
         let source = h.read_config().unwrap();
         let raw: toml::Value = toml::from_str(&source).unwrap();

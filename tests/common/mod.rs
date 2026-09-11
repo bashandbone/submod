@@ -4,6 +4,10 @@
 
 //! Common utilities for integration tests
 
+// Shared helpers are compiled into every test binary; items unused by one
+// binary are used by others, so per-binary dead-code reports are noise.
+#![allow(dead_code)]
+
 use std::fs;
 use std::path::PathBuf;
 use std::process::Command;

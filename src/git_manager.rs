@@ -257,6 +257,10 @@ enum ModuleOutcomeKind {
 }
 
 #[derive(Clone, Debug)]
+// Five bools, each gating a distinct, independently-tested reconciliation
+// branch (registration, metadata, sparse, remote, recursive). Bundling them
+// into flags would obscure the per-branch reads in the outcome builder.
+#[allow(clippy::struct_excessive_bools)]
 struct ReconcilePlan {
     name: String,
     path: String,
@@ -401,12 +405,17 @@ impl GitManager {
     /// Preserve filesystem failures discovered while validating an otherwise
     /// lexical path. Unsafe syntax is an argument error; inability to inspect
     /// a valid path is an operational I/O failure.
+    ///
+    /// `error` is owned to match `map_err` call sites and the sibling
+    /// `map_git_ops_error` helper.
+    #[allow(clippy::needless_pass_by_value)]
     fn map_path_validation_error(error: anyhow::Error) -> SubmoduleError {
-        if let Some(io_error) = error.downcast_ref::<std::io::Error>() {
-            SubmoduleError::IoError(std::io::Error::new(io_error.kind(), format!("{error:#}")))
-        } else {
-            SubmoduleError::InvalidPath(error.to_string())
-        }
+        error.downcast_ref::<std::io::Error>().map_or_else(
+            || SubmoduleError::InvalidPath(error.to_string()),
+            |io_error| {
+                SubmoduleError::IoError(std::io::Error::new(io_error.kind(), format!("{error:#}")))
+            },
+        )
     }
 
     /// Restore `update_toml_config` method
@@ -424,7 +433,7 @@ impl GitManager {
                 // Also populate sparse_checkouts so consumers using sparse_checkouts() see the paths
                 self.config
                     .submodules
-                    .add_checkout(name.clone(), stored_paths, true);
+                    .add_checkout(&name, stored_paths, true);
             }
         }
         // Normalize: convert Unspecified variants to None so they serialize cleanly
@@ -762,6 +771,10 @@ impl GitManager {
     }
 
     /// Create a manager while retaining whether `--config` was explicitly supplied.
+    ///
+    /// `config_path` is owned for constructor ergonomics: every call site
+    /// already holds an owned path.
+    #[allow(clippy::needless_pass_by_value)]
     pub fn with_verbose_config(
         config_path: PathBuf,
         verbose: bool,
@@ -832,7 +845,11 @@ impl GitManager {
     ///
     /// Used in tests to avoid depending on the caller's working directory
     /// being a git repository.
+    ///
+    /// `config_path` is owned so test call sites can pass temporaries
+    /// directly.
     #[cfg(test)]
+    #[allow(clippy::needless_pass_by_value)]
     fn with_repo_path(config_path: PathBuf, repo_path: &Path) -> Result<Self, SubmoduleError> {
         let context =
             RepositoryContext::discover(repo_path, Some(&config_path)).map_err(|error| {
@@ -2223,10 +2240,10 @@ impl GitManager {
             details.push("managed metadata reconciled".to_string());
         }
         if head_changed {
-            details.push(match plan.initial_head.as_deref() {
-                Some(initial) => format!("checkout moved from {initial} to {final_head}"),
-                None => format!("checkout materialized at {final_head}"),
-            });
+            details.push(plan.initial_head.as_deref().map_or_else(
+                || format!("checkout materialized at {final_head}"),
+                |initial| format!("checkout moved from {initial} to {final_head}"),
+            ));
         }
         if plan.sparse_changed {
             details.push("ordered sparse-checkout policy reconciled".to_string());
@@ -2253,9 +2270,11 @@ impl GitManager {
         plan.detail = details.join("; ");
         plan.target = Some(target.clone());
         if let Some(verbose) = &mut plan.verbose_detail {
-            verbose.push_str(&format!(
+            use std::fmt::Write as _;
+            let _ = write!(
+                verbose,
                 ", result_head={final_head}, selected_target={target}"
-            ));
+            );
         }
         Ok(plan)
     }
@@ -2496,20 +2515,15 @@ impl GitManager {
             };
             let mut issues = Vec::new();
             if !submodule_path.exists() {
-                if skip_reason.is_some() {
-                    println!(
-                        "{safe_name}: skipped-{} at {safe_path} (not materialized)",
-                        skip_reason.expect("checked")
-                    );
+                if let Some(reason) = skip_reason {
+                    println!("{safe_name}: skipped-{reason} at {safe_path} (not materialized)");
                     continue;
                 }
                 issues.push("checkout is missing".to_string());
             } else if !git_path.exists() {
-                if skip_reason.is_some() && submodule_path.read_dir()?.next().is_none() {
-                    println!(
-                        "{safe_name}: skipped-{} at {safe_path} (not materialized)",
-                        skip_reason.expect("checked")
-                    );
+                let empty_checkout = submodule_path.read_dir()?.next().is_none();
+                if let Some(reason) = skip_reason.filter(|_| empty_checkout) {
+                    println!("{safe_name}: skipped-{reason} at {safe_path} (not materialized)");
                     continue;
                 }
                 issues.push("checkout is not a Git repository".to_string());
@@ -2690,16 +2704,6 @@ impl GitManager {
         value.map(toml_edit::Value::from)
     }
 
-    fn sparse_value(value: Option<&Vec<String>>) -> Option<toml_edit::Value> {
-        value.map(|paths| {
-            let mut array = toml_edit::Array::new();
-            for path in paths {
-                array.push(path.as_str());
-            }
-            toml_edit::Value::Array(array)
-        })
-    }
-
     fn default_field_changed(
         &self,
         field: &'static str,
@@ -2837,7 +2841,13 @@ impl GitManager {
                 "update" => Self::string_value(new.update.as_ref().map(ToString::to_string)),
                 "active" => new.active.map(toml_edit::Value::from),
                 "shallow" => new.shallow.map(toml_edit::Value::from),
-                "sparse_paths" => Self::sparse_value(new.sparse_paths.as_ref()),
+                "sparse_paths" => new.sparse_paths.as_ref().map(|paths| {
+                    let mut array = toml_edit::Array::new();
+                    for path in paths {
+                        array.push(path.as_str());
+                    }
+                    toml_edit::Value::Array(array)
+                }),
                 "use_git_default_sparse_checkout" => new
                     .use_git_default_sparse_checkout
                     .map(toml_edit::Value::from),
@@ -3542,7 +3552,7 @@ impl GitManager {
                 let replace = !append_sparse;
                 self.config
                     .submodules
-                    .add_checkout(name.to_string(), &new_paths, replace);
+                    .add_checkout(name, &new_paths, replace);
 
                 if append_sparse {
                     let existing = updated.sparse_paths.get_or_insert_with(Vec::new);
@@ -3961,6 +3971,10 @@ impl GitManager {
         Self::generate_config_inner(output, from_setup, template, force, false)
     }
 
+    // The bools mirror the `generate-config` CLI flags 1:1; both call sites
+    // pass identically-named variables in the same order, and the dry-run
+    // contract tests catch any transposition.
+    #[allow(clippy::fn_params_excessive_bools)]
     fn generate_config_inner(
         output: &std::path::Path,
         from_setup: bool,

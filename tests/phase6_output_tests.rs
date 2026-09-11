@@ -4,6 +4,7 @@
 //! R26: assert display boundaries without modifying Git's machine-readable bytes.
 mod common;
 use common::TestHarness;
+use std::fmt::Write as _;
 use std::process::Output;
 
 fn fixture() -> TestHarness {
@@ -183,7 +184,7 @@ fn r26_real_local_git_error_redacts_userinfo_without_false_success() {
         raw.contains("R26_FAKE_PASS"),
         "fixture must prove Git actually echoed the secret: {raw}"
     );
-    h.create_config(&format!("[module]\npath = 'lib'\nurl = '{}'\n", url))
+    h.create_config(&format!("[module]\npath = 'lib'\nurl = '{url}'\n"))
         .unwrap();
     let config_before = h.read_config().unwrap();
     let out = h.run_submod(&["init"]).unwrap();
@@ -377,10 +378,11 @@ fn result_fixture(names: &[&str]) -> TestHarness {
             remote.to_str().unwrap(),
             name,
         ]);
-        config.push_str(&format!(
-            "[{name}]\npath = '{name}'\nurl = '{}'\nbranch = 'main'\nignore = 'none'\n",
+        let _ = writeln!(
+            config,
+            "[{name}]\npath = '{name}'\nurl = '{}'\nbranch = 'main'\nignore = 'none'",
             remote.display()
-        ));
+        );
     }
     h.create_config(&config).unwrap();
     h.run_submod_success(&["sync"]).unwrap();

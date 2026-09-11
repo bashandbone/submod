@@ -1,6 +1,8 @@
 // SPDX-FileCopyrightText: 2025 Adam Poulemanos <89049923+bashandbone@users.noreply.github.com>
 // SPDX-License-Identifier: LicenseRef-PlainMIT OR MIT
 
+//! Delete/move checkout regression tests
+
 mod common;
 use common::TestHarness;
 use std::{fs, path::PathBuf};
@@ -953,6 +955,19 @@ fn r22_nuke_changed_relative_url_fetches_missing_pin_from_selected_remote() {
 
 #[test]
 fn r22_nuke_refuses_nested_ignored_content_without_mutation() {
+    fn snapshot(
+        path: &std::path::Path,
+        entries: &mut std::collections::BTreeMap<PathBuf, Option<Vec<u8>>>,
+    ) {
+        if path.is_dir() {
+            entries.insert(path.to_path_buf(), None);
+            for entry in fs::read_dir(path).unwrap() {
+                snapshot(&entry.unwrap().path(), entries);
+            }
+        } else {
+            entries.insert(path.to_path_buf(), Some(fs::read(path).unwrap()));
+        }
+    }
     let h = fixture();
     add_child(&h);
     let remote = h.create_test_remote("nested").unwrap();
@@ -1049,19 +1064,6 @@ fn r22_nuke_refuses_nested_ignored_content_without_mutation() {
             .is_empty()
     );
 
-    fn snapshot(
-        path: &std::path::Path,
-        entries: &mut std::collections::BTreeMap<PathBuf, Option<Vec<u8>>>,
-    ) {
-        if path.is_dir() {
-            entries.insert(path.to_path_buf(), None);
-            for entry in fs::read_dir(path).unwrap() {
-                snapshot(&entry.unwrap().path(), entries);
-            }
-        } else {
-            entries.insert(path.to_path_buf(), Some(fs::read(path).unwrap()));
-        }
-    }
     let mut before = std::collections::BTreeMap::new();
     snapshot(&h.work_dir, &mut before);
     let output = h.run_submod(&["nuke-it-from-orbit", "child"]).unwrap();

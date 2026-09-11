@@ -459,6 +459,11 @@ impl SerializableBranch {
     }
 
     /// Import Git's branch setting: only `.` is special; aliases are literal names.
+    ///
+    /// The unit error is deliberate: it matches the `()` error of the
+    /// `FromStr`/`TryFrom`/conversion impls this feeds, and failure here
+    /// carries no information beyond "not a usable branch".
+    #[allow(clippy::result_unit_err)]
     pub fn from_git_branch(value: &str) -> Result<Self, ()> {
         if value == "." {
             return Ok(Self::CurrentInSuperproject);
@@ -764,7 +769,7 @@ mod tests {
                 assert_eq!(branch.as_config_value(), format!("refs/heads/{name}"));
                 assert_eq!(branch.to_gitmodules(), name);
                 let native: Branch = branch.try_into().unwrap();
-                assert!(matches!(native, Branch::Name(value) if value.to_string() == name));
+                assert!(matches!(native, Branch::Name(value) if value == name));
             }
         }
     }

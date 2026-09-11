@@ -18,7 +18,7 @@ fn git(h: &TestHarness, args: &[&str]) -> String {
     );
     String::from_utf8(out.stdout).unwrap().trim().to_owned()
 }
-fn success(out: Output) {
+fn success(out: &Output) {
     assert!(
         out.status.success(),
         "stdout={} stderr={}",
@@ -31,7 +31,8 @@ fn policy(h: &TestHarness, patterns: Option<&[&str]>, native: bool) {
     let mut doc =
         format!("[m]\nurl = {url:?}\npath = \"m\"\nuse_git_default_sparse_checkout = {native}\n");
     if let Some(patterns) = patterns {
-        doc.push_str(&format!("sparse_paths = {patterns:?}\n"));
+        use std::fmt::Write as _;
+        let _ = writeln!(doc, "sparse_paths = {patterns:?}");
     }
     fs::write(h.config_path(), doc).unwrap();
 }
@@ -54,7 +55,7 @@ fn fixture() -> TestHarness {
         .args(["commit", "-am", "record module"])
         .output()
         .unwrap();
-    success(out);
+    success(&out);
     policy(&h, Some(&["/src/", "/docs/"]), false);
     git(
         &h,
@@ -116,7 +117,7 @@ fn r15_ordered_globs_and_negation_materialize_exact_files() {
         ]),
         false,
     );
-    success(h.run_submod(&["sync"]).unwrap());
+    success(&h.run_submod(&["sync"]).unwrap());
     exact(
         &h,
         "!/*\n/*\n!/docs/*\n!/tests/*\n!/examples/*\n!/src/*.rs\n/src/lib.rs\n",
@@ -155,7 +156,7 @@ fn drift(kind: &str) {
         "{kind} drift must fail check"
     );
     assert_eq!(snapshot(&h), before, "check mutated {kind} drift");
-    success(h.run_submod(&["sync"]).unwrap());
+    success(&h.run_submod(&["sync"]).unwrap());
     exact(&h, "!/*\n/src/\n/docs/\n");
     assert!(h.work_dir.join("m/src/lib.rs").is_file());
     assert!(!h.work_dir.join("m/tests/test.rs").exists());
@@ -180,13 +181,13 @@ fn r15_cone_mode_drift() {
 fn r15_app_default_mode_change_removes_automatic_prefix() {
     let h = fixture();
     policy(&h, Some(&["/src/", "/docs/"]), true);
-    success(h.run_submod(&["sync"]).unwrap());
+    success(&h.run_submod(&["sync"]).unwrap());
     exact(&h, "/src/\n/docs/\n");
 }
 fn disable(empty: bool) {
     let h = fixture();
     policy(&h, if empty { Some(&[]) } else { None }, false);
-    success(h.run_submod(&["sync"]).unwrap());
+    success(&h.run_submod(&["sync"]).unwrap());
     assert_eq!(
         git(&h, &["config", "--bool", "core.sparseCheckout"]),
         "false"
@@ -220,7 +221,7 @@ fn r15_empty_patterns_restore_full_checkout() {
 fn r15_unchanged_sync_preserves_bytes_and_skips_sparse_commands() {
     let h = fixture();
     // Settle unrelated metadata once; the second sync is the no-op under test.
-    success(h.run_submod(&["sync"]).unwrap());
+    success(&h.run_submod(&["sync"]).unwrap());
     let before = snapshot(&h);
     let trace = h.temp_dir.path().join("trace.json");
     let out = std::process::Command::new(&h.submod_bin)
@@ -231,7 +232,7 @@ fn r15_unchanged_sync_preserves_bytes_and_skips_sparse_commands() {
         .env("GIT_TRACE", &trace)
         .output()
         .unwrap();
-    success(out);
+    success(&out);
     assert_eq!(snapshot(&h), before);
     let trace = fs::read_to_string(trace).unwrap();
     for line in trace.lines() {
