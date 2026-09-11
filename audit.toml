@@ -7,10 +7,10 @@
 # `cargo deny check advisories` enforce the same policy.
 [advisories]
 ignore = [
-    # Retired, kept as documentation so a re-entry fails loudly:
-    # - RUSTSEC-2024-0364 (gitoxide-core): dependency removed in Phase 7,
-    #   no longer in the graph.
-    # - RUSTSEC-2024-0436 (paste, unmaintained): arrived via the old rustls
-    #   TLS stack; that stack is gone, paste is not in the graph. The ignore
-    #   was stale (it named a crate absent from Cargo.lock).
+  # Retired, kept as documentation so a re-entry fails loudly:
+  # - RUSTSEC-2024-0364 (gitoxide-core): dependency removed in Phase 7,
+  #   no longer in the graph.
+  # - RUSTSEC-2024-0436 (paste, unmaintained): arrived via the old rustls
+  #   TLS stack; that stack is gone, paste is not in the graph. The ignore
+  #   was stale (it named a crate absent from Cargo.lock).
 ]
