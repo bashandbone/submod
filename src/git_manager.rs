@@ -1261,20 +1261,8 @@ impl GitManager {
             .unwrap_or(false)
     }
 
-    /// Get the actual Git directory after verifying the checkout identity.
-    fn get_git_directory(
-        &self,
-        submodule_path: &str,
-    ) -> Result<std::path::PathBuf, SubmoduleError> {
-        self.git_ops
-            .verify_submodule_checkout(submodule_path)
-            .map_err(Self::map_git_ops_error)?;
-        crate::utilities::git_path(
-            &self.context.worktree_root.join(submodule_path),
-            &["--absolute-git-dir"],
-        )
-        .map_err(Self::map_git_ops_error)
-    }
+    // Removed: get_git_directory was unused.
+
     // Removed: apply_sparse_checkout_cli is obsolete; sparse checkout is handled by GitOpsManager abstraction.
 
     /// Update a submodule to its parent-recorded commit using the effective strategy.
@@ -2869,7 +2857,7 @@ impl GitManager {
             SubmoduleError::ConfigError(format!("Loaded configuration is not UTF-8: {error}"))
         })?;
         let parsed = source
-            .parse::<toml_edit::ImDocument<String>>()
+            .parse::<toml_edit::Document<String>>()
             .map_err(|error| {
                 SubmoduleError::ConfigError(format!("Failed to edit configuration: {error}"))
             })?;

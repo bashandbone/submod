@@ -245,8 +245,9 @@ skip = [
 # dependencies starting at the specified crate, up to a certain depth, which is
 # by default infinite.
 skip-tree = [
-  # "ansi_term@0.11.0", # will be skipped along with _all_ of its direct and transitive dependencies
-  # { crate = "ansi_term@0.11.0", depth = 20 },
+  { crate = "figment@0.10.19", reason = "The Figment toml tree cascade. Figment is still on <v1 of toml, which pulls in similar toml_edit and toml_datetime deps." },
+
+  { crate = "gix@0.87.1", reason = "An internal gix ecosystem conflict affecting hashbrown (two versions) and syn (v2 and v3)" },
 ]
 
 # This section is considered when running `cargo deny check sources`.
