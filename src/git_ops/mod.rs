@@ -633,6 +633,13 @@ impl GitOpsManager {
         if base_is_relative && let Some(up_path) = up_path {
             resolved.insert_str(0, up_path);
         }
+        // Absolute URLs always use forward slashes: resolving against a
+        // Windows-spelled base (`file://C:\...`) must not propagate
+        // backslashes into the recorded URL, which would defeat exact-match
+        // remote lookups. Relative results keep their spelling.
+        if resolved.contains("://") {
+            resolved = resolved.replace('\\', "/");
+        }
         Ok(resolved)
     }
 
@@ -3170,6 +3177,36 @@ mod storage_path_tests {
                 .join("a")
                 .join("b")
                 .join("c")
+        );
+    }
+
+    #[test]
+    fn resolve_relative_url_normalizes_absolute_url_separators() {
+        // A Windows-spelled file base must resolve to a canonical URL so
+        // exact-match remote lookups keep working; relative results are
+        // untouched.
+        assert_eq!(
+            GitOpsManager::resolve_relative_submodule_url(
+                "file://C:\\Users\\me\\super.git",
+                "../reachable.git",
+                None
+            )
+            .unwrap(),
+            "file://C:/Users/me/reachable.git"
+        );
+        assert_eq!(
+            GitOpsManager::resolve_relative_submodule_url(
+                "file://C:/Users/me/super.git",
+                "../reachable.git",
+                None
+            )
+            .unwrap(),
+            "file://C:/Users/me/reachable.git"
+        );
+        assert_eq!(
+            GitOpsManager::resolve_relative_submodule_url("../base.git", "../sib.git", None)
+                .unwrap(),
+            "../sib.git"
         );
     }
 
