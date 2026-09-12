@@ -12,6 +12,76 @@ spellchecker:off
 We document all important changes below.
 
 Submod follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+## [0.5.0] - 2026-09-12
+### Bug Fixes
+
+- Cargo-deny warnings([`8c3c5c4`](https://github.com/bashandbone/submod/commit/8c3c5c44edb6c1979502d223b25e2285bcc8020e))
+
+- Invalid Cargo.toml formatting([`4e53b25`](https://github.com/bashandbone/submod/commit/4e53b2587b00c3e79612513623fde74d85c6f888))
+
+- Typos and more Cargo.toml([`3841286`](https://github.com/bashandbone/submod/commit/384128642569e092962b382e2c50b67896306a32))
+
+- Cargo metadata([`d23d1c9`](https://github.com/bashandbone/submod/commit/d23d1c90e1f3e3728a7c2668bad9dc6828131aad))
+
+- (**sync**) Mirror Git 2.51+ URL-first submodule sync remote selection([`9729215`](https://github.com/bashandbone/submod/commit/972921549167b487064239ad145ed8e49a7cebfe))
+
+- (**storage**) Compare canonical submodule storage paths on Windows([`aee5e61`](https://github.com/bashandbone/submod/commit/aee5e6179ece0b1ae756670b4af28786dbb9ecb7))
+
+- (**lookup**) Match gitmodules paths across Windows separators([`592a643`](https://github.com/bashandbone/submod/commit/592a643109f073eed4c047ccf3de3b5cfb65f0ee))
+
+- (**ci**) Disable git background maintenance in test harness; reflow module doc([`f946ee1`](https://github.com/bashandbone/submod/commit/f946ee1faf4aa89f5280dea4bd422987cf679772))
+
+- (**windows**) Normalize platform path spellings in comparisons and output([`f95a7d0`](https://github.com/bashandbone/submod/commit/f95a7d0c5268ffe2dfe4bdf5c3169f5142cbd512))
+
+- (**windows**) Store manager-planned add paths with Git separators([`bcd7e23`](https://github.com/bashandbone/submod/commit/bcd7e23cce757a177f298ec1e847b27c2d7463ba))
+
+- (**tests**) Build dotted spelling as string, Path::join drops dot segments([`8605ac6`](https://github.com/bashandbone/submod/commit/8605ac677ddc0a43060372b48ffdf965065e7820))
+
+- (**tests**) Use dot-dot spelling, Path equality skips dot segments([`cca4d90`](https://github.com/bashandbone/submod/commit/cca4d90e02712fd4bb3bce808ebccbc7f06fe50f))
+
+- (**windows**) Fold separators in add record check; canonical git dirs; portable display asserts([`74c693a`](https://github.com/bashandbone/submod/commit/74c693a1aa830789cc7881c6c21a40bf36d087d1))
+
+- (**windows**) Normalize separators in resolved absolute submodule URLs([`2bf3638`](https://github.com/bashandbone/submod/commit/2bf363872fabbdf851e1ab1ccdd75a9e14493538))
+
+- (**windows**) Canonicalize file URLs for identity compare, relax perf ceilings 3x([`2b0bf78`](https://github.com/bashandbone/submod/commit/2b0bf789b51ab65bb7f1b4ce7ea0f918c082e388))
+
+### CI/Build
+
+- (**windows**) Exclude ephemeral trees from Defender; accelerate fixture git([`c186f68`](https://github.com/bashandbone/submod/commit/c186f689f4f5df2e5a0e4bdb5e949d3c5249b958))
+
+### Documentation
+
+- Improve README([`bd101bb`](https://github.com/bashandbone/submod/commit/bd101bb030e9160b49442a4ea70acfaf2e542bd0))
+
+- (**readme**) Sync project structure, hooks, and test runner with current tree([`8d5d100`](https://github.com/bashandbone/submod/commit/8d5d100b6956904b49cbc112d0c4a5f180205d9d))
+
+### Miscellaneous
+
+- Update toolchain([`31c5e37`](https://github.com/bashandbone/submod/commit/31c5e373bfd29162f86675fa60ed4af0adf8df97))
+
+- Deps updates, clippy, formatting([`b618d3a`](https://github.com/bashandbone/submod/commit/b618d3ac5f910daa4912c031e6ee154fd36814f6))
+
+- Fix clippy warnings([`ac7c598`](https://github.com/bashandbone/submod/commit/ac7c59804b5a114e0ff6a48bed20863fd33d74da))
+
+- Fix intentional typo and formatting([`23d67fe`](https://github.com/bashandbone/submod/commit/23d67fe6b2e349f08107965fe2cb8797e82f986a))
+
+- Fix typos check([`1ce31f2`](https://github.com/bashandbone/submod/commit/1ce31f2b70de7e770a80be0602b55dd10402e7ea))
+
+### Testing
+
+- (**sync**) Lock relative-parent remote child URL resolution([`e9225aa`](https://github.com/bashandbone/submod/commit/e9225aa891e0634976b40d6d831258ccffc23a1e))
+
+### Style
+
+- Format toml([`36117bc`](https://github.com/bashandbone/submod/commit/36117bcce123e8c92f383c2be684b6cf88e2e8f2))
+
+- More reformatting on Cargo.toml([`4d17ad1`](https://github.com/bashandbone/submod/commit/4d17ad14946a12e101a53a0514045131cf116c2c))
+
+- Format config.rs([`9c822fe`](https://github.com/bashandbone/submod/commit/9c822fed2265c5a251329aa8b9d418f0a737b9e7))
+
+- Remove obvious and derivable README from Cargo.toml([`6edc426`](https://github.com/bashandbone/submod/commit/6edc426eca0479da1370ae7bc3e2ac65eb3a2d64))
+
+
 ## [0.4.0] - 2026-07-26
 ### Bug Fixes
 
