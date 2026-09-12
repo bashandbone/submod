@@ -511,10 +511,11 @@ hk run ci
 The pre-commit hooks automatically run:
 - **cargo fmt** - Code formatting
 - **cargo clippy** - Linting
-- **cargo test** - Test suite
+- **cargo check** - Type checking
+- **cargo nextest** - Test suite
 - **typos** - Spell checking
-- **prettier** - TOML/YAML formatting
 - **cargo deny** - Security and license auditing
+- **pkl eval** - Config validation
 
 ### Manual Setup (Alternative)
 
@@ -550,8 +551,8 @@ mise run ci             # Run full CI suite
 hk run test                 # Run tests only
 hk run ci                   # Run CI checks
 
-# Using cargo directly
-cargo test              # Run all tests
+# Using cargo directly (nextest is the preferred runner)
+cargo nextest run --all-features --no-fail-fast  # Run all tests
 cargo test --test integration_tests  # Integration tests only
 
 # Using the test script
@@ -567,12 +568,17 @@ submod/
 ├── src/
 │   ├── main.rs              # CLI entry point
 │   ├── commands.rs          # Command definitions (clap)
+│   ├── long_abouts.rs       # Long help text for commands
+│   ├── shells.rs            # Shell completion generation
 │   ├── config.rs            # TOML configuration handling
+│   ├── options.rs           # Git-config-compatible option newtypes
+│   ├── utilities.rs         # Shared display and repository helpers
+│   ├── lib.rs               # Library root (exposed for integration tests)
 │   ├── git_manager.rs       # High-level submodule operations
 │   └── git_ops/             # Git backend abstraction
 │       ├── mod.rs           # GitOpsManager (native Git mutation boundary)
 │       ├── gix_ops.rs       # gitoxide read backend
-│       └── git2_ops.rs      # libgit2 backend
+│       └── git2_ops.rs      # libgit2 read backend
 ├── tests/                   # Integration tests
 ├── sample_config/           # Example configurations
 ├── scripts/                 # Development scripts
