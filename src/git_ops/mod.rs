@@ -558,6 +558,19 @@ impl GitOpsManager {
         matches
     }
 
+    /// Compare a recorded URL against the canonical expectation: byte-exact
+    /// except that Windows separators fold, so a native-spelled record
+    /// matches. A mismatch still means Git pointed somewhere else entirely.
+    fn same_recorded_url(recorded: Option<&str>, canonical: Option<&str>) -> bool {
+        match (recorded, canonical) {
+            (Some(recorded), Some(canonical)) => {
+                Self::gitmodules_path_matches(recorded.as_bytes(), OsStr::new(canonical))
+            }
+            (None, None) => true,
+            _ => false,
+        }
+    }
+
     fn starts_dot_component(value: &str, parent: bool) -> bool {
         let prefix = if parent { ".." } else { "." };
         value
@@ -1629,16 +1642,29 @@ impl GitOpsManager {
                     self.expected_synced_urls(&path, desired.as_deref().expect("URL is present"))?;
                 let resolved = self.config_value("local", &key)?;
                 anyhow::ensure!(
-                    resolved.as_deref() == Some(expected_local.as_str()),
+                    Self::same_recorded_url(resolved.as_deref(), Some(expected_local.as_str())),
                     "Git did not resolve local URL for {key}"
                 );
+                // Native sync propagates the parent remote's separator
+                // spelling; enforce the canonical recorded URL so later
+                // exact-match lookups agree.
+                if resolved.as_deref() != Some(expected_local.as_str()) {
+                    self.set_config_value_exact("local", &key, Some(expected_local.as_str()))?;
+                }
                 if let Some((remote, expected)) = expected_child {
                     let child = self.worktree.join(&path);
-                    let actual = Self::config_value_in(&child, &format!("remote.{remote}.url"))?;
+                    let remote_key = format!("remote.{remote}.url");
+                    let actual = Self::config_value_in(&child, &remote_key)?;
                     anyhow::ensure!(
-                        actual.as_deref() == Some(expected.as_str()),
+                        Self::same_recorded_url(actual.as_deref(), Some(expected.as_str())),
                         "Git did not synchronize the selected child URL for {key}: expected remote.{remote}.url {expected:?}, found {actual:?}"
                     );
+                    if actual.as_deref() != Some(expected.as_str()) {
+                        self.child_git(
+                            path.to_str().context("Submodule path is not valid UTF-8")?,
+                            ["config", &remote_key, &expected],
+                        )?;
+                    }
                 }
             } else {
                 anyhow::ensure!(
@@ -3208,6 +3234,27 @@ mod storage_path_tests {
                 .unwrap(),
             "../sib.git"
         );
+    }
+
+    #[test]
+    fn same_recorded_url_folds_windows_separators_only() {
+        assert!(GitOpsManager::same_recorded_url(
+            Some("file://C:/w/reachable.git"),
+            Some("file://C:/w/reachable.git")
+        ));
+        assert_eq!(
+            GitOpsManager::same_recorded_url(
+                Some("file://C:\\w\\reachable.git"),
+                Some("file://C:/w/reachable.git")
+            ),
+            cfg!(windows)
+        );
+        assert!(!GitOpsManager::same_recorded_url(
+            Some("file://C:/w/other.git"),
+            Some("file://C:/w/reachable.git")
+        ));
+        assert!(!GitOpsManager::same_recorded_url(None, Some("x")));
+        assert!(GitOpsManager::same_recorded_url(None, None));
     }
 
     #[test]
