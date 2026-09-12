@@ -3180,8 +3180,9 @@ mod storage_path_tests {
         std::fs::create_dir(&sub).unwrap();
         // A `.` segment spells the same directory differently on every
         // platform, the way Git's forward slashes differ from verbatim UNC
-        // reports on Windows.
-        let dotted = dir.path().join(".").join("sub");
+        // reports on Windows. Build it as a string: `Path` joining drops
+        // `.` segments.
+        let dotted = PathBuf::from(format!("{}/./sub", dir.path().display()));
         assert_ne!(dotted, std::fs::canonicalize(&sub).unwrap());
         assert_eq!(
             GitOpsManager::canonical_worktree_root(&dotted, &sub).unwrap(),
