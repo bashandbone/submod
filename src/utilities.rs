@@ -143,11 +143,22 @@ impl RepositoryContext {
                 worktree_root.display()
             )
         })?;
+        // Same platform spelling as the worktree root above: canonicalize
+        // both Git metadata directories so identity comparisons hold.
         let git_dir = git_path(&invocation_dir, &["--absolute-git-dir"])?;
+        let git_dir = git_dir.canonicalize().with_context(|| {
+            format!("Discovered Git directory is missing: {}", git_dir.display())
+        })?;
         let common_dir = git_path(
             &invocation_dir,
             &["--path-format=absolute", "--git-common-dir"],
         )?;
+        let common_dir = common_dir.canonicalize().with_context(|| {
+            format!(
+                "Discovered common Git directory is missing: {}",
+                common_dir.display()
+            )
+        })?;
         let config_path = match explicit_config {
             Some(path) => {
                 let path = invocation_dir.join(path);

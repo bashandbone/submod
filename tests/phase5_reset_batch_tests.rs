@@ -105,8 +105,12 @@ fn dirty(h: &TestHarness, name: &str) {
 
 fn execute_advertised_recovery(h: &TestHarness, child: &Path, output: &Output, stash: &str) {
     let printed = text(output);
+    // The product prints the canonical checkout directory, which can differ
+    // textually from the fixture spelling (verbatim UNC and 8.3 short names
+    // on Windows); compare canonical forms on every platform.
+    let displayed = std::fs::canonicalize(child).unwrap();
     assert!(
-        printed.contains(child.to_str().unwrap()),
+        printed.contains(displayed.to_str().unwrap()),
         "display the recovery directory: {printed}"
     );
     let line = printed
