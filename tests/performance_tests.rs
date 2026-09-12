@@ -14,6 +14,18 @@ use std::time::Instant;
 mod common;
 use common::TestHarness;
 
+/// Scale a wall-clock ceiling for platform spawn cost.
+///
+/// Git-heavy flows shell out tens of times per operation, and Windows
+/// process creation plus file I/O runs an order of magnitude slower, so the
+/// same operations take proportionally longer without any product
+/// regression. Allocation ceilings stay identical everywhere; only
+/// wall-clock durations scale.
+#[must_use]
+const fn ceiling_secs(base: u64) -> u64 {
+    base * if cfg!(windows) { 3 } else { 1 }
+}
+
 use std::alloc::{GlobalAlloc, Layout, System};
 use std::sync::atomic::{AtomicUsize, Ordering};
 
@@ -127,15 +139,15 @@ mod tests {
 
         // Performance assertions (these are rough guidelines)
         assert!(
-            add_duration.as_secs() < 30,
+            add_duration.as_secs() < ceiling_secs(30),
             "Adding 10 submodules took too long: {add_duration:?}"
         );
         assert!(
-            check_duration.as_secs() < 5,
+            check_duration.as_secs() < ceiling_secs(5),
             "Checking 10 submodules took too long: {check_duration:?}"
         );
         assert!(
-            update_duration.as_secs() < 20,
+            update_duration.as_secs() < ceiling_secs(20),
             "Updating 10 submodules took too long: {update_duration:?}"
         );
     }
@@ -257,7 +269,7 @@ ignore = "all"
 
         // Performance assertion
         assert!(
-            duration.as_secs() < 15,
+            duration.as_secs() < ceiling_secs(15),
             "Deep directory creation too slow: {duration:?}"
         );
     }
@@ -307,7 +319,7 @@ ignore = "all"
 
         // Performance assertion
         assert!(
-            duration.as_secs() < 10,
+            duration.as_secs() < ceiling_secs(10),
             "Many patterns processing too slow: {duration:?}"
         );
     }
@@ -361,7 +373,7 @@ ignore = "all"
 
         // Performance assertion
         assert!(
-            total_duration.as_secs() < 60,
+            total_duration.as_secs() < ceiling_secs(60),
             "Config serialization too slow: {total_duration:?}"
         );
     }
@@ -414,7 +426,7 @@ ignore = "all"
 
         // Performance assertion
         assert!(
-            duration.as_secs() < 30,
+            duration.as_secs() < ceiling_secs(30),
             "Concurrent checks too slow: {duration:?}"
         );
     }
@@ -517,7 +529,7 @@ ignore = "all"
 
         // If we reach here without OOM or crashes, the test passes
         assert!(
-            duration.as_secs() < 60,
+            duration.as_secs() < ceiling_secs(60),
             "Large operations too slow: {duration:?}"
         );
     }
@@ -564,7 +576,7 @@ ignore = "all"
 
         // Performance assertion
         assert!(
-            duration.as_secs() < 20,
+            duration.as_secs() < ceiling_secs(20),
             "FS operations too slow: {duration:?}"
         );
     }
