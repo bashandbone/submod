@@ -88,7 +88,13 @@ jobs:
 
       - name: Lint gate
         run: |
+          if ! command -v cargo-fmt &>/dev/null; then
+            cargo install cargo-fmt || cargo install rustfmt
+          fi
           cargo fmt --all -- --check
+          if ! command -v cargo-clippy &>/dev/null; then
+            cargo install cargo-clippy || true
+          fi
           cargo clippy --locked --all-targets --all-features
 
       - name: Security gates
