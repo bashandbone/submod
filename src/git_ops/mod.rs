@@ -3178,14 +3178,15 @@ mod storage_path_tests {
         let dir = tempfile::TempDir::new().unwrap();
         let sub = dir.path().join("sub");
         std::fs::create_dir(&sub).unwrap();
-        // A `.` segment spells the same directory differently on every
-        // platform, the way Git's forward slashes differ from verbatim UNC
-        // reports on Windows. Build it as a string: `Path` joining drops
-        // `.` segments.
-        let dotted = PathBuf::from(format!("{}/./sub", dir.path().display()));
-        assert_ne!(dotted, std::fs::canonicalize(&sub).unwrap());
+        std::fs::create_dir(dir.path().join("other")).unwrap();
+        // An `..` segment spells the same directory with different components
+        // on every platform, the way Git's forward slashes differ from
+        // verbatim UNC reports on Windows. (`Path` equality itself skips `.`
+        // segments, so a dot spelling cannot prove anything here.)
+        let winding = PathBuf::from(format!("{}/other/../sub", dir.path().display()));
+        assert_ne!(winding, std::fs::canonicalize(&sub).unwrap());
         assert_eq!(
-            GitOpsManager::canonical_worktree_root(&dotted, &sub).unwrap(),
+            GitOpsManager::canonical_worktree_root(&winding, &sub).unwrap(),
             std::fs::canonicalize(&sub).unwrap()
         );
     }
