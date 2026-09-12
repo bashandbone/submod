@@ -68,6 +68,16 @@ jobs:
           git config --global user.email "ci@example.com"
           git config --global user.name "CI"
 
+      # Fixture repos churn tens of thousands of small files per run and the
+      # suite shells out to git tens of thousands of times; on Windows both
+      # costs are an order of magnitude higher without these. The runner is
+      # ephemeral, so excluding its temp trees from real-time scanning is
+      # safe. (In-test git performance comes from the harness gitconfig.)
+      - name: Exclude ephemeral trees from Windows Defender
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: Add-MpPreference -ExclusionPath $env:GITHUB_WORKSPACE, $env:RUNNER_TEMP, $env:TEMP
+
       - name: Run tests
         run: cargo nextest run --locked --all-features --profile ci --no-fail-fast
 
