@@ -3053,7 +3053,9 @@ impl GitManager {
             let display = prefix.join(&relative);
             let checkout = repository.join(&relative);
             let initialized = checkout.join(".git").exists();
-            paths.push((display.to_string_lossy().into_owned(), initialized));
+            // Nested Git paths display with forward slashes on every
+            // platform; a native join mixes separators on Windows.
+            paths.push((crate::config::stored_submodule_path(&display), initialized));
             if initialized {
                 git_ops
                     .verify_submodule_checkout(&relative)

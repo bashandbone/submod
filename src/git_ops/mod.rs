@@ -2769,7 +2769,7 @@ impl GitOperations for GitOpsManager {
             .stdout
             .strip_suffix(b"\n")
             .unwrap_or(&registered.stdout);
-        if registered != path.as_os_str().as_encoded_bytes() {
+        if !Self::gitmodules_path_matches(registered, path.as_os_str()) {
             anyhow::bail!("git submodule add did not record the requested path");
         }
         let index = self.git([
